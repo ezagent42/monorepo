@@ -8,10 +8,14 @@
 
 ```
 monorepo/                         → 主开发仓库（唯一工作入口）
-├── specs/                        → 产品规格与设计文档
-├── ezagent/                      → EZAgent 核心代码
-├── relay/                        → Relay 服务代码
-└── page/                         → 官网/落地页代码
+├── specs/                        → 产品规格与设计文档 (subtree, CC0-1.0)
+├── ezagent/                      → EZAgent 核心代码 (subtree, Apache 2.0)
+├── relay/                        → Relay 服务代码 (subtree, Apache 2.0)
+├── page/                         → 官网/落地页代码 (subtree, Apache 2.0)
+├── docs/plans/                   → 设计文档与实施计划
+├── .claude/                      → Claude Code 项目配置（skills, plugins）
+├── .github/workflows/            → CI/CD（subtree 自动同步）
+└── MONOREPO.md                   → 本文件
 ```
 
 ### 仓库地址
@@ -28,45 +32,38 @@ monorepo/                         → 主开发仓库（唯一工作入口）
 
 ---
 
-## 初始化（首次设置）
+## 新成员设置
 
-### 1. 克隆 monorepo
+Subtree 内容已包含在 monorepo 中，克隆即可使用。只需添加 remote 别名以支持 subtree push/pull：
 
 ```bash
 git clone git@github.com:ezagent42/monorepo.git
 cd monorepo
-```
 
-### 2. 添加各子仓库为 subtree
-
-```bash
-# 添加 specs
-git subtree add --prefix=specs git@github.com:ezagent42/specs.git main --squash
-
-# 添加 ezagent
-git subtree add --prefix=ezagent git@github.com:ezagent42/ezagent.git main --squash
-
-# 添加 relay
-git subtree add --prefix=relay git@github.com:ezagent42/relay.git main --squash
-
-# 添加 page
-git subtree add --prefix=page git@github.com:ezagent42/ezagent.cloud.git main --squash
-```
-
-### 3. 添加 remote 别名（推荐，避免每次输入完整 URL）
-
-```bash
+# 添加 remote 别名
 git remote add specs   git@github.com:ezagent42/specs.git
 git remote add ezagent git@github.com:ezagent42/ezagent.git
 git remote add relay   git@github.com:ezagent42/relay.git
 git remote add page    git@github.com:ezagent42/ezagent.cloud.git
-```
 
-验证 remote 配置：
-
-```bash
+# 验证
 git remote -v
 ```
+
+<details>
+<summary>初始化记录（首次设置，已完成）</summary>
+
+以下命令仅在 2026-02-26 首次初始化时执行过，记录备查：
+
+```bash
+git subtree add --prefix=specs git@github.com:ezagent42/specs.git main --squash
+git subtree add --prefix=ezagent git@github.com:ezagent42/ezagent.git main --squash
+git subtree add --prefix=relay git@github.com:ezagent42/relay.git main --squash
+git subtree add --prefix=page git@github.com:ezagent42/ezagent.cloud.git main --squash
+```
+
+详见 `docs/plans/2026-02-26-monorepo-init-design.md`。
+</details>
 
 ---
 
@@ -112,7 +109,7 @@ git subtree push --prefix=page page main
 
 ## 自动化同步（GitHub Actions）
 
-将以下 workflow 文件保存到 `.github/workflows/sync-subtrees.yml`，在 monorepo 的 `main` 分支有新 push 时自动同步对应子仓库。
+已配置 `.github/workflows/sync-subtrees.yml`，在 monorepo 的 `main` 分支有新 push 时自动同步对应子仓库。Workflow 内容如下（供参考）：
 
 ```yaml
 name: Sync Subtrees to Sub-repos
@@ -161,9 +158,9 @@ jobs:
         run: git subtree push --prefix=page page main
 ```
 
-**配置步骤**：
-1. 在 GitHub → Settings → Secrets and variables → Actions 中添加 `GH_TOKEN`（需要有目标仓库的写权限）
-2. 将上述文件提交到 monorepo 的 `.github/workflows/` 目录
+**配置要求**：
+- GitHub → Settings → Secrets → Actions 中需配置 `GH_TOKEN`（Fine-grained PAT，对 4 个子仓库有 Contents 写权限）
+- 已于 2026-02-27 配置完成并验证通过
 
 ---
 
@@ -208,7 +205,7 @@ git clone git@github.com:ezagent42/monorepo.git
 
 1. **永远不要在子仓库直接提交**。子仓库是只读的发布镜像，所有修改必须通过 monorepo → subtree push 的方式同步。如果紧急情况在子仓库直接修改，需立即用 `git subtree pull` 将变更拉回 monorepo，否则下次 push 时会产生冲突。
 
-2. **`--squash` 必须始终使用**。初始化时已选择 squash 模式，后续所有 `subtree push` 和 `subtree pull` 都必须加 `--squash`，绝不能混用。
+2. **`--squash` 规则**：`subtree add` 和 `subtree pull` 必须加 `--squash`（初始化时选择的模式，不能混用）。`subtree push` 不支持也不需要 `--squash`。
 
 3. **subtree push 较慢是正常现象**。Git 需要遍历历史来提取子目录的变更，历史越长越慢。推荐通过 CI 自动化来避免手动等待。
 
