@@ -1,12 +1,22 @@
 #!/bin/bash
 
+# ============================================
+# Claude Code launcher
+#
+# Both modes run inside tmux for:
+#   - SSH disconnect resilience (session keeps running)
+#   - Seamless reattach from any terminal (./claude.sh)
+#
+# Modes:
+#   [1] Interactive    — worktree + agent teams (auto split panes)
+#   [2] Remote Control — continue from phone/browser via claude.ai/code
+# ============================================
+
 # Source shell configuration for proper PATH setup
-# Try zsh config first (most common on macOS), then bash
 if [ -f "$HOME/.zprofile" ]; then
     source "$HOME/.zprofile" 2>/dev/null
 fi
 if [ -f "$HOME/.zshrc" ]; then
-    # Only source non-interactive parts (avoid prompt/completion issues)
     export ZDOTDIR_BACKUP="$ZDOTDIR"
     source "$HOME/.zshrc" 2>/dev/null
 fi
@@ -31,17 +41,23 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Get project name from directory (sanitize for tmux session name)
 PROJECT_NAME=$(basename "$SCRIPT_DIR" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9_-]/-/g')
 
-# Session naming: claude-PROJECT-YYYYMMDD-UUID
-generate_session_name() {
-    local date_part=$(date +%Y%m%d)
-    local uuid_part=$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
-    echo "claude-${PROJECT_NAME}-${date_part}-${uuid_part}"
-}
-
 # Session prefix for this project
 SESSION_PREFIX="claude-${PROJECT_NAME}"
 
-# Check if tmux is available
+# ============================================
+# Pre-flight checks
+# ============================================
+
+if ! command -v claude &> /dev/null; then
+    echo "❌ claude command not found!"
+    echo ""
+    echo "PATH: $PATH"
+    echo ""
+    echo "Please install Claude Code first:"
+    echo "  npm install -g @anthropic-ai/claude-code"
+    exit 1
+fi
+
 if ! command -v tmux &> /dev/null; then
     echo "❌ tmux not found!"
     echo ""
@@ -50,43 +66,104 @@ if ! command -v tmux &> /dev/null; then
     exit 1
 fi
 
-# Check if running inside tmux
+# ============================================
+# Flags per mode
+#
+# Interactive: supports --permission-mode, --mcp-config, --worktree
+# Remote Control: only supports --verbose, --sandbox, --no-sandbox
+# Permission mode is also set in .claude/settings.json (defaultMode)
+# so remote-control sessions inherit it without needing a CLI flag.
+# ============================================
+
+INTERACTIVE_FLAGS="--permission-mode bypassPermissions"
+
+if [ -f "$SCRIPT_DIR/.claude/mcp.json" ]; then
+    INTERACTIVE_FLAGS="$INTERACTIVE_FLAGS --mcp-config .claude/mcp.json"
+fi
+
+RC_FLAGS=""
+
+# ============================================
+# iTerm2 detection → tmux -CC (native integration)
+#
+# tmux -CC makes iTerm2 render tmux windows/panes as native
+# tabs and splits. Scrolling, copy/paste, resizing all work
+# natively. Over SSH, set SendEnv LC_TERMINAL in ~/.ssh/config
+# on the client, and AcceptEnv LC_* in sshd_config on the server.
+#
+# Override: CLAUDE_TMUX_CLASSIC=1 ./claude.sh  (force plain tmux)
+# ============================================
+
+TMUX_CC=""
+if [ "${CLAUDE_TMUX_CLASSIC:-}" != "1" ]; then
+    if [ "$TERM_PROGRAM" = "iTerm.app" ] || \
+       [ "$LC_TERMINAL" = "iTerm2" ] || \
+       [ -n "$ITERM_SESSION_ID" ]; then
+        TMUX_CC="-CC"
+    fi
+fi
+
+# ============================================
+# Outside tmux: mode selection + session management
+# ============================================
+
 if [ -z "$TMUX" ]; then
-    echo "🔍 Checking for existing sessions in project: $PROJECT_NAME"
+
+    echo "📂 Project: $(basename "$SCRIPT_DIR")"
+    echo "📍 Directory: $SCRIPT_DIR"
+    if [ -n "$TMUX_CC" ]; then
+        echo "🍎 iTerm2 detected — using native tmux integration (tmux -CC)"
+    fi
     echo ""
 
-    # List all tmux sessions for THIS project only
+    # --- Check for existing sessions first ---
     EXISTING_SESSIONS=$(tmux list-sessions -F '#{session_name}' 2>/dev/null | grep -E "^${SESSION_PREFIX}" || true)
 
+    # Helper: attach to a session, detaching other clients by default
+    # so window size adapts to the current terminal (not the old one).
+    # tmux -CC (iTerm2) handles sizing independently, so skip -d.
+    tmux_attach() {
+        local target="$1"
+        if [ -n "$TMUX_CC" ]; then
+            exec tmux -CC attach -t "$target"
+        else
+            exec tmux attach -dt "$target"
+        fi
+    }
+
     if [ -n "$EXISTING_SESSIONS" ]; then
-        # Found existing claude session(s)
         SESSION_COUNT=$(echo "$EXISTING_SESSIONS" | wc -l | tr -d ' ')
 
         if [ "$SESSION_COUNT" -eq 1 ]; then
-            # Only one session, ask to attach
-            echo "📌 Found existing session: $EXISTING_SESSIONS"
+            # Show session details
+            INFO=$(tmux list-sessions -F '#{session_name}: #{session_windows} windows (created #{t:session_created})' 2>/dev/null | grep "^$EXISTING_SESSIONS:")
+            CLIENTS=$(tmux list-clients -t "$EXISTING_SESSIONS" -F '#{client_name}' 2>/dev/null | wc -l | tr -d ' ')
+
+            echo "📌 Found existing session: $INFO"
+            if [ "$CLIENTS" -gt 0 ]; then
+                echo "   ⚡ $CLIENTS client(s) currently attached (will be detached)"
+            fi
             echo ""
             read -p "Attach to this session? [Y/n] " -n 1 -r
             echo ""
 
             if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-                exec tmux attach -t "$EXISTING_SESSIONS"
-            else
-                # User wants a new session, create with unique name
-                NEW_SESSION=$(generate_session_name)
-                echo "Creating new session: $NEW_SESSION"
-                exec tmux new-session -s "$NEW_SESSION" "cd '$SCRIPT_DIR' && '$0'"
+                tmux_attach "$EXISTING_SESSIONS"
             fi
+            echo ""
         else
-            # Multiple sessions, let user choose
             echo "📌 Found multiple sessions for project '$PROJECT_NAME':"
             echo ""
             i=1
             declare -a SESSION_ARRAY
             while IFS= read -r session; do
-                # Get session info
-                INFO=$(tmux list-sessions -F '#{session_name}: #{session_windows} windows, created #{session_created}' 2>/dev/null | grep "^$session:")
-                echo "  [$i] $INFO"
+                INFO=$(tmux list-sessions -F '#{session_name}: #{session_windows} windows (created #{t:session_created})' 2>/dev/null | grep "^$session:")
+                CLIENTS=$(tmux list-clients -t "$session" -F '#{client_name}' 2>/dev/null | wc -l | tr -d ' ')
+                ATTACHED=""
+                if [ "$CLIENTS" -gt 0 ]; then
+                    ATTACHED=" ⚡${CLIENTS} attached"
+                fi
+                echo "  [$i] $INFO$ATTACHED"
                 SESSION_ARRAY[$i]="$session"
                 ((i++))
             done <<< "$EXISTING_SESSIONS"
@@ -95,86 +172,152 @@ if [ -z "$TMUX" ]; then
             read -p "Select session [1]: " -r CHOICE
 
             if [[ "$CHOICE" =~ ^[Nn]$ ]]; then
-                NEW_SESSION=$(generate_session_name)
-                echo "Creating new session: $NEW_SESSION"
-                exec tmux new-session -s "$NEW_SESSION" "cd '$SCRIPT_DIR' && '$0'"
+                : # Fall through to create new session
             elif [ -z "$CHOICE" ] || [ "$CHOICE" = "1" ]; then
-                exec tmux attach -t "${SESSION_ARRAY[1]}"
+                tmux_attach "${SESSION_ARRAY[1]}"
             elif [[ "$CHOICE" =~ ^[0-9]+$ ]] && [ "$CHOICE" -le "${#SESSION_ARRAY[@]}" ]; then
-                exec tmux attach -t "${SESSION_ARRAY[$CHOICE]}"
+                tmux_attach "${SESSION_ARRAY[$CHOICE]}"
             else
                 echo "Invalid choice, attaching to first session"
-                exec tmux attach -t "${SESSION_ARRAY[1]}"
+                tmux_attach "${SESSION_ARRAY[1]}"
             fi
+            echo ""
         fi
-    else
-        # No existing session, create new one
-        NEW_SESSION=$(generate_session_name)
-        echo "📍 No existing session found for project: $PROJECT_NAME"
-        echo "🚀 Creating new tmux session: $NEW_SESSION"
-        echo ""
-        exec tmux new-session -s "$NEW_SESSION" "cd '$SCRIPT_DIR' && '$0'"
     fi
+
+    # --- Mode selection ---
+    echo "Create new session:"
+    echo "  [1] Interactive — worktree + agent teams (split panes in tmux)"
+    echo "  [2] Remote Control — continue from phone/browser via claude.ai/code"
+    echo ""
+    read -p "Mode [1]: " -r MODE
+    MODE=${MODE:-1}
+
+    if [ "$MODE" != "1" ] && [ "$MODE" != "2" ]; then
+        echo "❌ Invalid mode: $MODE"
+        exit 1
+    fi
+
+    # --- Prompt for session name ---
+    UUID_SHORT=$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
+    if [ "$MODE" = "1" ]; then
+        DEFAULT_NAME="${SESSION_PREFIX}-$(date +%m%d)-${UUID_SHORT}"
+        echo ""
+        echo "Enter a session name (also used as worktree branch name)."
+        echo "Examples: ${SESSION_PREFIX}-feat-auth, ${SESSION_PREFIX}-bugfix-login"
+    else
+        DEFAULT_NAME="${SESSION_PREFIX}-rc-$(date +%m%d)-${UUID_SHORT}"
+        echo ""
+        echo "Enter a session name for the remote control session."
+    fi
+    echo ""
+    read -p "Session name [$DEFAULT_NAME]: " -r SESSION_NAME
+    SESSION_NAME=${SESSION_NAME:-$DEFAULT_NAME}
+    echo ""
+
+    # --- Create tmux session (both modes go through tmux) ---
+    echo "🚀 Creating tmux session: $SESSION_NAME"
+    exec tmux $TMUX_CC new-session -s "$SESSION_NAME" "cd '$SCRIPT_DIR' && '$0' --_internal '$MODE' '$SESSION_NAME'"
 fi
 
 # ============================================
-# Code below runs INSIDE tmux session
+# Inside tmux: run Claude Code
 # ============================================
 
-# Change to script directory
 cd "$SCRIPT_DIR"
 
-# Show session info
 CURRENT_SESSION=$(tmux display-message -p '#S')
 echo "✅ Running in tmux session: $CURRENT_SESSION"
 echo "📂 Working directory: $(pwd)"
 echo ""
 
-# Check if claude is available
-if ! command -v claude &> /dev/null; then
-    echo "❌ claude command not found!"
+# Parse internal arguments (passed from outer invocation)
+RUN_MODE=""
+SESSION_NAME=""
+if [ "$1" = "--_internal" ]; then
+    RUN_MODE="${2:-}"
+    SESSION_NAME="${3:-}"
+fi
+
+# If no internal args, user ran ./claude.sh from a new tmux window — ask interactively
+if [ -z "$RUN_MODE" ]; then
+    echo "New session in existing tmux (Ctrl+b,c / Ctrl+b,% / Ctrl+b,\")"
     echo ""
-    echo "PATH: $PATH"
+    echo "  [1] Interactive — worktree + agent teams (split panes)"
+    echo "  [2] Remote Control — continue from phone/browser"
     echo ""
-    echo "Please install Claude Code first:"
-    echo "  npm install -g @anthropic-ai/claude-code"
+    read -p "Mode [1]: " -r RUN_MODE
+    RUN_MODE=${RUN_MODE:-1}
+
+    if [ "$RUN_MODE" != "1" ] && [ "$RUN_MODE" != "2" ]; then
+        echo "❌ Invalid mode: $RUN_MODE"
+        exit 1
+    fi
+
+    UUID_SHORT=$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
+    if [ "$RUN_MODE" = "1" ]; then
+        DEFAULT_NAME="${SESSION_PREFIX}-$(date +%m%d)-${UUID_SHORT}"
+        echo ""
+        echo "Enter a worktree/branch name."
+        echo "Examples: feat-auth, bugfix-login, refactor-api"
+    else
+        DEFAULT_NAME="rc-$(date +%m%d)-${UUID_SHORT}"
+        echo ""
+        echo "Enter a session label."
+    fi
     echo ""
-    echo "Press any key to exit..."
-    read -n 1
-    exit 1
+    read -p "Name [$DEFAULT_NAME]: " -r SESSION_NAME
+    SESSION_NAME=${SESSION_NAME:-$DEFAULT_NAME}
+    echo ""
 fi
 
 echo "💡 Tips:"
-echo "   Session:"
-echo "     - Detach (keep running): Ctrl+b, d"
-echo "     - Reattach after disconnect: ./claude.sh"
-echo ""
-echo "   Panes (split screen):"
-echo "     - Split horizontally: Ctrl+b, \""
-echo "     - Split vertically:   Ctrl+b, %"
-echo "     - Switch pane:        Ctrl+b, arrow keys"
-echo "     - Close current pane: Ctrl+b, x (or type 'exit')"
-echo "     - Zoom pane (toggle): Ctrl+b, z"
-echo ""
-echo "   Windows (tabs):"
-echo "     - New window:    Ctrl+b, c"
-echo "     - Next window:   Ctrl+b, n"
-echo "     - Prev window:   Ctrl+b, p"
-echo "     - Close window:  Ctrl+b, &"
-echo "     - List windows:  Ctrl+b, w"
-echo ""
-echo "   Scroll/Copy:"
-echo "     - Enter scroll mode: Ctrl+b, ["
-echo "     - Exit scroll mode:  q"
+echo "   - Reattach after disconnect: ./claude.sh"
+if [ -n "$TMUX_CC" ]; then
+    echo "   (iTerm2 native integration active)"
+    echo "   - New tab:     Cmd+T"
+    echo "   - Split horiz: Cmd+Shift+D"
+    echo "   - Split vert:  Cmd+D"
+    echo "   - Switch pane: Cmd+[ / Cmd+]"
+    echo "   - Close pane:  Cmd+W"
+    echo "   - Scroll:      mouse/trackpad (native)"
+    echo "   - Copy/paste:  Cmd+C / Cmd+V"
+    echo "   - Detach:      close iTerm2 window (session keeps running)"
+else
+    echo "   - Detach (keep running): Ctrl+b, d"
+    echo "   - New window: Ctrl+b, c  →  ./claude.sh"
+    echo "   - Split pane: Ctrl+b, %  or  Ctrl+b, \""
+    echo "   - Switch pane/window: Ctrl+b, arrow / Ctrl+b, n/p"
+    echo "   - Zoom pane:  Ctrl+b, z"
+    echo "   - Scroll mode: Ctrl+b, [  (exit: q)"
+fi
 echo ""
 
-# Run claude
-claude --permission-mode bypassPermissions --mcp-config .claude/mcp.json
+# --- Mode 1: Interactive (worktree) ---
+if [ "$RUN_MODE" = "1" ]; then
+    echo "🔧 Mode: Interactive (worktree + agent teams)"
+    echo ""
+    if [ -n "$SESSION_NAME" ]; then
+        claude --worktree "$SESSION_NAME" $INTERACTIVE_FLAGS
+    else
+        claude --worktree $INTERACTIVE_FLAGS
+    fi
+
+# --- Mode 2: Remote Control ---
+elif [ "$RUN_MODE" = "2" ]; then
+    echo "🌐 Mode: Remote Control"
+    echo "   Connect from: claude.ai/code or Claude mobile app"
+    echo "   Press spacebar to show QR code for mobile"
+    echo ""
+    claude remote-control $RC_FLAGS
+fi
+
 EXIT_CODE=$?
 
 if [ $EXIT_CODE -ne 0 ]; then
     echo ""
     echo "⚠️  Claude exited with code: $EXIT_CODE"
-    echo "Press any key to close this session..."
-    read -n 1
 fi
+echo ""
+echo "Session ended. Press any key to close, or Ctrl+b d to keep tmux session."
+read -n 1
