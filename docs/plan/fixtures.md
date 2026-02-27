@@ -118,12 +118,12 @@
 
 #### Timeline Index 文件结构
 
-`ezagent/room/{room_id}/index/{YYYY-MM}/state.json` 包含该月份的所有 refs：
+`ezagent/room/{room_id}/index/{shard_id}/state.json` 包含该 shard 的所有 refs：
 
 ```json
 {
   "_doc_type": "crdt_array<crdt_map>",
-  "_key": "ezagent/room/01957a3b-...-000000000001/index/2026-02",
+  "_key": "ezagent/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001",
   "refs": [
     { /* ref 0: M-001 */ },
     { /* ref 1: M-002 */ },
@@ -168,9 +168,7 @@
   },
   "ext.reply_to": null,
   "ext.channels": null,
-  "ext.thread": null,
-
-  "ext.annotations": {}
+  "ext.thread": null
 }
 ```
 
@@ -212,8 +210,8 @@
   "ext.channels": ["code-review"],
   "ext.thread": null,
 
-  "ext.annotations": {
-    "watch:@code-reviewer:relay-a.example.com": {
+  "ext.watch": {
+    "@code-reviewer:relay-a.example.com": {
       "reason": "processing_task",
       "on_content_edit": true,
       "on_reply": true,
@@ -239,8 +237,7 @@
   "ext.reactions": {},
   "ext.reply_to": { "ref_id": "01JMXYZ00000000000000003" },
   "ext.channels": null,
-  "ext.thread": null,
-  "ext.annotations": {}
+  "ext.thread": null
 }
 ```
 
@@ -402,20 +399,18 @@ Presence 是 ephemeral 数据，不持久化，不存在 fixture 文件。测试
 
 | ID | Room | Author | filename | mime_type | size | blob_hash | 存储位置 |
 |----|------|--------|----------|-----------|------|-----------|---------|
-| `BL-001` | R-alpha | E-alice | diagram.png | image/png | 204800 | sha256:aaaa1111... | `ezagent/room/{R-alpha}/blob/aaaa1111.bin` |
-| `BL-002` | R-alpha | E-bob | report.pdf | application/pdf | 1048576 | sha256:bbbb2222... | `ezagent/room/{R-alpha}/blob/bbbb2222.bin` |
+| `BL-001` | R-alpha | E-alice | diagram.png | image/png | 204800 | sha256:aaaa1111... | `ezagent/blob/aaaa1111.bin`（全局）+ `ezagent/room/{R-alpha}/ext/media/blob-ref/aaaa1111`（per-room ref） |
+| `BL-002` | R-alpha | E-bob | report.pdf | application/pdf | 1048576 | sha256:bbbb2222... | `ezagent/blob/bbbb2222.bin`（全局）+ `ezagent/room/{R-alpha}/ext/media/blob-ref/bbbb2222`（per-room ref） |
 
-Blob 元信息存储在 ref 的 `ext.annotations` 中：
+Blob 元信息存储在 Ref 的 `ext.media` 命名空间和 per-room Blob Ref doc 中：
 
 ```json
-"ext.annotations": {
-  "media_meta:@system:local": {
-    "blob_hash": "sha256:aaaa1111...",
-    "filename": "diagram.png",
-    "mime_type": "image/png",
-    "size_bytes": 204800,
-    "dimensions": { "width": 1920, "height": 1080 }
-  }
+"ext.media": {
+  "blob_hash": "sha256:aaaa1111...",
+  "filename": "diagram.png",
+  "mime_type": "image/png",
+  "size_bytes": 204800,
+  "dimensions": { "width": 1920, "height": 1080 }
 }
 ```
 
@@ -465,12 +460,12 @@ PF-002 state.json:
 
 #### §2.7.14 Watch (EXT-14)
 
-内嵌在 ref / room_config 的 `ext.annotations` 中。
+内嵌在 ref / room_config 的 `ext.watch` 中。
 
 | ID | Type | Watcher | Target | 存储位置 |
 |----|------|---------|--------|---------|
-| `W-001` | ref | E-agent1 | M-003 | M-003 ref 的 `ext.annotations."watch:@code-reviewer:..."` |
-| `W-002` | channel | E-agent1 | ["code-review"] | R-alpha config 的 `ext.annotations."channel_watch:@code-reviewer:..."` |
+| `W-001` | ref | E-agent1 | M-003 | M-003 ref 的 `ext.watch.@code-reviewer:...` |
+| `W-002` | channel | E-agent1 | ["code-review"] | R-alpha config 的 `ext.watch.@code-reviewer:...` |
 
 ### §2.8 验证数据 — Relay
 
@@ -581,13 +576,13 @@ R-minimal:
 
 # === Messages (ref in timeline + content) ===
 M-001:
-  ref: ezagent/room/01957a3b-...-000000000001/index/2026-02/state.json#refs[0]
+  ref: ezagent/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/state.json#refs[0]
   content: ezagent/room/01957a3b-...-000000000001/content/sha256_e3b0c442.json
 M-002:
-  ref: ezagent/room/01957a3b-...-000000000001/index/2026-02/state.json#refs[1]
+  ref: ezagent/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/state.json#refs[1]
   content: ezagent/room/01957a3b-...-000000000001/content/sha256_a1b2c3d4.json
 M-003:
-  ref: ezagent/room/01957a3b-...-000000000001/index/2026-02/state.json#refs[2]
+  ref: ezagent/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/state.json#refs[2]
   content.immutable: ezagent/room/01957a3b-...-000000000001/content/sha256_f5e6d7c8.json
   content.mutable: ezagent/room/01957a3b-...-000000000001/content/uuid_mut-001/state.json
 # ... (其他 message 省略)
@@ -605,9 +600,9 @@ RP-002:
 CH-001:
   location: M-003.ref > ext.channels
 W-001:
-  location: M-003.ref > ext.annotations > "watch:@code-reviewer:relay-a.example.com"
+  location: M-003.ref > ext.watch > @code-reviewer:relay-a.example.com
 W-002:
-  location: R-alpha.config > ext.annotations > "channel_watch:@code-reviewer:relay-a.example.com"
+  location: R-alpha.config > ext.watch > @code-reviewer:relay-a.example.com
 
 # === Extension Data (独立 doc) ===
 MUT-001:
@@ -634,10 +629,12 @@ PF-002:
 PF-003:
   path: ezagent/entity/@translator:relay-a.example.com/ext/profile/state.json
 BL-001:
-  path: ezagent/room/01957a3b-...-000000000001/blob/aaaa1111.bin
-  meta: M-BL001.ref > ext.annotations > "media_meta:@system:local"
+  path: ezagent/blob/aaaa1111.bin
+  ref: ezagent/room/01957a3b-...-000000000001/ext/media/blob-ref/aaaa1111
+  meta: M-BL001.ref > ext.media
 BL-002:
-  path: ezagent/room/01957a3b-...-000000000001/blob/bbbb2222.bin
+  path: ezagent/blob/bbbb2222.bin
+  ref: ezagent/room/01957a3b-...-000000000001/ext/media/blob-ref/bbbb2222
 
 # === Relay ===
 RELAY-A:
@@ -671,18 +668,18 @@ CMD-001:
   location: M-CMD-001.ref > ext.command
   note: "/ta:claim task-42 by @alice"
 CMD-RESULT-001:
-  location: M-CMD-001.ref > ext.annotations > "command_result:uuid_cmd-001"
+  location: M-CMD-001.ref > ext.command.result > uuid_cmd-001
   note: "TaskArena claim success result"
 
 # === Error Fixtures ===
 ERR-SIGN-001:
   base: M-001.ref
   tampered: signature 替换为 mallory 签名
-  path: ezagent-error/room/01957a3b-...-000000000001/index/2026-02/forged-signature.json
+  path: ezagent-error/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/forged-signature.json
 ERR-SIGN-003:
   base: M-001.ref
   tampered: timestamp 设为 future (now + 10min)
-  path: ezagent-error/room/01957a3b-...-000000000001/index/2026-02/future-timestamp.json
+  path: ezagent-error/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/future-timestamp.json
 ERR-MSG-002:
   base: M-001.content
   tampered: body 被修改，hash 不再匹配
@@ -690,7 +687,7 @@ ERR-MSG-002:
 ERR-MSG-003:
   base: M-001
   tampered: content.author 改为 @bob（与 ref.author @alice 不一致）
-  path: ezagent-error/room/01957a3b-...-000000000001/index/2026-02/author-mismatch.json
+  path: ezagent-error/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/author-mismatch.json
 ```
 
 ### §2.10 Scenarios（数据生成脚本）
@@ -923,7 +920,7 @@ steps:
       ref_id: "$M_001_REF"
       content_id: "$M_001_CONTENT"
     produces:
-      - ezagent/room/01957a3b-...-000000000001/index/2026-02/state.json
+      - ezagent/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/state.json
       - ezagent/room/01957a3b-...-000000000001/content/sha256_e3b0c442.json
 
   - name: send M-002
@@ -1049,25 +1046,25 @@ steps:
   - name: "ERR-SIGN-001: forged signature"
     action: copy_and_tamper
     params:
-      source: ezagent/room/01957a3b-...-000000000001/index/2026-02/state.json
+      source: ezagent/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/state.json
       extract: refs[0]
       tamper:
         signature: "ed25519:<mallory 用自己的私钥签名>"
         _signer_key: keypairs/mallory.json
       note: "M-001 的 ref，签名被替换为 mallory 的签名，但 author 仍为 alice"
     produces:
-      - ezagent-error/room/01957a3b-...-000000000001/index/2026-02/forged-signature.json
+      - ezagent-error/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/forged-signature.json
 
   - name: "ERR-SIGN-003: future timestamp"
     action: copy_and_tamper
     params:
-      source: ezagent/room/01957a3b-...-000000000001/index/2026-02/state.json
+      source: ezagent/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/state.json
       extract: refs[0]
       tamper:
         timestamp: "+10m"
       note: "M-001 的 Signed Envelope，timestamp 设为当前时间 + 10 分钟"
     produces:
-      - ezagent-error/room/01957a3b-...-000000000001/index/2026-02/future-timestamp.json
+      - ezagent-error/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/future-timestamp.json
 
   - name: "ERR-MSG-002: tampered content"
     action: copy_and_tamper
@@ -1087,7 +1084,7 @@ steps:
         author: "@bob:relay-a.example.com"
       note: "M-001 的 content，author 改为 bob 但 ref.author 是 alice → 不一致"
     produces:
-      - ezagent-error/room/01957a3b-...-000000000001/index/2026-02/author-mismatch.json
+      - ezagent-error/room/01957a3b-...-000000000001/index/019a1b2c-0000-7000-9000-000000000001/author-mismatch.json
 ```
 
 ### §2.11 Error Fixtures（异常数据）
@@ -1107,7 +1104,7 @@ Error Fixture 存储在 `ezagent-error/` 目录中，结构与 `ezagent/` 完全
 {
   "_error_meta": {
     "error_id": "ERR-SIGN-001",
-    "based_on": "ezagent/room/.../index/2026-02/state.json#refs[0]",
+    "based_on": "ezagent/room/.../index/019a1b2c-0000-7000-9000-000000000001/state.json#refs[0]",
     "tampered_fields": ["signature"],
     "description": "M-001 ref 的签名被替换为 mallory 用自己私钥生成的签名"
   },
@@ -1190,10 +1187,10 @@ Error Fixture 存储在 `ezagent-error/` 目录中，结构与 `ezagent/` 完全
 
 | Error ID | 基于 | 篡改内容 | fixture 路径 | Test Case |
 |----------|------|---------|-------------|-----------|
-| `ERR-SIGN-001` | M-001 ref | signature → mallory 签名 | `ezagent-error/room/{R-alpha}/index/2026-02/forged-signature.json` | TC-1-SIGN-002 |
-| `ERR-SIGN-003` | M-001 Signed Envelope | timestamp → now+10min | `ezagent-error/room/{R-alpha}/index/2026-02/future-timestamp.json` | TC-1-SIGN-003 |
+| `ERR-SIGN-001` | M-001 ref | signature → mallory 签名 | `ezagent-error/room/{R-alpha}/index/019a1b2c-0000-7000-9000-000000000001/forged-signature.json` | TC-1-SIGN-002 |
+| `ERR-SIGN-003` | M-001 Signed Envelope | timestamp → now+10min | `ezagent-error/room/{R-alpha}/index/019a1b2c-0000-7000-9000-000000000001/future-timestamp.json` | TC-1-SIGN-003 |
 | `ERR-MSG-002` | M-001 content | body 篡改，hash 不匹配 | `ezagent-error/room/{R-alpha}/content/sha256_tampered.json` | TC-1-MSG-002 |
-| `ERR-MSG-003` | M-001 ref+content | content.author → bob | `ezagent-error/room/{R-alpha}/index/2026-02/author-mismatch.json` | TC-1-MSG-003 |
+| `ERR-MSG-003` | M-001 ref+content | content.author → bob | `ezagent-error/room/{R-alpha}/index/019a1b2c-0000-7000-9000-000000000001/author-mismatch.json` | TC-1-MSG-003 |
 
 每个 error fixture 包含 `_error_meta` 字段，标注来源、篡改字段和描述。
 

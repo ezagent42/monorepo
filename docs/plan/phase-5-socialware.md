@@ -1,24 +1,26 @@
 # Phase 5: Socialware
 
-> **版本**：0.9.1
-> **目标**：Agent 驱动的协作——Socialware 四原语运行时 + 三个参考实现 + AgentForge
+> **版本**：0.9.3
+> **目标**：Agent 驱动的协作——Role-Driven Message 架构 + Socialware 四原语运行时 + 三个参考实现 + AgentForge
 > **预估周期**：3-4 周
 > **前置依赖**：Phase 4 (Chat App) 完成
-> **Spec 依赖**：socialware-spec.md, eventweaver-prd.md, taskarena-prd.md, respool-prd.md, agentforge-prd.md
+> **Spec 依赖**：socialware-spec.md, extensions-spec.md (EXT-17), eventweaver-prd.md, taskarena-prd.md, respool-prd.md, agentforge-prd.md
 
 ---
 
 ## 验收标准
 
+- EXT-17 Runtime Extension 完整工作（namespace check, content_type 管控, _sw:* channel）
 - Socialware 四原语 (Role, Arena, Commitment, Flow) Python 运行时可用
+- State Cache 从 Timeline Message 纯派生，重启后可完整重建
 - Socialware 安装注册表 (registry.toml) + 声明清单 (manifest.toml) 完整工作
 - EXT-15 Command 声明、派发、结果返回端到端可用
 - EventWeaver: 事件 DAG 可创建、分支、合并
-- TaskArena: 任务发布 → 认领 → 提交 → Review → 结算 完整流程
+- TaskArena: 任务发布 → 认领 → 提交 → Review → 结算 完整流程（全部通过 content_type Message）
 - ResPool: 资源声明 → 请求 → 分配 → 释放 完整流程
 - AgentForge: Agent 模板注册 → Spawn → @mention 触发 → 流式响应 → 休眠/唤醒
-- Agent 在 Room 中发送 structured_card，用户点击 action button 触发 Flow transition
-- Level 2 自定义组件 SDK 可用（DAG 可视化、Review 分栏）
+- Role pre_send Hook 正确拒绝无权限的 Message 发送
+- Flow pre_send Hook 正确拒绝非法状态转换
 
 ---
 
@@ -29,15 +31,14 @@
 ### TC-5-SW-001: Part A + Part B 声明解析
 
 ```
-GIVEN  EventWeaver 的完整 YAML 声明（Part A + Part B + Part C）
+GIVEN  EventWeaver 的完整声明（Part A + Part B + Part C）
 
 WHEN   Socialware 运行时加载声明
 
 THEN   Part A 解析成功：
-       - datatypes: [ew_event, ew_branch, ew_merge_request] 注册到 Engine
-       - hooks: pre_send (validate_causality), after_write (index_event, ...) 注册
-       - annotations: [ew:conflict, ew:approved, ew:lifecycle, ...] 声明加载
-       - indexes: [ew:dag_index, ew:branch_list, ...] 注册
+       - content_types: [ew:event.record, ew:branch.create, ew:merge.request, ew:merge.approve, ew:merge.reject] 注册
+       - hooks: pre_send (check_role, validate_causality), after_write (advance_state, ...) 注册
+       - namespace: "ew" 注册到 EXT-17 Runtime
        Part B 解析成功：
        - roles: [ew:emitter, ew:chronicler, ...] 注册
        - arenas: [ew:event_stream, ew:branch_workspace, ...] 注册
@@ -49,7 +50,7 @@ THEN   Part A 解析成功：
 ### TC-5-SW-002: 声明不完整拒绝
 
 ```
-GIVEN  Socialware 声明缺少 Part B 的 flows 字段
+GIVEN  Socialware 声明缺少 Part B 的 flows 声明
 
 WHEN   运行时尝试加载
 
@@ -74,7 +75,7 @@ THEN   拒绝注册，报错 "Socialware hooks must have priority >= 100"
 GIVEN  EventWeaver 和 TaskArena 同时加载
        两者都注册了 after_write Hook
 
-WHEN   一条 ew_event 消息写入
+WHEN   一条 content_type="ew:event.record" Message 写入
 
 THEN   EventWeaver 的 Hook 被触发
        TaskArena 的 Hook 也被触发（如果监听相同 trigger）
@@ -200,7 +201,7 @@ THEN   通过 federated Arena 的专用通道通信
 ### TC-5-SW-026: Commitment 创建与查询
 
 ```
-GIVEN  TaskArena 中 E-publisher 发布了 ta_task，E-worker 认领
+GIVEN  TaskArena 中 E-publisher 发送 ta:task.propose Message，E-worker 认领
 
 WHEN   Commitment 创建：
        ta:reward_guarantee (between: [publisher, worker],
@@ -216,19 +217,19 @@ THEN   Commitment 记录可查询：
 
 ```
 GIVEN  ta:reward_guarantee 已创建
-       ta_task Flow state 变为 "approved"
+       Task Flow state 变为 "approved"
 
 WHEN   Commitment triggered_by 条件满足
 
 THEN   Commitment 标记为 "fulfilled"
-       触发 ResPool 的 rp_request（奖励发放）
+       触发 ResPool 的 rp:allocation.request（奖励发放）
        Flow 记录 commitment fulfillment 事件
 ```
 
 ### TC-5-SW-028: Flow 状态转换
 
 ```
-GIVEN  ta_task 的 ta:task_lifecycle Flow，当前 state = "open"
+GIVEN  task_lifecycle Flow，当前 state = "open"
 
 WHEN   执行 transition "open → claimed" (trigger: worker claims):
        await arena.flows.advance("ta:task_lifecycle", task_ref, "claimed")
@@ -242,7 +243,7 @@ THEN   state 变为 "claimed"
 ### TC-5-SW-029: Flow 非法 transition 拒绝
 
 ```
-GIVEN  ta_task state = "open"
+GIVEN  Task state = "open"
 
 WHEN   尝试 transition "open → approved"（不在合法 transitions 列表中）
 
@@ -278,7 +279,7 @@ WHEN   创建 TaskArena
 THEN   TaskArena Identity 加入 Platform Bus Room
        发送 sw:capability-manifest Message:
        { capabilities: ["task_management", "bounty_system"],
-         datatypes: ["ta_task", "ta_submission", "ta_verdict"],
+         content_types: ["ta:task.*", "ta:verdict.*", "ta:dispute.*"],
          version: "0.1.0" }
 ```
 
@@ -300,7 +301,7 @@ THEN   返回 TaskArena 的 capability manifest
 GIVEN  TaskArena 和 ResPool 都在 Platform Bus 上
 
 WHEN   TaskArena 发送 Message 给 ResPool:
-       { type: "rp_request", payload: { resource: "USD", amount: 50, ... } }
+       { type: "rp:allocation.request", payload: { resource: "USD", amount: 50, ... } }
 
 THEN   ResPool 收到请求
        通过 Platform Bus Timeline 传递
@@ -325,7 +326,7 @@ THEN   TaskArena-CN 创建成功：
        - Part A + Part B 完整复制
        - Runtime 包含 10 个 task 的快照
        - 两者独立：后续 TaskArena 的变化不影响 CN
-       EventWeaver 记录 ew_event { event_type: "socialware_forked" }
+       EventWeaver 记录 ew:event.record Message { event_type: "socialware_forked" }
 ```
 
 ### TC-5-SW-051: Fork — 空白模式
@@ -404,7 +405,7 @@ WHEN   Bootstrap 流程执行：
        2. Bootstrap EventWeaver 创建
 
 THEN   EventWeaver 自身的创建被记录在自己的 DAG 中
-       ew_event { event_type: "socialware_created", payload: { id: "event-weaver" } }
+       ew:event.record Message { event_type: "socialware_created", payload: { id: "event-weaver" } }
        自举完成（EventWeaver 记录自己的诞生）
 ```
 
@@ -416,7 +417,7 @@ GIVEN  Bootstrap EventWeaver 已运行
 WHEN   创建 ResPool
 
 THEN   EventWeaver 自动记录：
-       ew_event { event_type: "socialware_created", payload: { id: "respool" } }
+       ew:event.record Message { event_type: "socialware_created", payload: { id: "respool" } }
        await ew.lifecycle.get(socialware="respool") 返回创建记录
 ```
 
@@ -471,7 +472,7 @@ THEN   Hook 检测到条件满足
 ### TC-5-SW-072: Task 级 HiTL — Flow preference 标记
 
 ```
-GIVEN  ta_task 标记 requires_human_review = true
+GIVEN  Task Message 标记 requires_human_review = true
 
 WHEN   task 进入 "under_review" state
 
@@ -486,7 +487,7 @@ GIVEN  HiTL 发生：Role 从 Agent 转移给 Human
 
 WHEN   查看 EventWeaver DAG
 
-THEN   存在 ew_event { event_type: "hitl_escalation",
+THEN   存在 ew:event.record Message { event_type: "hitl_escalation",
          payload: { from: "@agent-r1:...", to: "@alice:...", role: "ta:reviewer" } }
        所有参与者可在 Timeline 中看到转移记录
 ```
@@ -613,7 +614,7 @@ THEN   每个 transition 都：
 ### TC-5-TA-002: 争议触发 EventWeaver 分支
 
 ```
-GIVEN  ta_task state = "rejected"
+GIVEN  Task state = "rejected"
        E-worker 不同意
 
 WHEN   E-worker 发起争议 → state = "disputed"
@@ -628,13 +629,13 @@ THEN   自动创建 EventWeaver branch
 
 ```
 GIVEN  TaskArena 和 ResPool 通过 Compose 关联
-       ta_task state 变为 "approved"
+       Task state 变为 "approved"
        Commitment ta:reward_guarantee 条件满足
 
 WHEN   Commitment 触发
 
-THEN   TaskArena 向 ResPool 发送 rp_request
-       ResPool 自动匹配 → 生成 rp_allocation
+THEN   TaskArena 向 ResPool 发送 rp:allocation.request
+       ResPool 自动匹配 → 发送 rp:allocation.matched Message
        E-worker 收到奖励
        整个过程记录在 EventWeaver DAG 中
 ```
@@ -647,7 +648,7 @@ GIVEN  TaskArena Room 有 5 个 task（2 open, 1 claimed, 1 in_review, 1 approve
 WHEN   切换到 Board Tab
 
 THEN   Kanban 显示 11 列（Flow states），其中 4 列有卡片
-       每张卡片使用 ta_task 的 structured_card renderer
+       每张卡片使用 ta:task.propose 的 message_renderer
        拖拽功能按 Role 控制
 ```
 
@@ -703,7 +704,7 @@ WHEN   E-worker 请求 10 GPU-hours
 
 THEN   rp:check_quota Hook 拒绝：
        "Quota exceeded: 95 + 10 > 100"
-       rp_request 不被创建
+       rp:allocation.request 不被创建
 ```
 
 ---
@@ -741,7 +742,7 @@ WHEN   争议流程：
 
 THEN   EventWeaver DAG 记录分支和解决
        TaskArena Flow: rejected → disputed → resolved → approved
-       ResPool: 新的 rp_request → rp_allocation
+       ResPool: 新的 rp:allocation.request → rp:allocation
 ```
 
 ### TC-5-CROSS-003: Platform Bus 上的 Socialware 发现
@@ -780,7 +781,7 @@ THEN   TaskArena 有 5 个 task
 ```
 GIVEN  TaskArena Room，E-alice 有 ta:worker Role
 
-WHEN   Agent 发送 ta_task:
+WHEN   Agent 发送 content_type="ta:task.propose" Message:
        { title: "Design logo", reward: 200, deadline: "2026-03-15", status: "open" }
 
 THEN   Chat UI 显示 structured_card:

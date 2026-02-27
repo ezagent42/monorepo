@@ -520,6 +520,30 @@ interface WidgetProps {
 | ✅ 渲染任意 React UI | ❌ 发起外部网络请求 |
 | ✅ 使用 scoped CSS | ❌ 读取未声明的数据 |
 
+### §8.5 TypeScript 类型来源
+
+Widget SDK 中使用的类型来自 Rust 自动生成（通过 ts-rs），不应手动编辑。
+
+```typescript
+// @ezagent/ui-sdk 的类型来自 Rust 自动生成
+
+// 这些类型从 ezagent/bindings/ 同步而来，勿手动编辑
+import type { Ref, Room, WsEvent } from '../types/generated';
+
+// Widget SDK 在此基础上定义 Props 接口
+export interface WidgetProps {
+  data: {
+    ref?: Ref;          // ← 来自 Rust 生成
+    room?: Room;        // ← 来自 Rust 生成
+    query_results?: any;
+    annotations?: Record<string, any>;
+  };
+  // ...
+}
+```
+
+详见 repo-spec.md §3（TypeScript 类型同步）。
+
 ---
 
 ## §9 Extension → 四层映射速查表
@@ -649,4 +673,5 @@ indexes:
 | 版本 | 日期 | 变更 |
 |------|------|------|
 | 0.1.1 | 2026-02-26 | 新增 §10 Command 交互 UI（斜杠命令自动补全、command_badge、command_result card），Extension 映射表增加 EXT-15 |
+| 0.1.1 | 2026-02-27 | 新增 §8.5 TypeScript 类型来源（Rust → ts-rs → bindings/ 同步） |
 | 0.1 | 2026-02-25 | 初始版本。Render Pipeline 四层模型、Progressive Override、Widget SDK、Extension 映射表 |

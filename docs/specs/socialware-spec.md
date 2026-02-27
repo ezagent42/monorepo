@@ -1,8 +1,8 @@
-# ezagent Socialware Specification v0.9.1
+# ezagent Socialware Specification v0.9.3
 
 > **状态**：Architecture Draft
-> **日期**：2026-02-26
-> **前置文档**：ezagent-protocol-v0.8, ezagent-bus-spec-v0.9.1, ezagent-extensions-spec-v0.9.1
+> **日期**：2026-02-27
+> **前置文档**：ezagent-protocol-v0.8, ezagent-bus-spec-v0.9.3, ezagent-extensions-spec-v0.9.3
 > **作者**：Allen & Claude collaborative design
 
 ---
@@ -34,23 +34,34 @@ Socialware 是在 ezagent 之上构建的、由 Agent 驱动的人机混合软�
 - Bottom → Mid-layer：**组合关系**。Mid-layer 实体由底层原语组合构成。Identity、Room、Message、Timeline 都是 DataType 声明 + Hook 行为 + Annotation 元数据 + Index 查询能力 的组合。
 - Mid-layer → Socialware：**施加关系**。Socialware 原语作为正交维度施加于 Mid-layer 实体。每个原语可以施加于任何 Mid-layer 实体，每个实体可以被多个原语描述。
 
-**零浮空概念原则**：Socialware 不创造新的实体类型。所有领域概念（event、task、resource 等）都是通过 DataType 声明赋予 Mid-layer 实体新的语义标记，而非引入新的抽象层。任何领域术语都必须能分解为"DataType 标记的 Mid-layer 实体 + Socialware 原语维度"。
+**零浮空概念原则**：Socialware 不创造新的实体类型，也不创建新的 Datatype 或 CRDT 文档。所有领域概念（event、task、resource 等）都是具有特定 content_type 的 Message——Mid-layer 实体本身，而非引入新的抽象层。任何领域术语都必须能分解为"特定 content_type 的 Message + Socialware 四原语约束"。
+
+**Socialware 是行为约束者，不是数据管理者。** 四原语（Role, Arena, Commitment, Flow）全部是约束——约束谁能发什么 Message（Role）、在哪个 Room 中生效（Arena）、发了 Message 之后必须做什么（Commitment）、Message 的合法序列是什么（Flow）。Socialware 不需要自己的数据存储，所有状态隐含在 Timeline 的 Message 序列中，运行时状态由 State Cache 纯派生。
 
 **Python-First Socialware。** Socialware 的声明和运行时逻辑通过 Python 编写。ezagent-py 提供声明式 DSL：
 
 ```python
 @socialware("event-weaver")
 class EventWeaver:
+    namespace = "ew"
+
+    roles = {
+        "ew:chronicler": {"capabilities": {"branch.create", "branch.merge"}},
+    }
+
     # Socialware Hook（应用层，priority >= 100）
-    @hook(phase="after_write", trigger="timeline_index.insert", priority=100)
-    async def on_new_message(self, event, ctx):
-        if "code-review" in event.ref.channels:
-            await ctx.watch.set(event.ref_id, on_reply=True)
-            await ctx.messages.send(
-                room_id=event.room_id,
-                body="I'll review this.",
-                reply_to=event.ref_id
-            )
+    @hook(phase="after_write", trigger="timeline_index.insert",
+          filter="content_type startswith 'ew:'", priority=100)
+    async def on_ew_message(self, event, ctx):
+        # State Cache 更新
+        self.state.apply(event.ref)
+
+    @hook(phase="pre_send", trigger="timeline_index.insert",
+          filter="content_type startswith 'ew:'", priority=100)
+    async def check_role(self, event, ctx):
+        action = event.ref.content_type.split(":")[1]  # e.g. "branch.create"
+        if not self.roles.has_capability(event.room_id, event.ref.author, action):
+            raise Reject(f"Lacks capability '{action}'")
 ```
 
 底层通过 PyO3 将 Python Hook 注册到 Rust Engine Pipeline。Socialware 开发者无需接触 Rust。协议层功能（Extension API）通过 ctx 对象直接调用——这些 API 从 Extension 统一声明格式自动生成（详见 ezagent-py-spec §6）。
@@ -175,43 +186,38 @@ FlowDef:
 ```yaml
 Socialware:
   id:          string
+  namespace:   string               # 短标识，用于 content_type 前缀 (如 "ta", "ew", "rp")
   version:     string
   identity:    Identity              # Socialware 本身拥有统一的 Identity
 
-  # ═══ Part A: Bus 层声明 ═══
-  # 使用 REALM 统一 Datatype 声明格式（参见 ezagent-bus-spec §3.5）
-  bus_declaration:
-    datatypes:    [DatatypeEntry]
+  # ═══ Part A: 协议层约定 ═══
+  # Socialware 不创建 Datatype。Part A 声明的是 content_type 约定和 Hook 行为。
+  protocol_convention:
+    content_types:  [ContentTypeDef]  # 本 Socialware 使用的 content_type 列表
     hooks:
-      pre_send:     [Hook]
-      after_write:  [Hook]
-      after_read:   [Hook]
-    annotations:
-      on_ref:           {}
-      on_room_config:   {}
-      on_profile:       {}
-      standalone_doc:   {}
-    indexes:      [IndexDef]
+      pre_send:     [Hook]            # Role 检查 + Flow 转换验证（priority >= 100）
+      after_write:  [Hook]            # State Cache 更新 + Commitment 检查
+      after_read:   [Hook]            # 查询增强（可选）
+    indexes:        [IndexDef]        # 查询视图（可选，使用 EXT-17 通用 Index 即可）
 
   # ═══ Part B: Socialware 层声明 ═══
-  # 四维度施加于 Part A 产生的 Mid-layer 实体
+  # 四维度施加于 Timeline 中的 Message，约束行为序列
   socialware_declaration:
-    roles:        [RoleDef]
+    roles:        [RoleDef]           # Role → capability → content_type 映射
     arenas:       [ArenaDef]
     commitments:  [CommitmentDef]
-    flows:        [FlowDef]
+    flows:        [FlowDef]           # Flow transitions 由 content_type 触发
 
   # ═══ Part C: UI Manifest [MAY] ═══
   # 渲染声明，定义 Socialware 在 Chat UI 中的表现
-  # 详见 chat-ui-spec
   ui_manifest:
-    message_templates:               # DataType → Content Renderer 定制
-      - datatype:    string          #   关联的 DataType ID
-        renderer:    RendererDef     #   覆盖 DataType 默认 renderer
+    message_renderers:               # content_type → 渲染配置
+      - content_type: string         #   匹配模式（如 "ta:task.*"）
+        renderer:    RendererDef     #   渲染器定义
 
     views:                           # Socialware 注册的 Room Tab
       - id:          string          #   全局唯一 (sw:{sw_id}:{view_name})
-        index:       string          #   关联的 Index ID
+        data_source: string          #   数据来源（State Cache query 或 EXT-17 Index）
         renderer:    TabRendererDef  #   Tab 渲染配置
 
     flow_renderers:                  # Flow → 状态可视化 + Action 按钮
@@ -220,34 +226,111 @@ Socialware:
         actions:     [ActionDef]     #   transition → 按钮配置
 ```
 
-**Part C 不影响协议行为**。Part C 的所有内容是 [MAY]，仅供前端 Render Pipeline 消费。没有 Part C 的 Socialware 仍可正常运行——前端将使用 Level 0 自动生成的 UI。
+### §2.1 Part A: content_type 约定
 
-**Part A、Part B、Part C 之间的桥梁是 Mid-layer 实体的引用。**
+Part A 不创建 Datatype，不写 Annotation，不引入新的 CRDT 文档。Part A 声明的是：
+
+1. **content_type 列表**：本 Socialware 使用哪些 content_type，每个 content_type 的语义和 body schema
+2. **Hook 行为**：在 Message 写入前后执行什么检查和逻辑
+3. **Index**（可选）：如果 EXT-17 Runtime 的通用 Index 不够用，可以声明额外的查询视图
+
+```yaml
+ContentTypeDef:
+  type:          string              # 如 "ta:task.propose"
+  description:   string              # 语义描述
+  body_schema:   Schema              # body 的 JSON Schema
+  required_capability: string        # 发送此 content_type 需要的 Role capability
+  flow_subject:  boolean             # 是否创建新的 Flow subject（如 task.propose = true）
+  flow_trigger:  string | null       # 如果非 null，此 content_type 触发 Flow transition
+  reply_to_type: string | null       # 如果非 null，ext.reply_to 必须指向此 content_type
+```
+
+### §2.2 Part B: 行为约束声明
+
+Part B 声明 Role → capability → content_type 的三层映射，以及 Flow 状态机。
+
+```yaml
+# Role 声明
+RoleDef:
+  id:              string                  # 如 "ta:publisher"
+  capabilities:    Set<string>             # 如 {"task.propose", "task.cancel"}
+  assignable_to:   [entity_type_filter]    # 可赋予哪类实体
+  description:     string
+
+# capability → content_type 自动映射规则：
+# capability "task.propose" → content_type "{namespace}:task.propose" → "ta:task.propose"
+# Socialware Runtime 自动构建此映射
+
+# Flow 声明
+FlowDef:
+  id:              string                  # 如 "task_lifecycle"
+  subject_type:    string                  # 创建 Flow subject 的 content_type（如 "ta:task.propose"）
+  states:          Set<State>
+  transitions:     Map<(State, content_type_action), State>
+  auto_transitions: Map<State, State>      # 进入某 state 后自动触发的转换
+  preferences:     Map<Transition, Weight|Rule>
+```
+
+### §2.3 Part A/B 桥梁
 
 ```
-Part A (Bus):
-  DataType 声明 → 产生 → 特定 schema 的 Message/Room/...
-  Hook 声明    → 监听 → 这些 Message/Room 上的事件
-  Annotation   → 附加于 → 这些 Message
-  Index        → 查询  → 这些 Annotation
+Part A (Protocol Convention):
+  content_type 声明 → 定义 → Message 的语义和 body 格式
+  Hook 声明       → 执行 → Role 检查 + Flow 验证 + State Cache 更新
 
-         ↓ mid-layer 实体作为桥梁 ↓
+         ↓ Timeline Message 作为桥梁 ↓
 
 Part B (Socialware):
-  Role       施加于 → Message(datatype=X), Room, Identity, Timeline
-  Arena      划定于 → Room with role(X), entity sets
-  Commitment 建立于 → Identity with role(Y) 之间, Room ↔ Identity, ...
-  Flow       描述   → Message(datatype=X) 的状态演进, Room 的生命周期, ...
+  Role       约束 → "谁能发送什么 content_type 的 Message"
+  Arena      约束 → "哪些 Room 启用了此 Socialware（ext.runtime.enabled）"
+  Commitment 约束 → "发了 Message 之后必须做什么"
+  Flow       约束 → "content_type 的合法序列是什么"
 
-         ↓ Part A + Part B 作为数据基础 ↓
+         ↓ Part A + Part B 作为行为基础 ↓
 
 Part C (UI Manifest):
-  message_templates → DataType 的 Content Renderer 定制
-  views             → Index 的 Room Tab 注册
+  message_renderers → content_type 的渲染定制
+  views             → State Cache 的 Room Tab 展示
   flow_renderers    → Flow state badge + transition action buttons
 ```
 
-**概念溯源验证**：每个 Socialware 设计完成后，应能生成一张概念溯源表，证明所有领域术语均可分解为 "DataType 标记的 Mid-layer 实体 + Socialware 原语维度"。如果存在无法溯源的概念，则声明不完整。
+### §2.4 概念溯源验证
+
+每个 Socialware 设计完成后，应能生成一张概念溯源表，证明所有领域术语均可分解为"特定 content_type 的 Message + Socialware 四原语约束"。如果存在无法溯源的概念，则声明不完整。
+
+**溯源示例（TaskArena）**：
+
+| 领域术语 | 分解 |
+|---------|------|
+| Task | content_type="ta:task.propose" 的 Message |
+| Claim | content_type="ta:task.claim" 的 Message，reply_to 指向 Task Message |
+| Task 状态 | Flow "task_lifecycle" 对 Task Message 的 State Cache 派生值 |
+| Publisher | 拥有 "ta:publisher" Role 的 Identity |
+| Submission | content_type="ta:submission.create" 的 Message，reply_to 指向 Task Message |
+| Verdict | content_type="ta:verdict.approve" 的 Message，reply_to 指向 Submission Message |
+
+### §2.5 State Cache
+
+Socialware 的运行时状态（如 "Task ulid:001 当前处于 claimed 状态"）不是存储在 CRDT 中的数据，而是从 Timeline Message 序列**纯派生**的内存缓存。
+
+```
+State Cache:
+  ┌─ flow_states: Map<ref_id, FlowState>     # Flow subject → 当前状态
+  ├─ role_map: Map<(room_id, entity_id), Set<Role>>  # 角色分配
+  ├─ commitments: Map<commitment_id, CommitmentStatus>  # 义务状态
+  └─ domain_state: Map<string, any>           # Socialware 自定义状态
+```
+
+**重建策略**：
+
+1. **启动时**：从 EXT-17 Runtime Index 查询所有 `{namespace}:*` 的 Message，按 CRDT 因果序回放，重建 State Cache
+2. **运行时**：after_write Hook 增量更新 State Cache
+3. **检查点**（可选）：Socialware MAY 定期将 State Cache 序列化到本地存储（`ezagent/socialware/{sw_id}/checkpoint.bin`），重启时仅从检查点后增量回放
+
+- [MUST] State Cache 是**进程内存**中的数据结构，不参与 CRDT Sync。
+- [MUST] State Cache 在所有 Peer 上独立计算。由于 CRDT 最终一致性，所有 Peer 的 State Cache 最终一致。
+- [MUST] State Cache 可随时从 Timeline 完整重建。本地存储的检查点是性能优化，不是必须的。
+- [MUST NOT] Socialware 不得将 State Cache 写入 CRDT 文档或 `ext.*` 命名空间。
 
 ---
 
@@ -271,10 +354,10 @@ Platform Bus 是一个**普通的 Bus 实例**，其"成员"是 Socialware 的 I
 | 操作 | 实现方式 |
 |------|---------|
 | Socialware 注册 | Identity 加入 Platform Bus 的 Room |
-| 能力发布 | 发送 `sw:capability-manifest` DataType 的 Message |
-| 能力发现 | 通过 Index 查询 `sw:capability` Annotation |
+| 能力发布 | 发送 content_type=`sw:capability-manifest` 的 Message |
+| 能力发现 | 通过 EXT-17 Runtime Index 查询已启用的 Socialware |
 | 命令注册 | 在 Socialware Profile 上发布 `command_manifest` Annotation（EXT-15） |
-| Socialware 间交互 | Platform Bus 上的 Message 交换 |
+| Socialware 间交互 | Platform Bus 上的 Message 交换（使用各自 namespace 的 content_type） |
 
 ### §3.2 Socialware 内部/外部边界
 
@@ -391,7 +474,7 @@ Identity   │ new            │ 各自保留+C新增     │ new, 旧者archiv
    → 管理平台级生命周期事件
    → 自身的生命周期由自己记录（自举）
 3. 后续所有 Socialware 创建均经过 Bootstrap EventWeaver
-   → 每个 Socialware 的创建产生 ew_event { event_type: "socialware_created" }
+   → 每个 Socialware 的创建产生 ew:event.record Message { event_type: "socialware_created" }
    → 新 Socialware 的 Identity 注册到 Platform Bus
 ```
 
@@ -425,11 +508,11 @@ Flow.preferences:
   escalate_to_human: preferred_when(condition)
 
 → Hook (after_write) 检测 condition
-→ 写入 escalation Annotation 到相关实体上
-→ Human Identity 被赋予对应 Role
+→ 发送 content_type="{ns}:_system.escalation" Message（记录升级事件）
+→ Human Identity 被赋予对应 Role（通过 {ns}:role.grant Message）
 → Human 进入对应 Arena 处理
-→ 处理结果作为新的 Commitment 驱动 Flow transition
-→ Index 记录"所有被人类介入过的交互"用于后续训练
+→ 处理结果作为新的 content_type Message 驱动 Flow transition
+→ State Cache + EXT-17 Index 记录"所有被人类介入过的交互"用于后续训练
 ```
 
 ---
@@ -514,14 +597,17 @@ identity = "@agent-forge:relay-a.example.com"
 [socialware]
 id = "task-arena"
 name = "TaskArena"
-version = "0.9.1"
+namespace = "ta"
+version = "0.9.3"
 
 [declaration]
-datatypes = ["ta_task", "ta_submission", "ta_verdict"]
-hooks = ["task_lifecycle", "auto_assign", "deadline_check"]
+content_types = ["ta:task.propose", "ta:task.claim", "ta:task.submit", "ta:task.cancel",
+                 "ta:submission.create", "ta:verdict.approve", "ta:verdict.reject",
+                 "ta:verdict.request_revision", "ta:dispute.open", "ta:dispute.resolve",
+                 "ta:role.grant", "ta:role.revoke"]
+hooks = ["check_role", "check_flow", "advance_flow", "check_commitments"]
 roles = ["ta:publisher", "ta:worker", "ta:reviewer", "ta:arbiter"]
-annotations = ["ta:task_meta", "ta:submission_meta", "ta:verdict_meta"]
-indexes = ["task_board", "my_tasks", "review_queue"]
+flows = ["task_lifecycle", "submission_review"]
 
 [commands]
 # EXT-15 Command 声明（简写格式，完整声明见 Profile Annotation）
@@ -531,7 +617,7 @@ submit = { params = ["task_id"], role = "ta:worker" }
 review = { params = ["submission_id", "verdict"], role = "ta:reviewer" }
 
 [dependencies]
-extensions = ["EXT-01", "EXT-04", "EXT-06", "EXT-14", "EXT-15"]
+extensions = ["EXT-04", "EXT-06", "EXT-15", "EXT-17"]
 socialware = ["event-weaver"]
 ```
 
@@ -551,9 +637,9 @@ stop:       取消 Hook 注册 → 从 Platform Bus 下线 → 清理临时数�
 uninstall:  stop → 从 registry.toml 移除条目 → 归档或删除 {sw_id}/ 目录
 ```
 
-- [MUST] `install` 时检查命令命名空间唯一性（不可与已安装 Socialware 的 `ns` 冲突）。
+- [MUST] `install` 时检查命令命名空间唯一性（不可与已安装 Socialware 的 `namespace` 冲突）。
 - [MUST] `start` 时依赖的 Socialware MUST 已处于 `started` 状态。
-- [SHOULD] `uninstall` 时 Socialware 已创建的协议层数据（CRDT 文档、Annotations）SHOULD 保留。
+- [SHOULD] `uninstall` 时 Socialware 已发送的 Message（Timeline 中的 content_type 为 `{ns}:*` 的 Ref）SHOULD 保留。
 
 ### §7.5 启动序列
 
@@ -569,7 +655,11 @@ uninstall:  stop → 从 registry.toml 移除条目 → 归档或删除 {sw_id}/
    c. 连接 Platform Bus
    d. 注册 Hooks（priority >= 100）
    e. 发布 command_manifest（EXT-15）到 Profile Annotation
-   f. 标记为 started
+   f. 重建 State Cache：
+      - 查询所有 ext.runtime.enabled 包含自己 namespace 的 Room
+      - 对每个 Room，通过 EXT-17 Index 回放所有 {ns}:* Message
+      - 如有本地检查点，从检查点后增量回放
+   g. 标记为 started
 5. AgentForge 启动后：扫描 agents/ 目录 → 启动 auto_start Agent → 发布 Agent Profile
 6. Platform Bus 就绪，接受用户请求
 ```
@@ -580,11 +670,13 @@ uninstall:  stop → 从 registry.toml 移除条目 → 归档或删除 {sw_id}/
 |------|------|------|------|
 | Socialware Identity | `ezagent/@{sw_id}:...` | ✅ CRDT Sync | 协议可见，其他 Peer 可发现 |
 | Socialware Profile | `ezagent/@{sw_id}:.../ext/profile/` | ✅ CRDT Sync | 包含 command_manifest Annotation |
+| Socialware Message | Timeline 中 content_type=`{ns}:*` 的 Ref | ✅ CRDT Sync | 普通 Message，所有 Peer 同步 |
+| State Cache | 进程内存 | ❌ 不同步 | 从 Timeline Message 纯派生，各节点独立计算 |
 | 安装注册表 | `ezagent/socialware/registry.toml` | ❌ Local Only | 节点私有 |
 | 声明清单 | `ezagent/socialware/{sw_id}/manifest.toml` | ❌ Local Only | 节点私有 |
-| 运营数据 | `ezagent/socialware/{sw_id}/...` | ❌ Local Only | 节点私有 |
+| 检查点 | `ezagent/socialware/{sw_id}/checkpoint.bin` | ❌ Local Only | State Cache 的持久化快照，可选 |
 
-**原则：协议层数据（Identity、Profile、Message）通过 CRDT 同步，让其他参与者能发现和交互。本地运营数据（配置、模板、Agent 工作区）不同步，是节点私有的实现细节。**
+**原则：行为数据（Message）通过 CRDT 同步。派生状态（State Cache）在各节点独立计算。本地运营数据（配置、模板、检查点）不同步。**
 
 ---
 
@@ -592,7 +684,7 @@ uninstall:  stop → 从 registry.toml 移除条目 → 归档或删除 {sw_id}/
 
 ### §8.1 概述
 
-Socialware 通过 EXT-15 Command 向用户和 Agent 暴露操作入口。每个 Socialware 在 `manifest.toml` 中声明命令，在启动时发布到 Profile 的 `command_manifest` Annotation，客户端通过 Index 发现可用命令并提供自动补全。
+Socialware 通过 EXT-15 Command 向用户和 Agent 暴露操作入口。命令执行的结果是**发送一条特定 content_type 的 Message**。命令本身是触发器，Message 是持久化的行为记录。
 
 ### §8.2 声明流程
 
@@ -610,16 +702,19 @@ Socialware 通过 EXT-15 Command 向用户和 Agent 暴露操作入口。每个 
 
 ```
 1. Engine pre_send Hook (EXT-15 command.validate)
-   → 验证 ns、action、params、role
-2. Ref 写入 Timeline（含 ext.command 字段）
-3. Engine after_write Hook (EXT-15 command.dispatch)
+   → 验证 ns、action、params
+2. Engine pre_send Hook (EXT-17 runtime.namespace_check)
+   → 验证 "ta" ∈ Room 的 ext.runtime.enabled
+3. Ref 写入 Timeline（含 ext.command 字段）
+4. Engine after_write Hook (EXT-15 command.dispatch)
    → 路由到 TaskArena 的 Socialware Hook
-4. TaskArena Hook 处理命令
-   → 执行业务逻辑（如将 task 状态从 open → claimed）
-   → 写入 command_result Annotation 到原 Ref
-5. Engine after_write Hook (EXT-15 command.result_notify)
-   → 生成 command.result SSE 事件
-6. 客户端收到事件 → 显示命令执行结果
+5. TaskArena Hook 处理命令：
+   a. 从 State Cache 读取当前状态
+   b. 验证 Role 能力和 Flow 转换合法性
+   c. 发送结果 Message（如 content_type="ta:task.claim"）
+   d. 写入 command_result Annotation 到原 Ref
+6. State Cache 由 after_write Hook 增量更新
+7. 客户端收到事件 → 显示命令执行结果
 ```
 
 ### §8.4 Socialware Hook 中处理命令
@@ -632,32 +727,49 @@ class TaskArena:
     async def on_command(self, event, ctx):
         cmd = event.ref.ext.command
         if cmd.action == "claim":
-            task = await ctx.data.get("ta_task", cmd.params["task_id"])
-            if task.state != "open":
+            task_ref_id = cmd.params["task_id"]
+            task_state = self.state.flow_states.get(task_ref_id)
+
+            if task_state != "open":
                 await ctx.command.result(cmd.invoke_id, status="error",
-                    error=f"Task {cmd.params['task_id']} is not open")
+                    error=f"Task is not open (current: {task_state})")
                 return
-            # 执行认领逻辑
-            await ctx.data.update("ta_task", cmd.params["task_id"],
-                state="claimed", worker=event.ref.author)
+
+            if not self.state.role_map.has_capability(
+                    event.room_id, event.ref.author, "task.claim"):
+                await ctx.command.result(cmd.invoke_id, status="error",
+                    error="You don't have the worker role")
+                return
+
+            # 发送 claim Message（触发 Flow transition + State Cache 更新）
+            await ctx.messages.send(
+                room_id=event.room_id,
+                content_type="ta:task.claim",
+                body={"reason": cmd.params.get("reason", "")},
+                reply_to=task_ref_id,
+                channels=["_sw:ta"],
+            )
             await ctx.command.result(cmd.invoke_id, status="success",
-                result={"task_id": cmd.params["task_id"], "new_state": "claimed"})
+                result={"task_id": task_ref_id, "new_state": "claimed"})
 ```
 
 - [MUST] Socialware Hook 的 `filter` MUST 使用 `ext.command.ns` 确保只接收自己命名空间的命令。
 - [MUST] Socialware Hook MUST 在处理完成后写入 `command_result`（成功或失败均需写入）。
 - [SHOULD] Socialware Hook SHOULD 在 30s 内完成处理。超时由 EXT-15 的 timeout Hook 自动检测。
+- [MUST] 命令处理的最终结果是**发送一条 Socialware content_type 的 Message**，而非直接修改数据。
 
 ---
 
-## 附录 A: 与 REALM 规范的兼容性
+## 附录 A: 与协议规范的兼容性
 
-| Socialware 概念 | REALM 规范引用 |
+| Socialware 概念 | 协议规范引用 |
 |----------------|---------------|
 | Socialware Identity | ezagent-bus-spec §5.1 (Entity-Agnostic) |
-| Part A 声明格式 | ezagent-bus-spec §3.5 (Datatype 统一声明格式) |
+| Part A content_type 约定 | ezagent-extensions-spec §18 (EXT-17 Runtime) |
 | Hook 阶段和约束 | ezagent-bus-spec §3.2 (Hook Pipeline) |
-| Annotation Key 格式 | ezagent-bus-spec §3.3.2 (`{type}:{annotator_entity_id}`) |
+| content_type 命名格式 | ezagent-extensions-spec §18.4 |
+| _sw:* Channel 保留 | ezagent-extensions-spec §18.5 |
+| Room 级 Socialware 启用 | ezagent-extensions-spec §18.3 (ext.runtime) |
 | Index refresh 策略 | ezagent-bus-spec §3.4.2 (on_change / on_demand / periodic) |
 | Platform Bus Room | ezagent-bus-spec §5.2 (Room) |
 | Inner Bus Timeline | ezagent-bus-spec §5.3 (Timeline) |
@@ -675,12 +787,14 @@ class TaskArena:
 | **Flow** | 实体状态随 Commitment 兑现而演进的模式 |
 | **Platform Bus** | Socialware 间通信的普通 Bus 实例 |
 | **Inner Bus** | Socialware 内部通信的 Bus 实例 |
-| **Part A** | Socialware 的 Bus 层声明（DataType + Hook + Annotation + Index） |
-| **Part B** | Socialware 的 Socialware 层声明（Role + Arena + Commitment + Flow） |
+| **Part A** | Socialware 的协议层约定（content_type + Hook + Index） |
+| **Part B** | Socialware 的行为约束声明（Role + Arena + Commitment + Flow） |
+| **State Cache** | 从 Timeline Message 序列纯派生的内存运行时状态 |
+| **content_type 命名约定** | `{ns}:{entity_type}.{action}` 格式，由 EXT-17 Runtime 管控 |
 | **Fork** | 从已有 Socialware 创建结构相同但独立的新实例 |
 | **Compose** | 多个 Socialware 组成上层联邦 Socialware |
 | **Merge** | 两个同构 Socialware 合为一个 |
 | **HiTL** | Human-in-the-Loop，Agent 向 Human 的介入切换 |
 | **Registry** | 节点本地的 Socialware 安装注册表（`registry.toml`） |
-| **Manifest** | Socialware 的本地声明清单（`manifest.toml`），包含能力声明和命令注册 |
+| **Manifest** | Socialware 的本地声明清单（`manifest.toml`），包含 content_type 和命令注册 |
 | **Command** | 基于 EXT-15 的斜杠命令，Socialware 向用户暴露操作入口 |

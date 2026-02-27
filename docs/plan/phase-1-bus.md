@@ -218,7 +218,7 @@ WHEN   Engine 加载该 Extension
 THEN   Engine MUST 拒绝注册，报错 "extensions cannot register global hooks"
 ```
 
-### §4.3 Engine — Annotation Store
+### §4.3 Engine — Annotation Pattern
 
 #### TC-1-ANNOT-001: Annotation 写入和读取
 
@@ -226,11 +226,11 @@ THEN   Engine MUST 拒绝注册，报错 "extensions cannot register global hook
 GIVEN  R-alpha, M-001 已写入 timeline
        E-bob 是 R-alpha 的 member
 
-WHEN   E-bob 向 M-001 的 ext.annotations 写入:
+WHEN   E-bob 向 M-001 的 ext.watch 写入:
        key = "note:@bob:relay-a.example.com"
        value = { "text": "Important message" }
 
-THEN   读取 M-001 的 ext.annotations 包含该条目
+THEN   读取 M-001 的 ext.watch 包含该条目
        key 格式匹配 {type}:{entity_id}
 ```
 
@@ -253,7 +253,7 @@ GIVEN  P1 (E-alice) 在 M-001 上写入 annotation "tag:@alice:..."
 WHEN   P1 写入 annotation
 
 THEN   P2 在 <2s 内收到 annotation 更新
-       P2 读取 M-001.ext.annotations 包含 "tag:@alice:..."
+       P2 读取 M-001.ext.watch 包含 "tag:@alice:..."
 ```
 
 #### TC-1-ANNOT-004: 未知 Annotation 保留

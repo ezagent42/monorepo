@@ -104,11 +104,11 @@ AgentForge 不自己实现任何 AI 能力——它是一个编排层，通过 *
 
 | AgentForge 概念 | 分解为 |
 |----------------|--------|
-| Agent Template | DataType `af_template` 标记的 Message（模板配置） |
-| Agent Instance | Identity (ezagent) + `af_instance` Annotation (状态/配置) |
-| Agent Status | `af_instance` Annotation 中的 `status` 字段（CREATED/ACTIVE/SLEEPING/DESTROYED） |
-| Spawn 操作 | EXT-15 Command (`/af:spawn`) → Flow transition (CREATED → ACTIVE) |
-| Destroy 操作 | EXT-15 Command (`/af:destroy`) → Flow transition (* → DESTROYED) |
+| Agent Template | content_type=`af:template.register` 的 Message |
+| Agent Instance | Identity (ezagent) + State Cache 中的实例状态 |
+| Agent Status | State Cache 中从 af:* Message 序列派生的状态（CREATED/ACTIVE/SLEEPING/DESTROYED） |
+| Spawn 操作 | EXT-15 Command (`/af:spawn`) → content_type=`af:instance.spawn` Message → Flow transition |
+| Destroy 操作 | EXT-15 Command (`/af:destroy`) → content_type=`af:instance.destroy` Message → Flow transition |
 | Conversation Segment | Timeline 查询 + Reply chain 回溯（使用 EXT-04, EXT-06, EXT-11） |
 | Agent Workspace | `ezagent/socialware/agent-forge/agents/{agent_name}/` 本地目录 |
 
@@ -273,12 +273,12 @@ def build_segment(trigger_message, room_history, config):
 
 ### 5.1 DataTypes
 
-#### af_template
+#### af:template.register body schema
 
 Agent 模板定义。
 
 ```yaml
-af_template:
+# af:template.register Message body:
   content_type: immutable
   schema:
     id:               string          # 模板 ID
@@ -293,33 +293,35 @@ af_template:
     description:      string          # 模板描述
 ```
 
-#### af_instance
+#### af_instance (State Cache)
 
-Agent 实例状态。作为 Annotation 附加到 Agent Identity 的 Profile 上。
+Agent 实例状态。从 `af:instance.*` content_type Message 序列纯派生，存储在 State Cache 中。
 
-**Annotation 位置**：`profile.ext.annotations."af_instance:{agent_name}"`
+**不再是 Datatype doc**——所有状态变更通过发送 Message 记录。
 
 ```yaml
-af_instance:
-  agent_name:     string              # Agent 名称
-  template_id:    string              # 基于的模板 ID
-  status:         enum                # CREATED | ACTIVE | SLEEPING | DESTROYED
-  rooms:          [string]            # 加入的 Room 列表
-  config:                             # 实例级配置覆盖
+# State Cache 中的 Agent 实例信息（从 Message 序列重建）
+af_instance_state:
+  agent_name:     string              # 从 af:instance.spawn body 获取
+  template_id:    string              # 从 af:instance.spawn body 获取
+  status:         enum                # 从最近的 af:instance.* Message 推导
+                                      # CREATED | ACTIVE | SLEEPING | DESTROYED
+  rooms:          [string]            # 从 af:instance.join/leave 序列计算
+  config:                             # 从 af:instance.spawn + af:instance.configure 合并
     model:        string
     working_dir:  string
     sandbox:      [{path, access}]
   limits:
-    max_concurrent:     integer       # 最大并发处理数
-    max_context_messages: integer     # 上下文最大消息数
-    max_context_tokens:   integer     # 上下文最大 token 数
-    api_budget_daily:     integer     # 每日 API 调用预算
+    max_concurrent:     integer
+    max_context_messages: integer
+    max_context_tokens:   integer
+    api_budget_daily:     integer
   lifecycle:
-    auto_start:         boolean       # 节点启动时自动启动
-    idle_timeout:       string        # 空闲超时（如 "1h"）
-    auto_wake_on_mention: boolean     # @mention 时自动唤醒
-  created_at:     datetime
-  last_active_at: datetime
+    auto_start:         boolean
+    idle_timeout:       string
+    auto_wake_on_mention: boolean
+  created_at:     datetime            # af:instance.spawn Message 的 created_at
+  last_active_at: datetime            # 最近一次 af:* Message 的时间
 ```
 
 ### 5.2 Hooks
@@ -469,14 +471,17 @@ ezagent/socialware/agent-forge/
 [socialware]
 id = "agent-forge"
 name = "AgentForge"
-version = "0.1.0"
+namespace = "af"
+version = "0.9.3"
 
 [declaration]
-datatypes = ["af_template", "af_instance"]
-hooks = ["af.on_command", "af.on_mention", "af.auto_wake", "af.idle_check", "af.resource_guard"]
+content_types = ["af:template.register", "af:instance.spawn", "af:instance.destroy",
+                 "af:instance.wake", "af:instance.sleep", "af:instance.configure",
+                 "af:instance.join", "af:instance.leave",
+                 "af:role.grant", "af:role.revoke"]
+hooks = ["check_role", "on_command", "on_mention", "auto_wake", "idle_check", "resource_guard"]
 roles = ["af:admin", "af:operator", "af:agent"]
-annotations = ["af_instance"]
-indexes = ["agent_template_list", "agent_instance_list", "agent_activity"]
+flows = ["agent_lifecycle"]
 
 [commands]
 spawn = { params = ["template", "name", "rooms?"], role = "af:operator" }
@@ -489,7 +494,7 @@ templates = { params = [], role = "af:operator" }
 register-template = { params = ["id", "adapter", "config"], role = "af:admin" }
 
 [dependencies]
-extensions = ["EXT-01", "EXT-13", "EXT-14", "EXT-15"]
+extensions = ["EXT-04", "EXT-06", "EXT-13", "EXT-15", "EXT-17"]
 socialware = ["event-weaver"]
 
 [policy]

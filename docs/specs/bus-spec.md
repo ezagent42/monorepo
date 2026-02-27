@@ -5,8 +5,8 @@
 > Bus Layer Specification: Engine, Backend, Built-in Datatypes
 
 > **状态**：Draft
-> **日期**：2026-02-26
-> **版本**：0.9.1（新增 `ezagent/socialware/` 本地命名空间）
+> **日期**：2026-02-27
+> **版本**：0.9.3（方案 E: Socialware 不创建 Datatype，运行时状态从 Message 纯派生。EXT-17 Runtime 支持）
 > **前置文档**：ezagent-protocol-v0.8.md
 
 ---
@@ -21,7 +21,7 @@
      §3.2  Hook Pipeline
            §3.2.1 - §3.2.5 (existing)
            §3.2.6  Socialware Hook 注册
-     §3.3  Annotation Store
+     §3.3  Annotation（设计模式）
      §3.4  Index Builder
      §3.5  Datatype 声明格式
 §4   Storage / Sync Backend
@@ -64,7 +64,7 @@
 
 ### §1.1 协议概述
 
-ezagent 是一个基于 CRDT 的即时通信协议。协议定义了一个 **Engine** 抽象，由四个组件构成（Datatype Registry、Hook Pipeline、Annotation Store、Index Builder）。所有协议功能——无论是必须支持的 Identity/Room/Timeline/Message，还是可选的 Reactions/Channels/Moderation——都是 Engine 的实例，使用完全相同的声明格式。
+ezagent 是一个基于 CRDT 的即时通信协议。协议定义了一个 **Engine** 抽象，由四个组件构成（Datatype Registry、Hook Pipeline、Annotation Pattern、Index Builder）。所有协议功能——无论是必须支持的 Identity/Room/Timeline/Message，还是可选的 Reactions/Channels/Moderation——都是 Engine 的实例，使用完全相同的声明格式。
 
 本文档（Bus Spec）定义：
 
@@ -108,12 +108,12 @@ Extension Datatypes 定义在独立的 Extensions Spec 文档中。
 
 | 术语 | 定义 |
 |------|------|
-| **Engine** | ezagent 协议的核心抽象层，由 Datatype Registry、Hook Pipeline、Annotation Store、Index Builder 四个组件构成 |
+| **Engine** | ezagent 协议的核心抽象层，由 Datatype Registry、Hook Pipeline、Annotation Pattern、Index Builder 四个组件构成 |
 | **Datatype** | Engine 中数据的基本单元。声明一种可存储、可同步的数据结构及其行为规则 |
 | **Built-in Datatype** | 始终启用的 Datatype（Identity、Room、Timeline、Message），其 Hook 可注册全局作用范围 |
 | **Extension Datatype** | 可选启用的 Datatype（Reactions、Channels 等），按 Room 的 `enabled_extensions` 加载 |
 | **Hook** | 注册在 Engine 中的逻辑单元，在指定阶段（pre_send / after_write / after_read）和触发条件下执行 |
-| **Annotation** | 附着在已有数据节点上的元数据，存储在 `ext.annotations` 命名空间中 |
+| **Annotation** | Engine 四原语之一。描述"在已有数据节点上附加信息"的设计模式。物理存储由各 Extension 的 `ext.{ext_id}` 命名空间承载 |
 | **Index** | Datatype 对外暴露的查询/聚合能力，可映射为 API 端点 |
 | **Entity** | 协议中的参与者，由 Entity ID + Ed25519 密钥对标识。不区分 human 和 agent |
 | **Entity ID** | 格式为 `@{local_part}:{relay_domain}` 的唯一标识符 |
@@ -152,7 +152,7 @@ Extension Datatypes 定义在独立的 Extensions Spec 文档中。
 
 ## §3 ezagent.bus Engine
 
-Engine 是协议的核心抽象。所有协议功能通过 Engine 的四个组件声明和执行。
+Engine 是协议的核心抽象。所有协议功能通过 Engine 的四个核心组件声明和执行，外加 Extension Loader 负责动态加载 Extension。
 
 ### §3.1 Datatype Registry
 
@@ -175,6 +175,7 @@ Engine 是协议的核心抽象。所有协议功能通过 Engine 的四个组�
 | `key_pattern` | string | MUST | 存储路径模板（见 §3.1.3） |
 | `persistent` | boolean | MUST | 是否要求 Relay 持久化 |
 | `writer_rule` | string | MUST | 写入权限表达式（见 §3.1.4） |
+| `sync_strategy` | SyncStrategy | MAY | 同步策略（见 §3.1.6）。默认 `eager` |
 
 #### §3.1.2 storage_type 枚举
 
@@ -206,7 +207,7 @@ key_pattern 是存储路径的模板字符串。MUST 包含以下保留变量：
 |------|------|--------|
 | `{room_id}` | Room 的 UUIDv7 | `01957a3b-...` |
 | `{entity_id}` | Entity ID（含 @ 前缀和 relay domain） | `@alice:relay-a.example.com` |
-| `{YYYY-MM}` | 时间窗口标识 | `2026-02` |
+| `{shard_id}` | Timeline shard 标识 (UUIDv7) | `019a3b4c-...` |
 | `{content_id}` | Content Object ID | `sha256:a1b2c3...` 或 `uuid:...` |
 | `{blob_hash}` | Blob 的 SHA-256 哈希 | `a1b2c3d4...` |
 | `{ext_id}` | Extension Datatype ID | `moderation` |
@@ -243,6 +244,36 @@ Engine MUST 按以下规则加载 Datatype：
 4. [MUST] Extension Datatypes 仅在 Room Config 的 `enabled_extensions` 列表中出现时加载。
 5. [SHOULD] 加载顺序在满足依赖约束的前提下保持稳定（确定性排序）。
 
+#### §3.1.6 sync_strategy 枚举
+
+`sync_strategy` 控制 CRDT update 产生后如何传播给其他 Peer。
+
+```yaml
+SyncStrategy:
+  mode:     enum          # eager | batched | lazy
+  batch_ms: integer       # batched 模式的聚合窗口（毫秒），默认 2000
+```
+
+| 模式 | 行为 | 适用场景 |
+|------|------|---------|
+| `eager` | update 产生后立即发布到 Zenoh key expression，所有订阅者实时收到 | 消息、配置变更、实时协作 |
+| `batched` | update 先缓冲，到 `batch_ms` 窗口结束后合并为一个 merged update 发布 | 高频低优先级更新（Reactions、Read Receipts） |
+| `lazy` | update 不主动推送，其他 Peer 通过 state query 主动拉取 | 按需数据（Blob 内容、历史 Profile） |
+
+- [MUST] 未声明 `sync_strategy` 的 Datatype 默认为 `eager`。
+- [MUST] `ephemeral` 类型的 Datatype MUST 使用 `eager`（临时数据无法做 batched/lazy）。
+- [SHOULD] `batched` 模式在 Relay 中转场景下由 Relay 实现缓冲和合并。P2P 直连场景下 MAY 退化为 `eager`。
+- [MAY] Room Config 中 MAY 通过 `ext.{ext_id}.sync_strategy_override` 覆盖 Datatype 声明的默认策略。
+
+**Built-in Datatype 默认 sync_strategy**：
+
+| Datatype | 默认 | 理由 |
+|----------|------|------|
+| `room_config` | `eager` | 配置变更必须实时 |
+| `timeline_index` | `eager` | 新消息必须实时 |
+| `content_doc` | `eager` | 消息内容必须实时 |
+| `blob` | `lazy` | 大文件按需拉取 |
+
 ---
 
 ### §3.2 Hook Pipeline
@@ -270,7 +301,7 @@ Engine MUST 按以下规则加载 Datatype：
 | 约束 | 级别 |
 |------|------|
 | MAY 修改待写入的数据（添加字段、修改值） | |
-| MAY 向 `ext.annotations` 添加 annotation | |
+| MAY 向 `ext.{ext_id}` 添加 annotation | |
 | MAY 拒绝写入（返回错误，中止整个写入操作） | |
 | MUST NOT 读取尚未写入的数据 | |
 | MUST NOT 发起阻塞性外部请求（网络 I/O 等）。如需外部数据，SHOULD 异步获取后回写为 annotation | |
@@ -354,61 +385,41 @@ Engine MUST 按以下规则加载 Datatype：
 
 ---
 
-### §3.3 Annotation Store
+### §3.3 Annotation（设计模式）
 
-#### §3.3.1 存储位置
+Annotation 是 Engine 四原语之一。它描述的是一种数据组织模式：**在已有数据节点上附加结构化信息**。
 
-每个 CRDT type 的数据节点（Y.Map）MAY 包含一个 `ext.annotations` 子 Y.Map，用于存储 Annotation。
+Annotation 不是独立的存储位置或命名空间。它通过以下方式实现：
 
-[MUST] `ext.annotations` 是 Engine 的保留命名空间。任何 Datatype 或 Extension MUST NOT 将 `ext.annotations` 用于非 Annotation 目的。
-
-[MUST] 与 `ext.annotations` 并列的 `ext.{ext_id}` 命名空间由对应 Extension Datatype 管理，不属于 Annotation Store。
+- **Extension** 在 ref / room_config 的 `ext.{ext_id}` 命名空间中写入数据（如 `ext.reactions`、`ext.watch`、`ext.link-preview`）
+- **Socialware** 不直接写 Annotation。Socialware 通过发送特定 content_type 的 Message（经 EXT-17 Runtime 管控）表达状态变更，运行时状态从 Message 序列纯派生
+- **Built-in Hook** 在 ref 的 Bus 字段中写入数据（如 `status`）
 
 ```
 ref Y.Map:
   ref_id: ...                      # Bus 字段
-  ext.reactions: ...               # Extension 管理的字段
-  ext.channels: ...                # Extension 管理的字段
-  ext.annotations: Y.Map { ... }   # Annotation Store (Engine 管理)
+  ext.reactions: ...               # EXT-03 管理
+  ext.channels: ...                # EXT-06 管理
+  ext.link-preview: ...            # EXT-16 管理
+  ext.command: ...                 # EXT-15 管理
 ```
 
-#### §3.3.2 Annotation Key 格式
+#### §3.3.1 Annotation Key 约定
 
-Annotation 的 key MUST 为 `{type}:{annotator_entity_id}` 格式。
+当多个 Entity 在同一 `ext.{ext_id}` 命名空间内写入数据时，key 格式 SHOULD 包含 `entity_id` 以避免冲突。
 
-| 部分 | 规则 |
-|------|------|
-| `type` | `[a-z0-9_-]+`，长度 1-64。描述 annotation 的语义类型 |
-| `annotator_entity_id` | 有效的 Entity ID，标识是谁写入了此 annotation |
+- [SHOULD] 推荐 key 格式：`{semantic}:{entity_id}`（如 `👍:@alice:relay-a.com`）。
+- [MUST] 写入者只能修改包含自己 entity_id 的 key（由各 Extension 的 `writer_rule` 定义）。
+- [MUST] 不支持某 Extension 的 Peer 收到包含未知 `ext.*` 字段时，MUST 保留该字段（Y.Map 默认行为），MUST NOT 删除。
 
-特殊 annotator：`@system:local` 是实现内部 Hook 系统的保留 ID，表示由本地 Hook 自动生成。
+特殊 annotator：`@system:local` 是 Engine 内部 Hook 系统的保留 ID，表示由本地 Hook 自动生成。
 
-示例：
+#### §3.3.2 与 CRDT 的交互
 
-```
-"link_preview:@system:local"
-"watch:@agent-1:relay-a.example.com"
-"task_status:@agent-1:relay-a.example.com"
-```
-
-#### §3.3.3 权限规则
-
-- [MUST] 任何 Room member 都 MAY 在该 Room 内任何 ref 的 `ext.annotations` 上添加 annotation。
-- [MUST] Annotation key 中的 `annotator_entity_id` 必须等于签名者。实现 MUST 验证此约束。
-- [MUST] Entity 只能删除或修改自己创建的 annotation（key 中包含自己的 entity_id）。
-- [MAY] Relay 管理员可通过 Moderation Extension 移除恶意 annotation。
-
-#### §3.3.4 Annotation 值格式
-
-Annotation 的值 MUST 是 JSON-compatible 数据。实现 MUST 支持以下 JSON 类型作为 annotation 值：string, number, boolean, null, array, object。
-
-实现 MUST NOT 假设 annotation 值的 schema——annotation 的语义由写入者和消费者之间的约定决定，Engine 不验证值的结构。
-
-#### §3.3.5 与 CRDT 的交互
-
-- [MUST] Annotation 写入遵循宿主 Y.Map 的 LWW 语义。并发写入同一 annotation key 时，最后写入者胜出。
-- [MUST] Annotation 随宿主数据一起同步。不需要独立的同步通道。
-- [MUST] 不支持某个 Extension 的 Peer 收到包含未知 annotation 的数据时，MUST 保留该 annotation（Y.Map 默认行为），MUST NOT 删除。
+- [MUST] `ext.{ext_id}` 字段嵌入在宿主 Y.Map 中时，随宿主数据一起同步。
+- [MUST] Extension 声明为独立 CRDT doc 的数据（如 `read_receipts`）独立同步，可拥有自己的 `sync_strategy`。
+- [MUST] 并发写入同一 key 时，遵循 Y.Map 的 LWW 语义。
+- [MAY] Relay 管理员可通过 Moderation Extension 移除恶意数据。
 
 ---
 
@@ -459,6 +470,9 @@ datatypes:                     # [MUST] 至少一个 data entry（空列表表�
     key_pattern:   string
     persistent:    boolean
     writer_rule:   string
+    sync_strategy:               # [MAY] 同步策略（默认 eager）
+      mode:        enum          #   eager | batched | lazy
+      batch_ms:    integer       #   batched 模式的聚合窗口（毫秒）
 
 hooks:                         # [MAY] Hook 列表
   pre_send:    Hook[]
@@ -466,7 +480,7 @@ hooks:                         # [MAY] Hook 列表
   after_read:  Hook[]
 
 annotations:                   # [MAY] 此 Datatype 使用的 Annotation 描述
-  on_ref:         {}           # 附着在 ref 上的 ext.{ext_id} 或 ext.annotations.*
+  on_ref:         {}           # 附着在 ref 上的 ext.{ext_id}
   on_room_config: {}           # 附着在 room config 上的 ext.{ext_id}
   standalone_doc: {}           # 独立 doc 中的数据
 
@@ -482,13 +496,13 @@ indexes:                       # [MAY] Index 列表
 
 Datatype 有两种加载方式：
 1. **编译时注册**（Rust trait impl）：Built-in + Extension Datatypes。协议层行为，所有 peer 一致。
-2. **运行时 Hook 注册**（PyO3 callback）：Socialware 层通过 Python @hook decorator 注册应用级 Hook（参见 §3.2.6）。不创建新 Datatype，仅在已有 Datatype 上挂载 Hook。
+2. **运行时 Hook 注册**（PyO3 callback）：Socialware 层通过 Python @hook decorator 注册应用级 Hook（参见 §3.2.6）。不创建新 Datatype，不引入新的 CRDT 文档或命名空间，仅在已有 Datatype 上挂载 Hook。Socialware 的所有数据以普通 Message（特定 content_type，由 EXT-17 Runtime 管控）形式存在于 Timeline 中，运行时状态从 Message 序列纯派生（参见 ezagent-socialware-spec §2.5 State Cache）。
 
 [MUST] 统一声明格式同时作为 Python API 自动生成的输入。详见 ezagent-py-spec §6。
 
 #### §3.5.2 Renderer 声明 [MAY]
 
-统一声明格式的每个组件 MAY 附带 `renderer` 字段，用于声明 UI 渲染方式。`renderer` 字段不影响协议层行为——CRDT 同步、Hook 执行、Annotation 存储、Index 计算均不受影响。`renderer` 字段由前端实现消费，用于 Render Pipeline（详见 chat-ui-spec）。
+统一声明格式的每个组件 MAY 附带 `renderer` 字段，用于声明 UI 渲染方式。`renderer` 字段不影响协议层行为——CRDT 同步、Hook 执行、Annotation Pattern、Index 计算均不受影响。`renderer` 字段由前端实现消费，用于 Render Pipeline（详见 chat-ui-spec）。
 
 ```yaml
 # 完整的统一声明格式（含 renderer）
@@ -503,6 +517,9 @@ datatypes:
     key_pattern:   string
     persistent:    boolean
     writer_rule:   string
+    sync_strategy:                       # [MAY] 同步策略
+      mode:          enum                #   eager | batched | lazy
+      batch_ms:      integer             #   batched 聚合窗口
     renderer:                          # [MAY] Content Renderer 声明
       type:          string            #   预定义渲染器类型
       field_mapping: map               #   字段 → 显示位置
@@ -697,6 +714,28 @@ Network Backend 为 Engine 提供 Peer 间的数据传输能力。
 3. [MUST] 重连后，Peer MUST 发布所有 pending updates。
 4. [SHOULD] 实现 SHOULD 支持自动重连，无需用户干预。
 
+#### §4.5.4 sync_strategy 行为
+
+`sync_strategy` 影响 §4.5.2 Live Sync 的传播行为：
+
+**eager（默认）**：
+
+- [MUST] update 产生后立即发布到 Zenoh key expression。与 §4.5.2 行为完全一致。
+
+**batched**：
+
+- [MUST] Peer 本地仍然立即将 update 发布到 Zenoh。
+- [SHOULD] Relay 收到 `sync_strategy: batched` 的 Datatype 的 update 时，SHOULD 缓冲而非立即转发。
+- [SHOULD] 缓冲窗口到期（`batch_ms`）后，Relay SHOULD 将窗口内的所有 update 合并为一个 merged update 后转发给订阅者。
+- [MUST] P2P 直连场景下（不经 Relay），batched MAY 退化为 eager。协议不要求 Peer 端实现 batching。
+
+**lazy**：
+
+- [MUST] update 仍然正常发布到 Zenoh key expression（用于 Relay 持久化）。
+- [MUST] Relay MUST 持久化 lazy Datatype 的 update，但 MUST NOT 主动推送给订阅者。
+- [MUST] 其他 Peer 需要数据时，通过 §4.5.1 Initial Sync 的 state query 主动拉取。
+- [MAY] 实现 MAY 对 lazy Datatype 延迟订阅——仅在首次 query 时才建立订阅。
+
 ### §4.6 Persistence
 
 #### §4.6.1 本地持久化
@@ -711,6 +750,60 @@ Network Backend 为 Engine 提供 Peer 间的数据传输能力。
 - [MUST] Relay MUST 持久化 `persistent: true` 且 key_pattern 在其管辖范围内的文档。
 - [SHOULD] Relay SHOULD 定期合并累积的 CRDT updates 为单一 state snapshot，以减小 initial sync 的传输量。推荐每 100 次 update 合并一次。
 - [MUST NOT] Relay MUST NOT 持久化 `ephemeral` 类型数据。
+- [SHOULD] 对 `sync_strategy: batched` 的 Datatype，Relay SHOULD 在 `batch_ms` 窗口内缓冲 update 后合并转发（见 §4.5.4）。
+- [MUST] Relay 的配额管理和 Blob GC 策略见 relay-spec。
+
+### §4.7 Extension Loader
+
+Extension 采用动态链接加载。Engine 启动时从 `~/.ezagent/extensions/` 扫描并加载所有 Extension。官方和第三方 Extension 使用相同机制。
+
+#### §4.7.1 加载流程
+
+```
+Engine 启动
+  → 扫描 ~/.ezagent/extensions/*/manifest.toml
+  → 解析所有 manifest，构建依赖图
+  → 按拓扑排序确定加载顺序
+  → 依次 dlopen 每个 Extension 的 .so/.dylib
+  → 调用 Extension 入口函数注册 Datatypes 和 Hooks
+  → 注册完成，Engine 就绪
+```
+
+#### §4.7.2 manifest.toml 规范
+
+每个 Extension 目录 MUST 包含 `manifest.toml`：
+
+```toml
+[extension]
+name = "reactions"               # MUST: 唯一名称，与目录名一致
+version = "0.9.4"                # MUST: 语义化版本号
+api_version = "1"                # MUST: Extension ABI 版本
+
+[datatypes]
+declarations = ["reactions"]     # MUST: 声明的 DatatypeDeclaration 名称列表
+
+[hooks]
+phases = ["after_write"]         # MUST: 使用的 Hook 阶段
+triggers = ["message.insert"]    # MUST: 监听的 trigger 列表
+
+[dependencies]
+extensions = []                  # MAY: 依赖的其他 Extension 名称列表
+```
+
+#### §4.7.3 加载约束
+
+- [MUST] Engine MUST 扫描 `~/.ezagent/extensions/*/manifest.toml`。
+- [MUST] `api_version` 与 Engine 不兼容时，MUST 跳过该 Extension 并记录 WARNING 日志。
+- [MUST] `dependencies.extensions` 中声明的 Extension MUST 先于自身加载。循环依赖 MUST 导致所有涉及的 Extension 加载失败。
+- [SHOULD] 单个 Extension 加载失败 SHOULD NOT 阻止 Engine 启动。该 Extension 声明的 Datatypes 和 Hooks 不可用，Engine MUST 对引用这些 Datatypes 的操作返回 `EXTENSION_NOT_LOADED` 错误。
+- [MUST] Extension 入口函数 MUST 调用 Engine 提供的注册 API 完成 Datatype 和 Hook 注册，不得直接修改 Engine 内部状态。
+
+#### §4.7.4 动态注册
+
+Extension Loader 通过以下 Engine 内部 API 注册 Extension 提供的功能：
+
+- **DatatypeRegistry**：`registry.register_extension_datatype(decl)` — 在 §3.1 Registry 中注册新的 DatatypeDeclaration。与 Built-in Datatypes 的编译期注册使用相同数据结构。
+- **HookPipeline**：`pipeline.register_extension_hook(hook_decl)` — 在 §3.2 Pipeline 中注册 Hook handler。Extension Hook 的 priority 范围为 0-99（Built-in Hook 保留 ≥100）。
 
 ---
 
@@ -865,7 +958,7 @@ Room Config 是一个 `crdt_map`，包含以下字段：
 | `power_levels.admin` | integer | MUST | 修改 config 所需 power level |
 | `power_levels.users` | Map<Entity ID, integer> | MAY | 用户级别覆盖 |
 | `relays` | Array<{endpoint, role}> | MUST | Relay 列表。role: `primary` / `secondary` |
-| `timeline.window_size` | string | MUST | 分片策略。当前仅支持 `monthly` |
+| `timeline.shard_max_refs` | integer | MUST | 单 shard 最大 Ref 数量。默认 10000 |
 | `enabled_extensions` | string[] | MUST | 启用的 Extension Datatype ID 列表 |
 
 **Optional 字段**：
@@ -874,18 +967,15 @@ Room Config 是一个 `crdt_map`，包含以下字段：
 |------|------|------|
 | `avatar_hash` | sha256 | 房间头像 |
 | `encryption` | enum | `transport_only`（当前唯一支持值） |
-| `timeline.max_refs_per_window` | integer | 单窗口最大 ref 数量，默认 100000 |
 
 **Extension 字段（MAY）**：
 
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `ext.{ext_id}` | Y.Map | Extension 管理的配置数据（如 `ext.channels.hints`、`ext.moderation.power_level`） |
-| `ext.annotations` | Y.Map | Annotation Store（Engine 管理，如 `channel_watch:@{entity_id}`） |
 
 - [MUST] `ext.{ext_id}` 命名空间由对应 Extension 管理。Bus 实现 MUST 保留但 MUST NOT 解释这些字段。
-- [MUST] `ext.annotations` 由 Annotation Store 管理（见 §3.3）。
-- [MUST] 不支持某 Extension 的 Peer MUST 保留 Room Config 上的 `ext.*` 字段和 `ext.annotations`，MUST NOT 在更新 Config 时丢失这些字段。
+- [MUST] 不支持某 Extension 的 Peer MUST 保留 Room Config 上的 `ext.*` 字段，MUST NOT 在更新 Config 时丢失这些字段。
 
 #### §5.2.4 成员角色与 Power Level
 
@@ -953,7 +1043,7 @@ Room Config 是一个 `crdt_map`，包含以下字段：
 
 - [MUST] 创建者生成 UUIDv7 作为 `room_id`。
 - [MUST] 创建 Room Config doc，写入初始成员（创建者为 `owner`）和至少一个 Relay。
-- [MUST] 创建当前月份的 Timeline Index doc。
+- [MUST] 创建第一个 Timeline Index shard（生成 UUIDv7 作为 shard_id）。
 
 **加入**：
 
@@ -1013,7 +1103,7 @@ dependencies: ["identity", "room"]
 |------|---|
 | id | `timeline_index` |
 | storage_type | `crdt_array` |
-| key_pattern | `ezagent/{room_id}/index/{YYYY-MM}/{state\|updates}` |
+| key_pattern | `ezagent/{room_id}/index/{shard_id}/{state\|updates}` |
 | persistent | `true` |
 | writer_rule | `signer ∈ room.members AND ref.author == signer` |
 
@@ -1036,7 +1126,6 @@ Timeline Index 是一个 `crdt_array`，其中每个元素是一个 `crdt_map`�
 **Extension 字段命名空间**：
 
 - [MUST] Extension 注入的字段存储在 `ext.{ext_id}` key 下。
-- [MUST] Annotation Store 的数据存储在 `ext.annotations` key 下。
 - [MUST] 不支持某 Extension 的 Peer 收到含 `ext.*` 字段的 Ref 时，MUST 保留这些字段。
 
 #### §5.3.4 排序规则
@@ -1046,13 +1135,29 @@ Timeline Index 是一个 `crdt_array`，其中每个元素是一个 `crdt_map`�
 - [MUST] `created_at` 字段不影响排序。离线创建的消息上线后出现在 Timeline 的当前位置。
 - [SHOULD] 客户端 MAY 在 UI 中显示 `created_at` 作为辅助信息。
 
-#### §5.3.5 时间窗口分片
+#### §5.3.5 数量分片
 
-- [MUST] Timeline Index 按月分片。Doc ID 格式为 `ezagent/{room_id}/index/{YYYY-MM}`。
-- [MUST] 新 Ref MUST 写入当前 UTC 月份对应的 Index Doc。
-- [MUST] 旧月份的 Index Doc MUST 仍然允许 `ext.*` 字段的更新（Reactions、Status 变更等）。
-- [SHOULD] Peer 默认订阅当前月份和前一个月份的 Index Doc。更早的窗口按需加载。
-- [MAY] 窗口的 `max_refs_per_window` 超限时，实现 MAY 创建子分片（如 `2026-02-a`, `2026-02-b`）。
+Timeline Index 按 Ref 数量分片。每个 shard 是一个独立的 CRDT doc。
+
+- [MUST] `shard_id` 为 UUIDv7 格式。UUIDv7 天然包含创建时间戳，可按时间排序。
+- [MUST] Room 创建时 MUST 创建第一个 shard。
+- [MUST] 当当前 shard 的 Ref 数量 >= `shard_max_refs` 时，发送者 MUST 创建新 shard（生成新 UUIDv7）并将新 Ref 写入新 shard。
+- [MUST] 新 Ref MUST 总是写入最新的 shard（shard_id 最大的那个）。
+- [MUST] 旧 shard 的 Ref MUST 仍然允许 `ext.*` 字段的更新（Reactions、Status 变更等）。
+- [SHOULD] Peer 默认订阅最新的 2 个 shard。更早的 shard 按需加载。
+- [SHOULD] `shard_max_refs` 默认值为 10000，可在 Room Config 的 `timeline.shard_max_refs` 中配置。
+
+**Room Config 字段**：
+
+| 字段 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `timeline.shard_max_refs` | integer | MUST | 单 shard 最大 Ref 数量。默认 10000 |
+
+**时间定位**：由于 shard_id 是 UUIDv7（含时间戳），按时间范围查找消息的流程为：
+
+1. 列出 Room 的所有 shard_id
+2. 根据 UUIDv7 中的时间戳定位目标 shard
+3. 在目标 shard 内通过 cursor 分页
 
 #### §5.3.6 消息删除（Bus）
 
@@ -1105,7 +1210,7 @@ Timeline Index 是一个 `crdt_array`，其中每个元素是一个 `crdt_map`�
 
 | 字段 | 值 |
 |------|---|
-| input | `timeline_index for ezagent/{room_id}/index/{YYYY-MM}` |
+| input | `timeline_index for ezagent/{room_id}/index/{shard_id}` |
 | transform | CRDT-ordered refs with cursor-based pagination |
 | refresh | `on_change` |
 | operation_id | `timeline.list` |
@@ -1241,12 +1346,16 @@ Extension MAY 注册新的 `status` 值（如 `"edited"`）。
 Public Relay 是 ezagent 网络中提供跨网络桥接、离线恢复、身份注册和实体发现的可选公共服务。Relay 不拥有数据——它缓存和转发数据。
 
 - [MUST] Public Relay MUST 以 Zenoh router mode 运行。
-- [MUST] Public Relay MUST 支持 §4.5 定义的 Sync Protocol。
+- [MUST] Public Relay MUST 支持 §4.5 定义的 Sync Protocol（含 §4.5.4 sync_strategy 行为）。
 - [MUST] Public Relay MUST 持久化 `persistent: true` 的数据。
 - [MUST] Public Relay MUST 通过 TLS 对外提供服务。
 - [MUST] Public Relay MUST 支持 Entity 注册（存储 entity_id → public_key 映射）。
 - [MUST] Public Relay MUST 提供公钥查询服务，供 P2P 身份验证使用。
+- [MUST] Public Relay MUST 维护全局 Blob Store（全局去重存储，见 EXT-10 及 relay-spec §4.3）。
 - [SHOULD] Public Relay SHOULD 支持 Access Control（§6.4）。
+- [SHOULD] Public Relay SHOULD 支持配额管理（Quota），详见 relay-spec §5。
+
+Relay 的完整运营规范（Admin API、配额管理、Blob GC、监控）定义在 relay-spec 中。
 
 ### §6.3 合规性等级
 
@@ -1290,7 +1399,7 @@ Access Control 验证入站 CRDT update 的合法性。
 
 ### §6.6 Relay 本地数据
 
-Relay 维护自身的运营数据，这些数据**不参与 CRDT 同步**，仅存在于 Relay 本地存储中。
+Relay 维护自身的运营数据，这些数据**不参与 CRDT 同步**，仅存在于 Relay 本地存储中。完整的 Relay 存储管理规范见 relay-spec §4。
 
 #### §6.6.1 数据分类
 
@@ -1298,6 +1407,8 @@ Relay 维护自身的运营数据，这些数据**不参与 CRDT 同步**，仅�
 |------|------|-----------------|
 | **Relay 配置** | 合规性等级、支持的 Extension 列表、TLS 证书、管理员 Entity ID | Level 1+ |
 | **Entity 注册表** | entity_id → public_key 映射 | Level 1+ |
+| **Quota 配置** | per-entity 存储配额和用量统计 | Level 2+ |
+| **Blob 引用计数** | blob_hash → ref_count（全局 Blob GC 依赖） | Level 1+ |
 | **Discovery 索引** | 本 Relay 上所有 Entity Profile 的聚合索引，支持 Discovery 搜索 | Level 3 |
 | **Proxy Profile 缓存** | 外部 Relay 上 Entity 的 Profile 本地缓存（Virtual User），供 Discovery 使用 | Level 3 |
 | **State Vector 缓存** | 与各 Peer/Relay 的 state vector 缓存，加速 initial sync 差量计算 | Level 1+ |
@@ -1392,7 +1503,7 @@ events.stream          # 实时事件流
 status                 # 节点状态
 ```
 
-> Annotation Operations 覆盖两个层级：Ref 和 Room Config。任何包含 `ext.annotations` 子 Y.Map 的 CRDT 文档节点都通过此 Operation 访问。
+> Annotation Operations 覆盖两个层级：Ref 和 Room Config。Annotation 数据存储在各 Extension 的 `ext.{ext_id}` 命名空间中，通过对应 Extension 的 Operation 访问。
 
 Extension Operations 由各 Extension 的 Indexes 导出，定义在 Extensions Spec 中。
 
@@ -1465,7 +1576,7 @@ Extension 的 Event Types 定义在 Extensions Spec 中。
 ### §8.2 向前兼容性
 
 - [MUST] 低层级 Peer 与高层级 Peer 在同一 Room 共存时：
-  - 低层级 Peer MUST 保留未知的 `ext.*` 字段和 `ext.annotations`。
+  - 低层级 Peer MUST 保留未知的 `ext.*` 字段。
   - 低层级 Peer 修改 Ref 的 Bus 字段时，MUST NOT 丢失 Extension 字段。
   - 低层级 Peer MUST NOT 渲染未知 Extension 的数据。
   - 低层级 Peer MAY 不订阅未知 Extension 的独立 Doc。
@@ -1521,16 +1632,19 @@ ezagent/@{entity_id}/identity/pubkey
 
 # === Room Bus ===
 ezagent/{room_id}/config/{state|updates}
-ezagent/{room_id}/index/{YYYY-MM}/{state|updates}
+ezagent/{room_id}/index/{shard_id}/{state|updates}         # shard_id = UUIDv7
 
 # === Content (Bus + Extension) ===
 ezagent/{room_id}/content/{sha256_hash}                    # Bus §5.4 Immutable Content
 ezagent/{room_id}/content/{content_id}/{state|updates}     # EXT-01/02 Mutable/Collab
 ezagent/{room_id}/content/{content_id}/acl/{state|updates} # EXT-02 Collab ACL
-ezagent/{room_id}/blob/{blob_hash}                         # EXT-10 Media
+
+# === Global Blob ===
+ezagent/blob/{sha256_hash}                                  # EXT-10 Global Blob (immutable)
 
 # === Extension Docs ===
 ezagent/{room_id}/ext/{ext_id}/{state|updates}             # EXT-07, EXT-08
+ezagent/{room_id}/ext/media/blob-ref/{sha256_hash}         # EXT-10 per-room Blob Ref
 ezagent/{room_id}/ext/draft/{entity_id}/{state|updates}    # EXT-12
 
 # === Ephemeral ===
@@ -1599,7 +1713,7 @@ AFTER_READ phase (当其他 Peer 读取此 Ref 时):
 | Content Object | Event content | Message content | ezagent 分离索引与内容 |
 | Timeline Index | Event DAG | (无) | ezagent 用 CRDT array |
 | Channel | (无) | Stream + Topic | ezagent Channel 是 tag |
-| ext.annotations | (无) | (无) | ezagent 独有 |
+| ext.{ext_id} | (无) | (无) | Extension 的 Annotation 数据，各 Extension 自行管理 |
 | Relay | Homeserver | Server | ezagent Relay 不拥有数据 |
 | Moderation Overlay | Redaction event | (无) | ezagent 不修改原始数据 |
 | Watch | (无) | (无) | ezagent Hook + Annotation 组合 |
@@ -1611,5 +1725,7 @@ AFTER_READ phase (当其他 Peer 读取此 Ref 时):
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 0.4 | 2026-02-27 | 新增 §4.7 Extension Loader（dlopen 动态加载 + manifest.toml 规范 + 动态注册）。§3 引言更新提及 Extension Loader |
+| 0.3 | 2026-02-27 | Annotation Store 重构为 Annotation Pattern（移除 ext.annotations 命名空间）。新增 sync_strategy（eager/batched/lazy）。Timeline 分片从月度改为数量分片（UUIDv7 shard_id）。Blob 从 per-room 改为全局去重 + per-room Ref。Relay 运营规范提取到 relay-spec。新增 EXT-16 Link Preview |
 | 0.2 | 2026-02-23 | Engine-centric 重构。Datatype+Hook+Annotation+Index 统一模型。Built-in 与 Extension 统一声明格式。Sync 降级为可替换 Backend。新增 EXT-13 Profile、EXT-14 Watch。Annotation Store 内置为 Engine 组件 |
 | 0.1 | 2026-02-22 | 初始 Spec（5 Bus + Extension 三种原子操作） |

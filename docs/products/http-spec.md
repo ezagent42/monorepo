@@ -19,24 +19,22 @@ ezagent-py SDK (PyO3)
   FastAPI Server  ← 本文档定义的 HTTP 接口
        │
        ├── REST API (/api/*)
-       ├── WebSocket (/ws)
-       └── Static Files (Chat UI)
+       └── WebSocket (/ws)
 ```
 
 ### §1.1 启动
 
 ```bash
-ezagent start                     # 默认 localhost:8000，含 Chat UI
+ezagent start                     # 前台启动 API server (localhost:8847)
 ezagent start --port 9000         # 自定义端口
-ezagent start --no-ui             # 只启动 API，不 serve Chat UI
+ezagent serve                     # 后台 daemon 模式
 ```
 
 ### §1.2 基础 URL
 
 ```
-http://localhost:{port}/api/      # REST API
-ws://localhost:{port}/ws           # WebSocket Event Stream
-http://localhost:{port}/           # Chat UI 静态文件（除非 --no-ui）
+http://localhost:8847/api/        # REST API
+ws://localhost:8847/ws            # WebSocket Event Stream
 ```
 
 ---
@@ -264,7 +262,7 @@ http://localhost:{port}/           # Chat UI 静态文件（除非 --no-ui）
 | `/api/agents/{agent_name}` | GET | Agent 详情（状态、配置、活动日志） |
 | `/api/agents/templates` | GET | 列出可用 Agent 模板 |
 
-> Agent 的 spawn/destroy/wake/sleep 操作通过 EXT-15 Command 执行（`/af:spawn` 等），不设独立的 REST 端点。这保持了操作路径的一致性——CLI、Chat UI、REST 都通过同一套命令系统。
+> Agent 的 spawn/destroy/wake/sleep 操作通过 EXT-15 Command 执行（`/af:spawn` 等），不设独立的 REST 端点。这保持了操作路径的一致性——CLI、Desktop App、REST 都通过同一套命令系统。
 
 ---
 
@@ -400,5 +398,6 @@ async def get_renderers():
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 0.1.2 | 2026-02-27 | §1 移除 Static Files / Chat UI；端口 8000 → 8847；§1.1 start/serve 命令更新 |
 | 0.1.1 | 2026-02-26 | 新增 §3.14 EXT-15 Command 端点, §3b Socialware 管理 + Agent 管理端点, WebSocket command.* 事件 |
 | 0.1 | 2026-02-25 | 从 ezagent-py-spec v0.8 §9 + extensions-spec 附录 G 整合。新增 §4 Render Pipeline API |

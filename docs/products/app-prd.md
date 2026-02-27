@@ -25,10 +25,10 @@ ezagent Chat App 是 ezagent 协议的终端用户入口。用户通过类似 Sl
 ### §1.3 交付形态
 
 | 形态 | 技术 | 分发方式 |
-|------|------|---------|
-| Desktop App | 内嵌 Python + FastAPI + React WebView | DMG (macOS), MSI (Windows), AppImage (Linux) |
-| Web 访问 | `ezagent start` → 浏览器访问 | `pip install ezagent` → `ezagent start` |
-| Homebrew | `brew install ezagent` | macOS |
+|------|------|---------:|
+| Desktop App (Tray + UI) | 内嵌 Python runtime + Engine + React WebView | DMG (macOS), MSI (Windows), AppImage (Linux) |
+| Homebrew | `brew install ezagent` → CLI + App + LaunchAgent | macOS |
+| CLI only | `pip install ezagent` | 所有平台 |
 
 ---
 
@@ -121,22 +121,49 @@ ezagent Chat App 是 ezagent 协议的终端用户入口。用户通过类似 Sl
 ### §4.2 启动流程
 
 ```
-用户双击 ezagent.app
-  → launcher binary 启动
-  → 加载内嵌 Python runtime
-  → python -m ezagent.server
-  → FastAPI + Chat UI 启动
-  → 打开系统 WebView 或浏览器
-  → 用户看到 Chat UI
+首次安装 (DMG):
+  用户拖拽 ezagent.app → /Applications/
+  首次打开:
+    → 检测 /usr/local/bin/ezagent 是否存在
+    → 若不存在:
+      ┌─────────────────────────────────────────────┐
+      │  ⚡ ezagent 需要后台运行才能让 Agent 保持在线。 │
+      │                                             │
+      │  这将：                                      │
+      │   • 安装 ezagent 命令到 /usr/local/bin/      │
+      │   • 设置开机自动启动                          │
+      │                                             │
+      │           [Enable Background Service]        │
+      └─────────────────────────────────────────────┘
+    → symlink ezagent.app/Contents/MacOS/ezagent-cli
+        → /usr/local/bin/ezagent
+    → 写入 ~/Library/LaunchAgents/dev.ezagent.daemon.plist
+    → 启动 daemon (ezagent serve)
+    → Tray icon 出现在 Menu Bar
+
+日常运行:
+  系统启动 → LaunchAgent 启动 ezagent serve (后台)
+  → Tray icon 出现 (◆)
+  → 用户双击 ezagent.app 或点击 Tray "Open App"
+  → React UI 窗口打开，连接 localhost:8847
+  → 关闭窗口 → Tray 仍在，Engine 继续运行
+  → Tray "Quit ezagent" → daemon 停止，Agent 离线
+
+Homebrew 安装:
+  brew install ezagent
+  → 安装 CLI 到 /usr/local/bin/
+  → 安装 ezagent.app 到 ~/Applications/
+  → 配置 LaunchAgent
+  → 启动 daemon + Tray
 ```
 
 ### §4.3 平台分发
 
 | 平台 | 安装方式 | 打包格式 |
 |------|---------|---------|
-| macOS | `brew install ezagent` 或 下载 DMG | .app bundle |
-| Windows | `winget install ezagent` 或 下载 MSI | .msi installer |
-| Linux | `apt install ezagent` 或 AppImage | .AppImage / .deb |
+| macOS | `brew install ezagent` 或 下载 DMG | .app bundle (Tray + UI) |
+| Windows | `winget install ezagent` 或 下载 MSI | .msi installer (System Tray + UI) |
+| Linux | `apt install ezagent` 或 AppImage | .AppImage / .deb (System Tray + UI) |
 
 ### §4.4 Packaging
 
@@ -144,17 +171,18 @@ ezagent Chat App 是 ezagent 协议的终端用户入口。用户通过类似 Sl
 
 ```
 pip install ezagent
-→ 安装 Rust .so (PyO3) + Python 层 (CLI + HTTP + SDK)
-→ 不含 Desktop 打包资源
+→ 安装 Rust .so (PyO3) + Python SDK + CLI + HTTP Server
+→ 无 Desktop 资源、无 Tray
+→ 适用场景：服务器部署、CI/CD、Agent-only 节点
 ```
 
 **产物 B: Desktop installer**
 
 ```
 brew install ezagent / 下载 DMG
-→ 包含 产物 A + 内嵌 Python runtime + React 前端 + launcher
-→ 双击打开，无需安装任何依赖
-→ 约 50-60MB
+→ 产物 A + 内嵌 Python runtime + React build + Tray launcher
+→ 自带完整运行时，无需系统 Python
+→ ≈ 60-70MB
 ```
 
 ### §4.5 CI/CD pipeline
@@ -171,20 +199,47 @@ GitHub Actions:
 
 [Future Work] 待社区贡献。
 
+### §4.7 Tray 功能定义
+
+```
+Menu Bar: ◆ ezagent (或 ◇ 当离线)
+
+点击展开菜单:
+  ┌──────────────────┐
+  │ ● Online          │  连接状态 (Online / Connecting / Offline)
+  │ 3 Agents active   │  当前活跃 Agent 数
+  │ 2 Rooms synced    │  已同步 Room 数
+  │──────────────────│
+  │ Open ezagent      │  打开主 UI 窗口
+  │──────────────────│
+  │ Preferences...    │  打开设置
+  │ About             │  版本信息
+  │──────────────────│
+  │ Quit ezagent      │  停止 Engine + 退出 Tray
+  └──────────────────┘
+
+Tray 状态指示:
+  ◆ (实心) = Engine 运行中，至少一个 Relay 或 Peer 已连接
+  ◇ (空心) = Engine 运行中，但无网络连接
+  ⊘ (划线) = Engine 启动失败
+```
+
 ---
 
 ## §5 验收标准
 
 | # | 场景 | 预期 |
 |---|------|------|
-| APP-1 | `ezagent start` → 浏览器访问 | Chat UI 可用 |
+| APP-1 | `ezagent start` → Desktop App 连接 localhost:8847 | UI 可用 |
 | APP-2 | 两个 peer 通过 Chat UI 互发消息 | 实时同步 |
-| APP-3 | brew install / DMG 安装 → 双击打开 | 可用 |
-| APP-4 | 首次打开 → 注册流程 → 进入主界面 | 流畅完成 |
+| APP-3 | brew install / DMG 安装 → Tray 出现 → 点击 Open | 可用 |
+| APP-4 | 首次打开 → 安装 CLI + LaunchAgent → 注册流程 → 进入主界面 | 流畅完成 |
 | APP-5 | Room Tab 切换 (Timeline ↔ Board ↔ Gallery) | 同一数据不同视图 |
 | APP-6 | Agent 发送 structured_card → 用户点击 action button | Flow transition 正常 |
 | APP-7 | Level 0 renderer：无 ui_hints 的 DataType 自动渲染 | 显示 key:value 卡片 |
 | APP-8 | Level 1 renderer：有 renderer 声明的 Extension 渲染 | 按声明渲染 |
+| APP-9 | 关闭 App 窗口 → Tray 仍在 → Agent 仍在线 | daemon 不退出 |
+| APP-10 | Tray Quit → Agent 离线 | daemon 停止 |
 
 ---
 
@@ -192,4 +247,5 @@ GitHub Actions:
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 0.2 | 2026-02-27 | §1.3 交付形态重写（Tray 模式）；§4 打包流程完全重写（Tray + daemon + LaunchAgent）；新增 §4.7 Tray 功能定义；验收标准新增 APP-9/APP-10 |
 | 0.1 | 2026-02-25 | 从 py-spec v0.8 §10-§11 提取。新增用户旅程、信息架构、验收标准 |

@@ -5,9 +5,10 @@
 > A CRDT-based messaging protocol where humans and agents are indistinguishable by design.
 
 > **状态**：Architecture Overview Draft
-> **日期**：2026-02-25（rev.8：Self-Sufficient Node 架构，P2P-First 拓扑，Public Relay 重新定位）
+> **日期**：2026-02-27（rev.11：文件名 protocol.md → architecture.md）
 > **作者**：Allen & Claude collaborative design
 > **目标读者**：协议实现者、架构评审者
+> **备注**：本文件从 `specs/protocol.md` 重命名为 `specs/architecture.md`，以避免与 `ezagent-protocol` crate 混淆。
 
 ---
 
@@ -17,7 +18,7 @@ ezagent（Easy Agent Communication Protocol）是一个基于 CRDT 的即时通�
 
 **Entity-Agnostic。** 协议不区分 human 和 agent——只要持有 Ed25519 keypair，你就是一个 entity，享有完全相同的身份、权限和消息能力。
 
-**一切皆 Datatype。** 协议的核心是一个 Engine，由四个组件构成：Datatype Registry、Hook Pipeline、Annotation Store、Index Builder。所有功能——无论是"内置"的 Identity/Room/Timeline/Message，还是"扩展"的 Reactions/Channels/Moderation——都是同一个 Engine 的实例，用完全相同的声明格式描述。内置与扩展的区别仅在于依赖顺序，不在于机制。
+**一切皆 Datatype。** 协议的核心是一个 Engine，由四个组件构成：Datatype Registry、Hook Pipeline、Annotation Pattern、Index Builder。所有功能——无论是"内置"的 Identity/Room/Timeline/Message，还是"扩展"的 Reactions/Channels/Moderation——都是同一个 Engine 的实例，用完全相同的声明格式描述。内置与扩展的区别仅在于依赖顺序，不在于机制。
 
 **Hook + Annotation 驱动。** 每个 Datatype 通过 Hook 定义"什么时候执行什么逻辑"，通过 Annotation 在已有数据结构上附加信息，通过 Index 对外暴露查询能力。Discovery（用户发现）、Watch（上下文订阅）、Link Preview、@Mention 等功能都不是独立的协议概念，而是 Hook + Annotation 的具体应用模式。
 
@@ -185,10 +186,10 @@ Datatype:
 
 ```
 ezagent/{room_id}/config/{state|updates}          # Room Config
-ezagent/{room_id}/index/{YYYY-MM}/{state|updates}  # Timeline Index
+ezagent/{room_id}/index/{shard_id}/{state|updates}  # Timeline Index
 ezagent/{room_id}/content/{id}/{state|updates}     # Mutable/Collab Content
 ezagent/{room_id}/content/{id}/acl/{state|updates} # Collab ACL
-ezagent/{room_id}/blob/{hash}                      # Blob
+ezagent/blob/{hash}                                   # Global Blob (immutable)
 ezagent/{room_id}/ext/{ext_id}/{state|updates}     # Extension docs
 ezagent/{room_id}/ephemeral/{ext_id}/@{entity_id}  # Ephemeral
 ezagent/@{entity_id}/identity/pubkey               # Identity
@@ -280,53 +281,44 @@ API response ← ┌─────────────┐ ← CRDT read ←
 
 **全局 Hook vs 局部 Hook**：`trigger.datatype: "*"` 表示全局 hook，拦截所有 datatype 的操作。只有 built-in datatype 允许注册全局 hook。Extension 的 hook 只能注册在具体的 datatype 上。
 
-### 2.3 Annotation Store
+### 2.3 Annotation（设计模式）
 
-Annotation 是附着在已有数据节点上的元数据。它是 Engine 的内置能力，不是任何一个 extension 的功能。
+Annotation 是"在已有数据节点上附加结构化信息"的设计模式。它是 Engine 四原语之一，但不是独立的存储位置或命名空间。
 
-```yaml
-Annotation:
-  key:       "{type}:{annotator_entity_id}"    # 全局唯一 key
-  value:     any                               # JSON-compatible
-  on:        DataNodeRef                       # 附着在哪个数据节点上
-```
+Annotation 通过以下方式实现：
 
-**存储位置**：Annotation 存储在宿主数据结构的 `ext.annotations` 命名空间中。
+- **Extension** 在 ref / room_config 的 `ext.{ext_id}` 命名空间中写入数据
+- **Socialware** 不直接写 Annotation；通过发送特定 content_type 的 Message 表达状态，运行时状态由 Socialware Runtime 从 Message 序列纯派生（EXT-17 Runtime 提供协议层支持）
+- **Built-in Hook** 在 ref 的 Bus 字段中写入数据
 
 ```yaml
-# 一条 ref (Y.Map) 上的 annotations
+# 一条 ref (Y.Map) 上的 extension 数据（Annotation Pattern 的物理实现）
 ref Y.Map:
-  ref_id: "ulid:..."                                   # core 字段
-  author: "@alice:..."                                  # core 字段
+  ref_id: "ulid:..."                                   # Bus 字段
+  author: "@alice:..."                                  # Bus 字段
   ...
-  ext.annotations: Y.Map {                              # Annotation Store
-    "link_preview:@system:local":                       # by pre-send hook
-      { url: "...", title: "...", image_hash: "..." }
-    "mentions:@system:local":                           # by pre-send hook
-      ["@bob:...", "@agent-1:..."]
-    "code_blocks:@system:local":                        # by pre-send hook
-      [{ lang: "rust", line_start: 5, line_end: 20 }]
-    "watch:@agent-1:relay-a.com":                       # by agent
-      { reason: "processing_task" }
-    "task_status:@agent-1:relay-a.com":                 # by agent
-      { status: "in_progress", progress: 0.7 }
+  ext.reactions: Y.Map { ... }                         # EXT-03 管理
+  ext.channels: { ... }                                # EXT-06 管理
+  ext.link-preview: Y.Map { ... }                      # EXT-16 管理
+  ext.watch: Y.Map {                                   # EXT-14 管理
+    "@agent-1:relay-a.com":
+      { reason: "processing_task", on_reply: true }
   }
+  ext.command: { ... }                                 # EXT-15 管理
 ```
 
-**Annotation Key 格式**：`{type}:{annotator_entity_id}`。这确保不同 annotator 的同类 annotation 不冲突。`@system:local` 是 ezagent-core 本地 hook 系统的保留 annotator ID。
+**Annotation Key 约定**：当多个 Entity 在同一 `ext.{ext_id}` 命名空间内写入数据时，key SHOULD 包含 entity_id 以避免冲突。`@system:local` 是 Engine 内部 Hook 系统的保留 ID。
 
-**权限**：任何 room member 都可以在任何 ref 上添加 annotation。annotation key 中的 entity_id 必须等于签名者（你只能以自己的名义标注）。恶意 annotation 由 relay 管理员通过 moderation 处理。
-
-**与 ext.* 命名空间的关系**：
+**所有 `ext.*` 命名空间由对应 Extension 管理**，各有自己的 `writer_rule`：
 
 ```
-ext.reactions     → Extension Datatype 注入的字段（由 specific extension 管理）
-ext.channels      → Extension Datatype 注入的字段
-ext.reply_to      → Extension Datatype 注入的字段
-ext.annotations   → Annotation Store（Engine 内置，任何人都可以写）
+ext.reactions     → EXT-03 管理（writer_rule: any room member）
+ext.channels      → EXT-06 管理（writer_rule: message author）
+ext.reply_to      → EXT-04 管理（writer_rule: message author）
+ext.watch         → EXT-14 管理（writer_rule: key contains signer entity_id）
+ext.link-preview  → EXT-16 管理（writer_rule: @system:local）
+ext.command       → EXT-15 管理（writer_rule: message author for command, handler for result）
 ```
-
-`ext.{ext_id}` 由对应 extension 的 hook 管理，有各自的 writer_rule。`ext.annotations` 由 Engine 的 Annotation Store 管理，writer_rule 统一为 "annotation key contains signer_id"。
 
 ### 2.4 Index Builder
 
@@ -376,7 +368,7 @@ Datatype Declaration:
 
   # === 3. ANNOTATIONS — 我在已有数据上附加什么信息 ===
   annotations:
-    on_ref:         {}    # ext.{ext_id} or ext.annotations.* on ref
+    on_ref:         {}    # ext.{ext_id} on ref
     on_room_config: {}    # ext.{ext_id} on room config
     on_profile:     {}    # profile doc 内容
     standalone_doc: {}    # 独立 doc 中的数据
@@ -686,7 +678,7 @@ dependencies: ["identity", "room"]
 ```yaml
 - id: "timeline_index"
   storage_type: crdt_array          # Y.Array<Y.Map>
-  key_pattern: "ezagent/{room_id}/index/{YYYY-MM}/{state|updates}"
+  key_pattern: "ezagent/{room_id}/index/{shard_id}/{state|updates}"
   persistent: true
   writer_rule: "signer ∈ room.members AND ref.author == signer"
 ```
@@ -709,9 +701,8 @@ ref Y.Map:
   ext.reply_to:    Y.Map { ... }              # by Reply To extension
   ext.channels:    [...]                      # by Channels extension
   ext.thread:      Y.Map { ... }              # by Threads extension
-
-  # Engine 管理的 Annotation 命名空间
-  ext.annotations: Y.Map { ... }             # by Annotation Store
+  ext.watch:       Y.Map { ... }              # by Watch extension
+  ext.link-preview: Y.Map { ... }             # by Link Preview extension
 ```
 
 Bus peer 遇到 `ext.*` 字段：保留（Y.Map 默认行为），不渲染，不删除。
@@ -735,8 +726,7 @@ after_write:
     description: |
       新 ref insert → emit "message.new"
       status 变化 → emit "message.deleted" / "message.edited"
-      ext.* 变化 → emit 对应 extension 事件
-      ext.annotations 变化 → 检查 watch annotation，触发通知
+      ext.* 变化 → emit 对应 extension 事件（含 watch 通知检查）
 
 after_read:
   - id: "timeline_pagination"
@@ -749,16 +739,15 @@ after_read:
 
 ```yaml
 on_ref:
-  - ext.{ext_id}: 由各 extension 注入
-  - ext.annotations.*: 由 Annotation Store 管理（watch, link_preview, mentions, ...）
+  - ext.{ext_id}: 由各 Extension 在自己的命名空间中管理
 ```
 
 **Indexes**：
 
 ```yaml
 - id: "timeline_view"
-  input: "timeline_index for ezagent/{room_id}/index/{YYYY-MM}"
-  transform: "YATA-ordered refs with window sharding"
+  input: "timeline_index for ezagent/{room_id}/index/{shard_id}"
+  transform: "YATA-ordered refs with count-based sharding"
   refresh: on_change
   operation_id: "timeline.list"
 
@@ -1257,31 +1246,36 @@ indexes:
 
 ```yaml
 id: "media"
-version: "0.1.0"
+version: "0.2.0"
 dependencies: ["message"]
 
 datatypes:
-  - id: "blob_storage"
+  - id: "global_blob"
     storage_type: blob
-    key_pattern: "ezagent/{room_id}/blob/{blob_hash}"
+    key_pattern: "ezagent/blob/{blob_hash}"
+    persistent: true
+    writer_rule: "any authenticated entity"
+    sync_strategy: { mode: lazy }
+  - id: "blob_ref"
+    storage_type: crdt_map
+    key_pattern: "ezagent/{room_id}/ext/media/blob-ref/{blob_hash}"
     persistent: true
     writer_rule: "signer ∈ room.members"
 
 hooks:
   pre_send:
     - id: "media.upload"
-      trigger: { datatype: "blob_storage", event: "insert" }
+      trigger: { datatype: "global_blob", event: "insert" }
       priority: 20
-      description: "计算 sha256 hash, 存储 blob"
+      description: "计算 sha256 hash, 全局去重存储 blob, 创建 per-room blob ref"
 
 annotations:
-  standalone_doc:
-    content_type: "blob"
-    media_ref: "{ blob_hash, filename, mime_type, size_bytes }"
+  on_ref:
+    ext.media: "{ blob_hash, filename, mime_type, size_bytes }"
 
 indexes:
   - id: "media_gallery"
-    input: "timeline refs where content_type == blob"
+    input: "ezagent/{room_id}/ext/media/blob-ref/*"
     transform: "room_id → list of media refs"
     refresh: on_demand
     operation_id: "media.get"
@@ -1434,8 +1428,8 @@ hooks:
       trigger: { datatype: "timeline_index", event: "update", filter: "annotation type == watch" }
       priority: 30
       description: |
-        Entity 在 ref 上设置 watch annotation:
-        ext.annotations."watch:@{entity_id}" = {
+        Entity 在 ref 上设置 watch:
+        ext.watch.@{entity_id} = {
           reason: "processing_task",
           on_content_edit: true,
           on_reply: true,
@@ -1444,11 +1438,11 @@ hooks:
         }
 
     - id: "watch.set_channel"
-      trigger: { datatype: "room_config", event: "update", filter: "annotation type == channel_watch" }
+      trigger: { datatype: "room_config", event: "update", filter: "ext.watch changed" }
       priority: 30
       description: |
-        Entity 在 room config 上设置 channel watch annotation:
-        ext.annotations."channel_watch:@{entity_id}" = {
+        Entity 在 room config 上设置 channel watch:
+        room_config.ext.watch.@{entity_id} = {
           channels: ["code-review", "design"],
           scope: "all_rooms"
         }
@@ -1792,7 +1786,7 @@ Spec 按 Engine 架构分层：
 §2  ezagent.bus Engine
     §2.1  Datatype Registry (storage_type, key_pattern, writer_rule, dependencies)
     §2.2  Hook Pipeline (三阶段形式化定义, 执行顺序, 约束)
-    §2.3  Annotation Store (key 格式, 存储位置, 签名策略)
+    §2.3  Annotation Pattern (设计模式, ext.{ext_id} 命名空间, 签名策略)
     §2.4  Index Builder (声明格式, refresh 策略, API 映射)
 §3  Storage / Sync Backend
     §3.1  CRDT Backend (Yjs usage profile)
@@ -1823,7 +1817,7 @@ ezagent/
 │   │   ├── src/
 │   │   │   ├── datatype.rs          # Datatype Registry
 │   │   │   ├── hook.rs              # Hook Pipeline
-│   │   │   ├── annotation.rs        # Annotation Store
+│   │   │   ├── annotation.rs        # Annotation Pattern helpers
 │   │   │   ├── index.rs             # Index Builder
 │   │   │   ├── backend.rs           # Storage/Sync Backend trait
 │   │   │   └── lib.rs
@@ -2041,7 +2035,7 @@ watch.channel_new_ref          # EXT-14 Watch
 **交付物**：
 - Datatype Registry: 注册/加载/依赖解析
 - Hook Pipeline: 三阶段执行框架
-- Annotation Store: ext.annotations 读写
+- Annotation Pattern: ext.{ext_id} 读写
 - Index Builder: 声明式 index 注册
 - Signed Envelope + 断线恢复 + 本地持久化
 
@@ -2050,7 +2044,7 @@ watch.channel_new_ref          # EXT-14 Watch
 | P1-1 | 注册 identity + room datatype，依赖解析 | identity 先加载 |
 | P1-2 | pre_send hook chain 按 priority 执行 | 签名在最后 |
 | P1-3 | after_write hook 不修改触发数据 | 违反则报错 |
-| P1-4 | Annotation 写入和读取 | ext.annotations 正确持久化 |
+| P1-4 | Annotation 写入和读取 | ext.{ext_id} 正确持久化 |
 | P1-5 | Signed Envelope 签名/验证 | 无效签名被丢弃 |
 | P1-6 | 断线 60s → 恢复 | 差量同步无丢失 |
 
@@ -2097,7 +2091,7 @@ watch.channel_new_ref          # EXT-14 Watch
 | # | 场景 | 预期 |
 |---|------|------|
 | P3-1 | ezagent CLI (room create, send, rooms) | 正常输出 |
-| P3-2 | ezagent start --no-ui → HTTP API 可用 | 端点正常响应 |
+| P3-2 | ezagent start → HTTP API 可用 | 端点正常响应 (localhost:8847) |
 | P3-3 | GET /api/renderers → 返回 renderer 声明 | JSON 正确 |
 
 ### Phase 4：Chat App（3-4 周）
@@ -2117,17 +2111,17 @@ watch.channel_new_ref          # EXT-14 Watch
 
 ### Phase 5：Socialware（3-4 周）
 
-**目标**：Socialware 四原语 + 示例 Socialware。Agent 驱动的协作。
+**目标**：Socialware 四原语 + 示例 Socialware。Role-Driven Message 架构。Agent 驱动的协作。
 
-**交付物**：Socialware Python 实现 + EventWeaver/TaskArena/ResPool 基础功能。
+**交付物**：Socialware Python Runtime（State Cache + Role/Flow 检查 Hook） + EventWeaver/TaskArena/ResPool 基础功能。
 
 | # | 场景 | 预期 |
 |---|------|------|
-| P5-1 | @socialware decorator + 四原语 | Socialware 正常运行 |
-| P5-2 | Agent 发送 structured_card 消息 | 渲染为卡片 + action buttons |
-| P5-3 | 用户点击 action button → Flow transition | 状态正确变更 |
-| P5-4 | TaskArena Kanban Room Tab | 看板视图可用 |
-| P5-5 | Level 2 自定义组件 SDK | registerRenderer() 可用 |
+| P5-1 | @socialware decorator + Role/Flow 声明 | Socialware 正常加载，Hook 注册到 Pipeline |
+| P5-2 | content_type="ta:task.propose" Message 发送 | EXT-17 namespace_check 通过，Role check 通过 |
+| P5-3 | Flow transition: ta:task.claim → State Cache 更新 | Flow 状态正确推进，pre_send 拒绝非法转换 |
+| P5-4 | State Cache 重建（节点重启后回放 Timeline） | 重建后状态与重启前一致 |
+| P5-5 | TaskArena Kanban Room Tab（从 State Cache 查询） | 看板视图可用 |
 
 ### Gate Review
 

@@ -1,8 +1,8 @@
-# ezagent-py — Python Binding Specification v0.9.1
+# ezagent-py — Python Binding Specification v0.9.3
 
 > **状态**：Architecture Draft
 > **日期**：2026-02-26
-> **前置文档**：ezagent-protocol-v0.8, ezagent-bus-spec-v0.9.1, ezagent-extensions-spec-v0.9.1
+> **前置文档**：ezagent-protocol-v0.8, ezagent-bus-spec-v0.9.3, ezagent-extensions-spec-v0.9.3
 > **拆分文档**：ezagent-cli-spec, ezagent-http-spec, ezagent-app-prd
 > **作者**：Allen & Claude collaborative design
 
@@ -14,7 +14,7 @@
 
 ### §1.1 PyO3 唯一桥接原则
 
-ezagent-py 是 Rust Engine 的**唯一外部接口**。所有面向用户的界面（CLI、HTTP Server、Desktop App）均在 Python 层基于此 SDK 实现。
+ezagent-py 是 Rust Engine 的**唯一外部接口**。所有面向用户的界面（CLI、HTTP Server）均在 Python 层基于此 SDK 实现。Desktop App 作为独立 repo（app/），通过 HTTP/WS 连接 Python 层启动的 API Server。
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -23,13 +23,20 @@ ezagent-py 是 Rust Engine 的**唯一外部接口**。所有面向用户的界�
                            │ PyO3 (唯一出口)
 ┌──────────────────────────┴───────────────────────────┐
 │              ezagent-py (Python SDK)                  │
-└───┬──────────────┬──────────────┬────────────────────┘
-    │              │              │
-┌───┴────┐  ┌─────┴──────┐  ┌───┴──────────┐
-│  CLI   │  │ HTTP Server│  │ Desktop App  │
-│ typer  │  │ FastAPI    │  │ 内嵌 Python  │
-│        │  │ + React UI │  │ + WebView    │
-└────────┘  └────────────┘  └──────────────┘
+└───┬──────────────────────┬───────────────────────────┘
+    │                      │
+┌───┴────┐          ┌─────┴──────┐        ── ezagent/ repo ──
+│  CLI   │          │ HTTP Server│
+│ typer  │          │ FastAPI    │
+│        │          │ (API only) │
+└────────┘          └─────┬──────┘
+                          │ REST + WS (localhost:8847)
+                          │               ── app/ repo ──
+                    ┌─────┴──────────┐
+                    │ ezagent.app    │
+                    │ Tray + React   │
+                    │ Desktop (独立)  │
+                    └────────────────┘
 ```
 
 ### §1.2 pip install ezagent
@@ -38,7 +45,8 @@ ezagent-py 是 Rust Engine 的**唯一外部接口**。所有面向用户的界�
 pip install ezagent          # 安装 SDK + CLI
 ezagent --help               # CLI 可用
 python -c "import ezagent"   # SDK 可用
-ezagent start                # 启动 HTTP Server + Chat UI
+ezagent start                # 前台启动 API Server (localhost:8847)
+ezagent serve                # 后台 daemon 模式
 ```
 
 ### §1.3 协议层与用户接口层的边界
@@ -48,7 +56,8 @@ ezagent start                # 启动 HTTP Server + Chat UI
 | Engine + Built-in + Extensions | ✅ | Rust | 所有 peer MUST 一致 |
 | ezagent-py SDK (PyO3 binding) | ✅ | Rust + Python | 从声明派生，确定性 |
 | Socialware Hook | ✅ | Python | 每个 Socialware 可不同 |
-| CLI / HTTP / Desktop | ❌ | Python | 实现细节 |
+| CLI / HTTP Server | ❌ | Python | 实现细节 |
+| Desktop App / Chat UI | ❌ | TypeScript (React) | 独立 repo，通过 HTTP API 交互 |
 
 ---
 
@@ -383,7 +392,7 @@ class EventWeaver:
 
 ### §7.2 四原语 Python 实现
 
-Role、Arena、Commitment、Flow 四原语通过 Python class 声明，存储为 Annotation 或 Extension Datatype 字段。详见 ezagent-socialware-spec。
+Role、Arena、Commitment、Flow 四原语通过 Python class 声明。Role 约束 content_type 发送能力，Flow 约束 content_type 的合法序列。运行时状态（State Cache）从 Timeline Message 纯派生，由 after_write Hook 增量维护。详见 ezagent-socialware-spec §2。
 
 ### §7.3 ctx 对象
 
@@ -392,25 +401,28 @@ Hook callback 接收 `ctx` 参数，提供对 Engine API + Extension API 的完�
 ```python
 async def on_message(event, ctx):
     # Engine API
-    await ctx.messages.send(room_id=..., body=...)
+    await ctx.messages.send(
+        room_id=..., content_type="ta:task.claim",
+        body={...}, reply_to=ref_id, channels=["_sw:ta"])
     await ctx.rooms[id].members()
 
     # Extension API (auto-generated)
     await ctx.rooms[id].messages[ref].reactions.add("👍")
     await ctx.rooms[id].messages[ref].watch.set(on_reply=True)
 
-    # Annotation API
-    await ctx.rooms[id].messages[ref].annotations.add(
-        type="task_status", value={"status": "done"})
+    # EXT-17 Runtime API
+    refs = await ctx.runtime.list_sw_messages(room_id, ns="ta")
+    rooms = await ctx.runtime.list_enabled_rooms(ns="ta")
 
     # EXT-15 Command API (Socialware Hook 中使用)
     await ctx.command.result(
         invoke_id="uuid:...",
-        status="success",                    # "success" | "error" | "pending"
-        result={"task_id": "t-42"},          # 任意 JSON-compatible
-        error=None                           # status="error" 时使用
+        status="success",
+        result={"task_id": "t-42"},
     )
 ```
+
+注：Socialware 通过 `self.state`（State Cache）访问派生状态，不再通过 `ctx.data` 直接读写 Datatype 文档。
 
 ### §7.4 EXT-15 Command 便捷 API
 
@@ -484,6 +496,35 @@ class SocialwareInfo:
     auto_start: bool
     commands: list[str]      # 注册的命令动作列表（如 ["claim", "post-task"]）
     dependencies: dict       # extensions + socialware 依赖
+```
+
+---
+
+## §8.5 Extension Management API
+
+Extension 采用动态链接（`.so` / `.dylib`），由 Engine 从 `~/.ezagent/extensions/` 加载。Python 层提供管理接口：
+
+```python
+# Extension 管理
+installed_ext = await bus.extensions.list()
+# → [ExtensionInfo(name="reactions", version="0.9.4", status="loaded"), ...]
+
+ext_info = await bus.extensions.info("reactions")
+# → ExtensionInfo(name="reactions", version="0.9.4", api_version="1",
+#     datatypes=["reactions"], hooks=[...], status="loaded")
+```
+
+```python
+@dataclass
+class ExtensionInfo:
+    name: str
+    version: str
+    api_version: str          # Extension ABI 版本
+    status: str               # "loaded" | "failed" | "disabled"
+    datatypes: list[str]      # 声明的 DatatypeDeclaration 名称
+    hooks: list[str]          # 注册的 Hook trigger 列表
+    path: str                 # ~/.ezagent/extensions/{name}/
+    error: str | None = None  # 加载失败时的错误信息
 ```
 
 ---
@@ -594,6 +635,7 @@ type = "my-custom"
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 0.9.4 | 2026-02-27 | §1.1 架构图修正（App 独立 repo）；§1.2 CLI 命令更新（start/serve）；§1.3 新增 Desktop App 行；§8.5 新增 Extension Management API |
 | 0.9.1 | 2026-02-26 | 新增 §7.4 EXT-15 Command 便捷 API、§8 Socialware Management API、§9 AgentAdapter Protocol。Command 相关 Error 类型 |
 | 0.8 | 2026-02-25 | 拆分：§8 CLI → cli-spec.md、§9 HTTP → http-spec.md、§10-§11 Desktop/Packaging → app-prd.md。新增 §6.7 Renderer 声明传递 |
 | 0.7 | 2026-02-25 | 初始版本。PyO3 唯一桥接架构。Engine Python API、类型映射、Socialware Hook 协议、Extension API 自动生成规则 |

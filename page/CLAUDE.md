@@ -39,7 +39,7 @@ EZAgent 官方网站 — 品牌门户与开发者社区入口。License: Apache 
 | 路由 | 页面 | 内容来源 |
 |------|------|----------|
 | `/dev/` | 开发者入口 | 改编自 `docs/README.md` 架构部分 |
-| `/dev/architecture/` | 三层分形架构详解 | 来自 `docs/specs/protocol.md` §0-§1 |
+| `/dev/architecture/` | 三层分形架构详解 | 来自 `docs/specs/architecture.md` §0-§1 |
 | `/dev/socialware-guide/` | Socialware 开发入门 | 改编自 `docs/specs/socialware-spec.md` + `py-spec.md` |
 | `/dev/showcase/` | Socialware 开发者展示（含代码） | 来自 `docs/socialware/*.md` + 代码示例 |
 | `/dev/resources/` | 资源链接（ReadTheDocs、GitHub、社区） | 链接聚合页 |
@@ -140,7 +140,7 @@ page/
 | Showcase: TaskArena | `docs/socialware/taskarena-prd.md` §1 | 同上 |
 | Showcase: ResPool | `docs/socialware/respool-prd.md` §1 | 同上 |
 | Showcase: AgentForge | `docs/socialware/agentforge-prd.md` §1 | 同上 |
-| Dev: Architecture | `docs/specs/protocol.md` §0-§1 | 保留三层图，简洁解释每层 |
+| Dev: Architecture | `docs/specs/architecture.md` §0-§1 | 保留三层图，简洁解释每层 |
 | Dev: Socialware Guide | `docs/specs/socialware-spec.md` + `py-spec.md` | 展示 `@socialware` 装饰器，链接 ReadTheDocs |
 | Dev: Showcase | `docs/socialware/*.md` + 代码示例 | 含 Python 代码片段 |
 | Dev: Resources | 所有文档 + 外部链接 | 策展链接列表 |

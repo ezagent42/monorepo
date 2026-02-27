@@ -27,7 +27,7 @@ ezagent 的所有持久化和临时数据组织在统一的 Key Space 中。Key 
 
 Extension 数据分两种存储位置：
 
-- **内嵌在 CRDT 文档中的字段**（`ext.*` 前缀）：如 `ext.reactions`、`ext.reply_to`、`ext.channels`、`ext.thread`、`ext.annotations`——这些是 Timeline Index 中 Ref 的字段，随 Ref 所在的 Y.Doc 一起同步，没有独立的存储路径。
+- **内嵌在 CRDT 文档中的字段**（`ext.*` 前缀）：如 `ext.reactions`、`ext.reply_to`、`ext.channels`、`ext.thread`、`ext.watch`, `ext.link-preview`——这些是 Timeline Index 中 Ref 的字段，随 Ref 所在的 Y.Doc 一起同步，没有独立的存储路径。
 - **独立 CRDT 文档**（`ext/{ext_id}/` 子目录）：如 Moderation Overlay、Read Receipts、Drafts——这些是 Room 级的独立文档，存储在 `ezagent/room/{room_id}/ext/{ext_id}/`。
 - **Entity 级 Extension**：如 Profile——存储在 `ezagent/entity/@{entity_id}/ext/profile/`。
 
@@ -69,14 +69,14 @@ ezagent/
 │       │   ├── state                    # Room Config (crdt_map)
 │       │   └── updates                  #   含 membership, power_levels, enabled_extensions,
 │       │                                #   ext.* (channel hints, moderation config 等),
-│       │                                #   ext.annotations (channel_watch 等)
+│       │                                #   ext.watch (channel_watch 等)
 │       │
 │       ├── index/
-│       │   └── {YYYY-MM}/
+│       │   └── {shard_id}/
 │       │       ├── state                # Timeline Index (crdt_array<crdt_map>)
 │       │       └── updates              #   每个 ref 含 core 字段 + ext.reactions,
 │       │                                #   ext.reply_to, ext.channels, ext.thread,
-│       │                                #   ext.annotations (watch 等)
+│       │                                #   ext.watch (watch 等)
 │       │
 │       ├── content/
 │       │   ├── {sha256_hash}            # Immutable Content (blob, 不可变)
@@ -151,9 +151,10 @@ Relay 数据的特殊性：
 | `ezagent/@{entity_id}/identity/pubkey` | `ezagent/entity/@{entity_id}/identity/pubkey` |
 | `ezagent/@{entity_id}/ext/profile/{s\|u}` | `ezagent/entity/@{entity_id}/ext/profile/{state\|updates}` |
 | `ezagent/{room_id}/config/{s\|u}` | `ezagent/room/{room_id}/config/{state\|updates}` |
-| `ezagent/{room_id}/index/{YYYY-MM}/{s\|u}` | `ezagent/room/{room_id}/index/{YYYY-MM}/{state\|updates}` |
+| `ezagent/{room_id}/index/{shard_id}/{s\|u}` | `ezagent/room/{room_id}/index/{shard_id}/{state\|updates}` |
 | `ezagent/{room_id}/content/{id}` | `ezagent/room/{room_id}/content/{id}` |
-| `ezagent/{room_id}/blob/{hash}` | `ezagent/room/{room_id}/blob/{hash}` |
+| `ezagent/blob/{hash}` | `ezagent/blob/{hash}` |
+| `ezagent/{room_id}/ext/media/blob-ref/{hash}` | `ezagent/room/{room_id}/ext/media/blob-ref/{hash}` |
 | `ezagent/{room_id}/ext/{ext_id}/{s\|u}` | `ezagent/room/{room_id}/ext/{ext_id}/{state\|updates}` |
 | `ezagent/{room_id}/ext/draft/{eid}/{s\|u}` | `ezagent/room/{room_id}/ext/draft/@{entity_id}/{state\|updates}` |
 | `ezagent/{room_id}/ephemeral/presence/@{eid}` | `ezagent/room/{room_id}/ephemeral/presence/@{entity_id}` |

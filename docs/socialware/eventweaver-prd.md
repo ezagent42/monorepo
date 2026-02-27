@@ -102,187 +102,152 @@ EventWeaver 是 Bootstrap Socialware——平台启动时第一个被创建的 S
 
 1. Merger 发起 merge request，将分支 A 和 B 合并
 2. EventWeaver 的 `ew:detect_conflict` Hook 检测到 Flow 状态冲突
-3. 冲突信息写入 `ew:conflict` Annotation：两个分支对 `task_lifecycle` Flow 做了不兼容的修改
+3. 冲突信息发送 ew:_system.conflict Message：两个分支对 `task_lifecycle` Flow 做了不兼容的修改
 4. Agent 尝试自动解决（置信度 0.4，低于阈值）→ escalate to Human
 5. Human Merger 进入 merge_chamber Arena，查看两个分支的差异
 6. Human 决定采用分支 B 的方案并手动整合分支 A 的 peer_review 概念
-7. Human 写入 `ew:approved` Annotation，附带解决方案
+7. Human 发送 ew:merge.approve Message，附带解决方案
 8. EventWeaver 执行合并
 
 **价值**：Agent 处理简单冲突，Human 处理复杂冲突，HiTL 自然涌现。
 
 ---
 
-## 3. Part A: Bus 层声明
+## 3. Part A: 协议层约定
 
 ```yaml
-id: "eventweaver"
-version: "0.1.0"
-dependencies: ["identity", "room", "timeline", "message"]
+id: "event-weaver"
+namespace: "ew"
+version: "0.9.3"
+dependencies: ["channels", "reply-to", "command", "runtime"]
 ```
 
-### 3.1 Datatypes
+### 3.1 Content Types
 
-#### ew_event — 事件记录
-
-| 字段 | 值 |
-|------|---|
-| id | `ew_event` |
-| storage_type | `crdt_map` |
-| key_pattern | `ezagent/{room_id}/ew/events/{event_id}` |
-| persistent | `true` |
-| writer_rule | `signer ∈ room.members` |
+#### ew:event.record — 事件记录
 
 ```yaml
-ew_event:
-  event_id:      ULID
-  event_type:    string          # 自由定义，由消费者约定语义
-  payload:       any             # 事件内容，JSON-compatible
-  causality:     [ULID]          # 因果前驱事件的 event_id 列表
-  actor:         Entity ID       # 触发者
-  source_ref:    Ref ID | null   # 关联的 Timeline Ref（如来自某条 Message）
-  created_at:    RFC 3339
+type: "ew:event.record"
+required_capability: "event.emit"
+flow_subject: true                   # 每个 event 可作为 DAG 节点
+body_schema:
+  event_type:    string              # 自由定义，由消费者约定语义
+  payload:       any                 # 事件内容，JSON-compatible
+  causality:     [ref_id]            # 因果前驱 event.record Message 的 ref_id 列表
+  source_ref:    ref_id | null       # 关联的原始 Message
 ```
 
-#### ew_branch — 分支声明
-
-| 字段 | 值 |
-|------|---|
-| id | `ew_branch` |
-| storage_type | `crdt_map` |
-| key_pattern | `ezagent/{room_id}/ew/branches/{branch_id}` |
-| persistent | `true` |
-| writer_rule | `signer ∈ room.members AND signer has capability(branch.create)` |
+#### ew:branch.create — 创建分支
 
 ```yaml
-ew_branch:
-  branch_id:     UUIDv7          # 同时作为分支 Room 的 Room ID
-  parent_room:   UUIDv7          # 从哪个 Room 分叉
-  fork_point:    ULID            # 从哪个 event 之后分叉
-  created_by:    Entity ID
-  created_at:    RFC 3339
+type: "ew:branch.create"
+required_capability: "branch.create"
+flow_subject: true
+body_schema:
+  parent_room:   UUIDv7
+  fork_point:    ref_id              # 从哪个 event 之后分叉
 ```
 
-#### ew_merge_request — 合并请求
-
-| 字段 | 值 |
-|------|---|
-| id | `ew_merge_request` |
-| storage_type | `crdt_map` |
-| key_pattern | `ezagent/{room_id}/ew/merge_requests/{mr_id}` |
-| persistent | `true` |
-| writer_rule | `signer ∈ room.members AND signer has capability(merge.request)` |
+#### ew:merge.request — 合并请求
 
 ```yaml
-ew_merge_request:
-  mr_id:            ULID
-  source_branch:    UUIDv7       # 合并源 Room ID
-  target_branch:    UUIDv7       # 合并目标 Room ID
-  event_range:      [ULID, ULID] # 要合并的事件范围 [from, to]
-  requested_by:     Entity ID
-  created_at:       RFC 3339
+type: "ew:merge.request"
+required_capability: "merge.request"
+flow_subject: true
+body_schema:
+  source_branch: UUIDv7
+  target_branch: UUIDv7
+  event_range:   [ref_id, ref_id]    # 要合并的事件范围
+```
+
+#### ew:merge.approve / ew:merge.reject — 合并审批
+
+```yaml
+type: "ew:merge.approve"
+required_capability: "merge.approve"
+reply_to_type: "ew:merge.request"
+body_schema:
+  comment:       string | null
+
+type: "ew:merge.reject"
+required_capability: "merge.approve"
+reply_to_type: "ew:merge.request"
+body_schema:
+  reason:        string
 ```
 
 ### 3.2 Hooks
 
-#### pre_send: ew:validate_causality
+#### pre_send: ew:check_role (priority 100)
 
 | 字段 | 值 |
 |------|---|
-| trigger.datatype | `ew_event` |
-| trigger.event | `insert` |
-| priority | `30` |
+| trigger.filter | `content_type startswith 'ew:'` |
+| priority | `100` |
 
-- [MUST] 验证 `causality` 中所有 event_id 存在于当前 Room 的事件集中。
+- [MUST] 从 content_type 提取 action，验证 sender 拥有对应 capability。
+
+#### pre_send: ew:validate_causality (priority 101)
+
+| 字段 | 值 |
+|------|---|
+| trigger.filter | `content_type == 'ew:event.record'` |
+| priority | `101` |
+
+- [MUST] 验证 `causality` 中所有 ref_id 存在于当前 Room 的 State Cache 中。
 - [MUST] 检测因果环。如果新事件的 causality 链形成环路，MUST 拒绝写入。
-- [MAY] 对空 `causality`（根事件）放行。
 
-#### after_write: ew:index_event
-
-| 字段 | 值 |
-|------|---|
-| trigger.datatype | `ew_event` |
-| trigger.event | `insert` |
-| priority | `30` |
-
-- [MUST] 更新 `ew:dag_index`（添加新节点和因果边）。
-- [MUST] 更新 `ew:causal_order` Index。
-- [MUST] 生成 `ew.event.new` Engine Event。
-
-#### after_write: ew:detect_conflict
+#### after_write: ew:advance_state (priority 100)
 
 | 字段 | 值 |
 |------|---|
-| trigger.datatype | `ew_merge_request` |
-| trigger.event | `insert` |
-| priority | `30` |
+| trigger.filter | `content_type startswith 'ew:'` |
+| priority | `100` |
 
-- [MUST] 比较 source_branch 和 target_branch 自 fork_point 以来的事件集合。
-- [MUST] 将冲突信息写入 `ew:conflict:{@system:local}` Annotation。
-- [MUST] 如果无冲突，写入 `ew:no_conflict:{@system:local}` Annotation。
+- [MUST] 更新 State Cache：DAG 邻接表、因果序、分支列表、合并状态。
+- [MUST] 对 ew:merge.request，比较源/目标分支检测冲突，记录到 State Cache。
 
-#### after_write: ew:execute_merge
+#### after_write: ew:execute_merge (priority 101)
 
 | 字段 | 值 |
 |------|---|
-| trigger.datatype | `ew_merge_request` |
-| trigger.event | `update` |
-| trigger.filter | `ext.annotations has "ew:approved:*"` |
-| priority | `40` |
+| trigger.filter | `content_type == 'ew:merge.approve'` |
+| priority | `101` |
 
-- [MUST] 验证 approved annotation 数量满足 merge quorum。
-- [MUST] 将 source_branch 的事件按因果顺序写入 target_branch 的 Room。
-- [MUST] 生成 `ew_event { event_type: "branch_merged" }` 记录。
-- [MUST NOT] 修改 source_branch 中的原始事件。
+- [MUST] 检查 State Cache 中当前 merge_request 的 approve 数量是否满足 quorum。
+- 满足时：将 source_branch 的事件按因果顺序写入 target_branch Room。
+- [MUST] 发送 ew:event.record { event_type: "branch_merged" } 记录。
 
-### 3.3 Annotations
+### 3.3 State Cache Schema
 
-```yaml
-annotations:
-  on_ref:
-    # 附加到 ew_merge_request 上
-    "ew:conflict":              # key: "ew:conflict:{@system:local}"
-      value: { conflicting_events: [ULID], description: string }
-    "ew:no_conflict":           # key: "ew:no_conflict:{@system:local}"
-      value: { verified_at: RFC 3339 }
-    "ew:approved":              # key: "ew:approved:{approver_entity_id}"
-      value: { approved_at: RFC 3339, comment: string | null }
-    "ew:rejected":              # key: "ew:rejected:{rejector_entity_id}"
-      value: { reason: string }
-
-    # 附加到任意 ew_event 上
-    "ew:lifecycle":             # key: "ew:lifecycle:{@system:local}"
-      value: { socialware_id: string, lifecycle_type: string }
-      # lifecycle_type: created | forked | composed | merged | suspended | archived
+```python
+class EventWeaverState:
+    dag: dict[str, list[str]]            # event_ref_id → [causal_parent_ref_ids]
+    causal_order: list[str]              # 拓扑排序后的 ref_id 列表
+    branches: dict[str, dict]            # branch_ref_id → branch info
+    merge_requests: dict[str, dict]      # mr_ref_id → {approvals, rejections, conflict_status}
+    lifecycle_events: list[dict]         # Socialware 生命周期事件
+    role_map: dict[tuple[str,str], set[str]]
 ```
 
 ### 3.4 Indexes
 
-```yaml
-indexes:
-  - id:           "ew:dag_index"
-    input:        "All ew_event in room, keyed by event_id"
-    transform:    "Build adjacency list from causality field"
-    refresh:      on_change
-    operation_id: "ew.dag.get"
+```python
+@api("GET /ew/dag")
+async def get_dag(room_id):
+    """DAG 邻接表（从 State Cache 查询）"""
 
-  - id:           "ew:causal_order"
-    input:        "ew:dag_index"
-    transform:    "Topological sort of event DAG"
-    refresh:      on_change
-    operation_id: "ew.events.list"
+@api("GET /ew/events")
+async def list_events(room_id, event_type=None):
+    """因果序事件列表"""
 
-  - id:           "ew:branch_list"
-    input:        "All ew_branch in room"
-    transform:    "List with status derived from merge_request annotations"
-    refresh:      on_change
-    operation_id: "ew.branches.list"
+@api("GET /ew/branches")
+async def list_branches(room_id):
+    """分支列表"""
 
-  - id:           "ew:lifecycle_log"
-    input:        "All ew_event where annotation ew:lifecycle exists"
-    transform:    "Filter and sort by created_at"
-    refresh:      on_change
-    operation_id: "ew.lifecycle.get"
+@api("GET /ew/lifecycle")
+async def lifecycle_log(room_id):
+    """Socialware 生命周期日志"""
 ```
 
 ---
@@ -296,7 +261,7 @@ roles:
   # 施加于 Identity
   - id: ew:emitter
     assignable_to: [Identity]
-    capabilities: [event.emit, event.annotate]
+    capabilities: [event.record]
 
   - id: ew:branch_owner
     assignable_to: [Identity]
@@ -321,7 +286,7 @@ roles:
 
   # 施加于 Message
   - id: ew:merge_request_authority
-    assignable_to: [Message where datatype == ew_merge_request]
+    assignable_to: [Message where content_type == ew:merge.request]
     capabilities: [authority.propose_merge, binding.on_approval]
 
   - id: ew:directive
@@ -346,7 +311,7 @@ arenas:
     purpose: "对外提供 Event DAG 只读查询"
 
   - id: ew:branch_workspace
-    over: [Room created per ew_branch]
+    over: [Room created per ew:branch.create Message]
     boundary: internal
     entry_policy: role_required(ew:branch_owner | ew:merger)
     purpose: "分支内部的事件提交和演进"
@@ -381,12 +346,12 @@ commitments:
 
   - id: ew:conflict_transparency
     between: [Room with role(ew:merge_zone), Room with role(ew:branch_workspace)]
-    obligation: "冲突完整暴露在 ew:conflict Annotation 中，不静默丢弃"
+    obligation: "冲突完整暴露在 ew:_system.conflict 系统 Message 中，不静默丢弃"
     triggered_by: "ew:detect_conflict hook 发现冲突"
 
   - id: ew:lifecycle_tracking
     between: [EventWeaver Identity, any Socialware Identity]
-    obligation: "所有 Socialware 生命周期事件被忠实记录为 ew_event"
+    obligation: "所有 Socialware 生命周期事件被忠实记录为 ew:event.record Message"
     triggered_by: "any Socialware lifecycle state change"
 ```
 
@@ -395,7 +360,7 @@ commitments:
 ```yaml
 flows:
   - id: ew:event_lifecycle
-    subject: Message where datatype == ew_event
+    subject_type: "ew:event.record"
     states: [emitted, validated, indexed, archived]
     transitions:
       emitted   --[ew:validate_causality passes]--> validated
@@ -406,11 +371,11 @@ flows:
       archive_retention: 30d
 
   - id: ew:branch_lifecycle
-    subject: Room created per ew_branch
+    subject_type: "ew:branch.create"
     states: [created, active, merge_requested, merged, abandoned]
     transitions:
-      created          --[first ew_event written]---------> active
-      active           --[ew_merge_request submitted]-----> merge_requested
+      created          --[first ew:event.record sent]---------> active
+      active           --[ew:merge.request sent]-----> merge_requested
       merge_requested  --[sufficient ew:approved]---------> merged
       merge_requested  --[ew:rejected]--------------------> active
       active           --[branch_owner closes]------------> abandoned
@@ -419,7 +384,7 @@ flows:
       auto_merge_when_no_conflict: true
 
   - id: ew:conflict_resolution
-    subject: Message where datatype == ew_merge_request AND annotation(ew:conflict) exists
+    subject_type: "ew:merge.request" AND annotation(ew:conflict) exists
     states: [detected, auto_resolved, escalated, human_resolved]
     transitions:
       detected   --[agent confidence > 0.8]-----> auto_resolved
@@ -442,7 +407,7 @@ flows:
 GIVEN  EventWeaver 已初始化，R-ew-main Room 已创建
        E-alice 拥有 ew:emitter Role
 
-WHEN   E-alice 写入 ew_event:
+WHEN   E-alice 发送 ew:event.record Message:
        { event_id: "evt-001", event_type: "task_created",
          causality: [], actor: "@alice:relay-a" }
 
@@ -457,7 +422,7 @@ THEN   ew:validate_causality hook 通过（根事件允许空 causality）
 ```
 GIVEN  R-ew-main 包含 evt-001
 
-WHEN   E-alice 写入 ew_event:
+WHEN   E-alice 发送 ew:event.record Message:
        { event_id: "evt-002", event_type: "task_claimed",
          causality: ["evt-001"], actor: "@alice:relay-a" }
 
@@ -470,7 +435,7 @@ THEN   ew:validate_causality hook 验证 evt-001 存在 → 通过
 ```
 GIVEN  R-ew-main 包含因果链: evt-001 → evt-002 → evt-003
 
-WHEN   E-alice 写入 ew_event:
+WHEN   E-alice 发送 ew:event.record Message:
        { event_id: "evt-004", causality: ["evt-003"],
          但 evt-003 的 causality 中指向了 evt-004（循环引用） }
 
@@ -484,7 +449,7 @@ THEN   ew:validate_causality hook 检测到因果环
 ```
 GIVEN  R-ew-main 包含 evt-001
 
-WHEN   E-alice 写入 ew_event:
+WHEN   E-alice 发送 ew:event.record Message:
        { event_id: "evt-005", causality: ["evt-999"] }
 
 THEN   ew:validate_causality hook 发现 evt-999 不存在 → 拒绝写入
@@ -498,7 +463,7 @@ THEN   ew:validate_causality hook 发现 evt-999 不存在 → 拒绝写入
 GIVEN  R-ew-main 包含事件链 evt-001 → evt-002 → evt-003
        E-bob 拥有 ew:branch_owner Role
 
-WHEN   E-bob 写入 ew_branch:
+WHEN   E-bob 发送 ew:branch.create Message:
        { branch_id: "R-branch-a", parent_room: "R-ew-main",
          fork_point: "evt-002" }
 
@@ -528,10 +493,10 @@ GIVEN  R-branch-a fork from evt-002
        R-branch-a 包含 branch-evt-001 (不与主线冲突)
        R-ew-main 包含 evt-003, evt-004 (与分支无关)
 
-WHEN   E-merger 写入 ew_merge_request:
+WHEN   E-merger 发送 ew:merge.request Message:
        { source_branch: "R-branch-a", target_branch: "R-ew-main" }
 
-THEN   ew:detect_conflict hook 写入 ew:no_conflict Annotation
+THEN   ew:detect_conflict hook 写入 State Cache conflict_status
        Flow preference auto_merge_when_no_conflict = true
        ew:execute_merge hook 自动执行
        R-ew-main Timeline 新增 branch-evt-001
@@ -544,9 +509,9 @@ THEN   ew:detect_conflict hook 写入 ew:no_conflict Annotation
 GIVEN  R-branch-a 和 R-branch-b 都 fork from evt-002
        两个分支修改了同一个配置项
 
-WHEN   E-merger 写入 ew_merge_request
+WHEN   E-merger 发送 ew:merge.request Message
 
-THEN   ew:detect_conflict hook 写入 ew:conflict Annotation
+THEN   ew:detect_conflict hook 写入 ew:_system.conflict 系统 Message
        { conflicting_events: [...], description: "..." }
        合并不自动执行
        等待 human intervention
@@ -563,7 +528,7 @@ GIVEN  Bootstrap EventWeaver 已运行
 WHEN   ResPool Identity 注册到 Platform Bus
 
 THEN   EventWeaver 自动记录:
-       ew_event { event_type: "socialware_created",
+       ew:event.record Message { event_type: "socialware_created",
                   payload: { socialware_id: "respool", ... },
                   actor: platform_admin }
        ew:lifecycle Annotation 写入该事件
@@ -578,7 +543,7 @@ GIVEN  TaskArena 已在平台运行
 WHEN   Platform Admin 对 TaskArena 执行 Fork → TaskArena-CN
 
 THEN   EventWeaver 记录:
-       ew_event { event_type: "socialware_forked",
+       ew:event.record Message { event_type: "socialware_forked",
                   payload: { source: "taskarena", target: "taskarena-cn",
                              fork_type: "snapshot" } }
        await ew.lifecycle.get(socialware="taskarena") 包含 fork 记录
@@ -590,7 +555,7 @@ THEN   EventWeaver 记录:
 #### TC-EW-030: 冲突解决中的 HiTL 升级
 
 ```
-GIVEN  ew_merge_request 带有 ew:conflict Annotation
+GIVEN  ew:merge.request Message 带有 ew:_system.conflict 系统 Message
        Agent 尝试自动解决，置信度 = 0.4
 
 WHEN   ew:conflict_resolution Flow 判断 confidence <= 0.8
@@ -622,10 +587,10 @@ EventWeaver 被依赖:
 
 | 领域概念 | Bus 层实现 | Socialware 层维度 |
 |---------|-----------|------------------|
-| Event | Message(datatype=ew_event) | Role(ew:directive), Flow(ew:event_lifecycle) |
-| Branch | Room(created per ew_branch) | Arena(ew:branch_workspace), Flow(ew:branch_lifecycle) |
-| Fork Point | ULID field in ew_branch | — (纯数据，无需 Socialware 维度) |
-| Merge Request | Message(datatype=ew_merge_request) | Role(ew:merge_request_authority), Flow(ew:conflict_resolution) |
+| Event | Message(content_type=ew:event.record) | Role(ew:directive), Flow(ew:event_lifecycle) |
+| Branch | Room(created per ew:branch.create) | Arena(ew:branch_workspace), Flow(ew:branch_lifecycle) |
+| Fork Point | ref_id field in ew:branch.create body | — (纯数据，无需 Socialware 维度) |
+| Merge Request | Message(content_type=ew:merge.request) | Role(ew:merge_request_authority), Flow(ew:conflict_resolution) |
 | Conflict | Annotation(ew:conflict) on merge_request | — (纯元数据) |
 | Approval | Annotation(ew:approved) on merge_request | — (纯元数据) |
 | Lifecycle Event | Annotation(ew:lifecycle) on ew_event | — (纯元数据) |

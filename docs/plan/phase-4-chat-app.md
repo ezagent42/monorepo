@@ -47,7 +47,7 @@ THEN   渲染为 Markdown：标题、粗体正确显示
 ### TC-4-RENDER-003: structured_card 渲染
 
 ```
-GIVEN  Message (datatype=ta_task) 有 renderer 声明：
+GIVEN  Message (content_type=ta:task.propose) 有 renderer 声明：
        { type: structured_card, field_mapping: {
            header: "title", metadata: [
              { field: "reward", format: "{value} {currency}", icon: "coin" },
@@ -240,7 +240,7 @@ THEN   E-bob 头像旁显示绿色 presence dot
 ### TC-4-ACTION-001: Action 按钮基本渲染
 
 ```
-GIVEN  ta_task 消息，Flow state = "open"
+GIVEN  ta:task.propose Message，Flow state = "open"
        Flow renderer 声明 action: { transition: "open → claimed",
          label: "Claim Task", style: primary, visible_to: "role:ta:worker" }
        当前 viewer 拥有 ta:worker Role
@@ -266,7 +266,7 @@ THEN   [Claim Task] 按钮不显示
 ### TC-4-ACTION-003: Action 点击触发 Flow transition
 
 ```
-GIVEN  ta_task state = "open"，viewer 有 ta:worker Role
+GIVEN  Task Flow state = "open"，viewer 有 ta:worker Role
 
 WHEN   用户点击 [Claim Task]（confirm=false）
 
@@ -280,7 +280,7 @@ THEN   写入 Annotation 推进 Flow: open → claimed
 ### TC-4-ACTION-004: Action 确认弹窗
 
 ```
-GIVEN  ta_task state = "under_review"
+GIVEN  Task Flow state = "under_review"
        "Approve" action 声明 confirm=true, confirm_message="确认批准？"
 
 WHEN   用户点击 [Approve]
@@ -293,7 +293,7 @@ THEN   弹出确认对话框 "确认批准？"
 ### TC-4-ACTION-005: 多个 Action 并存
 
 ```
-GIVEN  ta_task state = "under_review"
+GIVEN  Task Flow state = "under_review"
        viewer 同时拥有 ta:reviewer 和 ta:arbiter Role
 
 WHEN   渲染
@@ -305,7 +305,7 @@ THEN   显示多个按钮：[Approve] (primary) [Reject] (danger)
 ### TC-4-ACTION-006: State 变化后按钮实时更新
 
 ```
-GIVEN  Peer-A 看到 ta_task state = "open"，显示 [Claim Task]
+GIVEN  Peer-A 看到 Task Flow state = "open"，显示 [Claim Task]
 
 WHEN   Peer-B 点击 [Claim Task]（open → claimed）
        CRDT 同步到 Peer-A
@@ -358,7 +358,7 @@ THEN   Timeline 回到之前的滚动位置（不重载）
 ### TC-4-TAB-004: kanban Layout
 
 ```
-GIVEN  R-taskarena 中有 ta_task 消息，启用了 TaskArena
+GIVEN  R-taskarena 中有 ta:task.propose Message，启用了 TaskArena
        Index "ta:task_board" 声明 layout=kanban, columns_from=flow:ta:task_lifecycle
 
 WHEN   切换到 Board Tab

@@ -242,7 +242,7 @@ class TaskArena:
 
 | 文档 | 内容 | 适合谁 |
 |------|------|--------|
-| [protocol.md](specs/protocol.md) | 协议总览、架构分层、实现路线 | 所有人的入口 |
+| [architecture.md](specs/architecture.md) | 协议总览、架构分层、实现路线 | 所有人的入口 |
 | [bus-spec.md](specs/bus-spec.md) | Engine 四组件 + Backend + Built-in Datatypes | Rust 开发者 |
 | [extensions-spec.md](specs/extensions-spec.md) | 15 个 Extension Datatype 详细规范 | Rust 开发者 |
 | [socialware-spec.md](specs/socialware-spec.md) | Socialware 四原语 + 声明格式 + 组合操作 | Socialware 开发者 |
@@ -282,7 +282,7 @@ class TaskArena:
 
 ### 阅读路径
 
-- **我想理解全貌** → protocol.md → socialware-spec.md → 本 README
+- **我想理解全貌** → architecture.md → socialware-spec.md → 本 README
 - **我想用 Rust 实现核心** → bus-spec.md → extensions-spec.md
 - **我想开发前端** → app-prd.md → chat-ui-spec.md → http-spec.md
 - **我想写一个 Socialware** → socialware-spec.md → py-spec.md → 任意 PRD 作为参考
@@ -293,7 +293,7 @@ class TaskArena:
 
 ## 项目状态
 
-ezagent 目前处于 **Architecture Draft** 阶段（v0.9.1）。协议规范和产品设计已基本完成，正在进入实现阶段。
+ezagent 目前处于 **Architecture Draft** 阶段（v0.9.4）。协议规范和产品设计已基本完成，正在进入实现阶段。
 
 **实施路线：**
 

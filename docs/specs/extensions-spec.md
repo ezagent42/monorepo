@@ -2,12 +2,12 @@
 
 > **ezagent** — Easy Agent Communication Protocol
 >
-> Extension Datatypes: EXT-01 through EXT-15
+> Extension Datatypes: EXT-01 through EXT-17
 
 > **状态**：Draft
-> **日期**：2026-02-26
-> **版本**：0.9.1（新增 EXT-15 Command）
-> **前置文档**：ezagent-bus-spec-v0.9.1.md, ezagent-chat-ui-spec-v0.1.md
+> **日期**：2026-02-27（rev.3：Extension 动态加载模型）
+> **版本**：0.9.4（§1.2 重构为动态加载 + Room 级激活两层模型）
+> **前置文档**：ezagent-bus-spec-v0.9.4.md, ezagent-chat-ui-spec-v0.1.1.md
 
 ---
 
@@ -34,7 +34,9 @@
 §14 EXT-13: Entity Profile
 §15 EXT-14: Watch
 §16 EXT-15: Command
-§17 Extension Interaction Rules
+§17 EXT-16: Link Preview
+§18 EXT-17: Runtime
+§19 Extension Interaction Rules
 附录 F: Extension SSE Events 汇总
 附录 G: Extension API Endpoints 汇总
 附录 H: content_type / status 注册表汇总
@@ -46,25 +48,45 @@
 
 ### §1.1 文档范围
 
-本文档定义 ezagent 协议的 15 个 Extension Datatypes。每个 Extension 使用 Bus Spec §3.5 定义的统一声明格式（datatypes + hooks + annotations + indexes）。
+本文档定义 ezagent 协议的 17 个 Extension Datatypes。每个 Extension 使用 Bus Spec §3.5 定义的统一声明格式（datatypes + hooks + annotations + indexes）。
 
 所有 Extension 对 Bus Spec 有前置依赖。读者 MUST 先理解 Bus Spec 中的 Engine（§3）、Built-in Datatypes（§5）后再阅读本文档。
 
 ### §1.2 Extension 加载规则
 
+#### §1.2.1 分发模型
+
+所有 Extension（官方 17 个 + 第三方）编译为独立的动态链接库（`.so` / `.dylib` / `.dll`），安装到 `~/.ezagent/extensions/{ext_name}/`。Engine 启动时通过 `dlopen` 加载。详见 bus-spec §4.7 Extension Loader。
+
+```
+~/.ezagent/extensions/
+├── reactions/
+│   ├── manifest.toml       # 声明 datatypes, hooks, dependencies, api_version
+│   └── libreactions.so     # 编译产物
+├── moderation/
+│   ├── manifest.toml
+│   └── libmoderation.so
+└── ...
+```
+
+`pip install ezagent` 首次安装时，官方 Extension 的预编译产物自动部署到此目录。第三方 Extension 通过 `ezagent ext install {name}` 安装。
+
+#### §1.2.2 Room 级激活
+
 - [MUST] Extension 仅在 Room Config 的 `enabled_extensions` 列表中出现时激活。
 - [MUST] 激活 Extension 时，Engine MUST 先验证该 Extension 的 `dependencies` 是否已满足。未满足则 MUST 拒绝激活。
 - [MUST] Extension 的 Hook 仅在该 Extension 激活时执行。
 - [MUST] Extension 被禁用后，其 Hook 停止执行，但已写入的数据（`ext.*` 字段、独立 Doc）MUST NOT 被删除。
-- [MUST] 不支持某 Extension 的 Peer MUST 保留该 Extension 写入的 `ext.*` 字段和 `ext.annotations`。
+- [MUST] 不支持某 Extension 的 Peer MUST 保留该 Extension 写入的 `ext.*` 字段。
 
 ### §1.3 合规性层级
 
 | 层级 | 包含的 Extensions |
 |------|------------------|
 | **Level 0: Core** | 无（仅 Built-in） |
-| **Level 1: Standard** | EXT-01 Mutable, EXT-03 Reactions, EXT-04 Reply To, EXT-08 Read Receipts, EXT-09 Presence, EXT-10 Media |
+| **Level 1: Standard** | EXT-01 Mutable, EXT-03 Reactions, EXT-04 Reply To, EXT-08 Read Receipts, EXT-09 Presence, EXT-10 Media, EXT-16 Link Preview |
 | **Level 2: Advanced** | Level 1 + EXT-02 Collab, EXT-05 Cross-Room Ref, EXT-06 Channels, EXT-07 Moderation, EXT-13 Profile, EXT-14 Watch, EXT-15 Command |
+| **Level 3: Socialware-Ready** | Level 2 + EXT-17 Runtime |
 | **Level 3: Full** | Level 2 + EXT-11 Threads, EXT-12 Drafts |
 
 ### §1.4 依赖图
@@ -102,6 +124,8 @@ Built-in (always)
     EXT-12 Drafts      ─ depends → Room
     EXT-13 Profile     ─ depends → Identity
     EXT-15 Command     ─ depends → Timeline, Room
+    EXT-16 Link Preview─ depends → Message
+    EXT-17 Runtime     ─ depends → Channels, Reply To, Command
 ```
 
 ### §1.5 API 写入模式
@@ -774,6 +798,7 @@ dependencies: ["timeline", "room"]
 | key_pattern | `ezagent/{room_id}/ext/read-receipts/{state\|updates}` |
 | persistent | `true` |
 | writer_rule | `crdt_map key == signer entity_id` |
+| sync_strategy | `{ mode: batched, batch_ms: 5000 }` |
 
 Schema：`Y.Map<Entity ID, Y.Map>`
 
@@ -782,7 +807,7 @@ Schema：`Y.Map<Entity ID, Y.Map>`
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | `last_read_ref` | ULID | 最后阅读的 Ref ID |
-| `last_read_window` | string | 最后阅读的 Timeline Window |
+| `last_read_shard` | UUIDv7 | 最后阅读的 Timeline Shard |
 | `updated_at` | RFC 3339 | 更新时间 |
 
 - [MUST] 每个 Entity 只能写入以自己 Entity ID 为 key 的 entry。
@@ -944,27 +969,51 @@ Awareness Payload：
 
 ### §11.1 概述
 
-Media 支持发送文件、图片、音视频等二进制附件。
+Media 支持发送文件、图片、音视频等二进制附件。Blob 内容全局去重存储，per-room 通过 Blob Ref 引用。
 
 ### §11.2 声明
 
 ```yaml
 id: "media"
-version: "0.1.0"
+version: "0.2.0"
 dependencies: ["message"]
 ```
 
 ### §11.3 Datatypes
 
-**blob_storage**
+**global_blob**
 
 | 字段 | 值 |
 |------|---|
-| id | `blob_storage` |
+| id | `global_blob` |
 | storage_type | `blob` |
-| key_pattern | `ezagent/{room_id}/blob/{blob_hash}` |
+| key_pattern | `ezagent/blob/{blob_hash}` |
+| persistent | `true` |
+| writer_rule | `any authenticated entity` |
+| sync_strategy | `{ mode: lazy }` |
+
+**blob_ref**
+
+| 字段 | 值 |
+|------|---|
+| id | `blob_ref` |
+| storage_type | `crdt_map` |
+| key_pattern | `ezagent/{room_id}/ext/media/blob-ref/{blob_hash}` |
 | persistent | `true` |
 | writer_rule | `signer ∈ room.members` |
+
+Blob Ref Schema：
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `blob_hash` | string | SHA-256 hash |
+| `filename` | string | 原始文件名 |
+| `mime_type` | string | MIME 类型 |
+| `size_bytes` | integer | 文件大小 |
+| `uploader` | Entity ID | 上传者 |
+| `uploaded_at` | RFC 3339 | 上传时间 |
+| `dimensions` | object | 图片/视频尺寸（MAY） |
+| `duration_seconds` | number | 音视频时长（MAY） |
 
 ### §11.4 注册
 
@@ -973,10 +1022,10 @@ dependencies: ["message"]
 
 ### §11.5 Blob 元信息
 
-Blob 的元信息作为 Ref 的 annotation 存储：
+Blob 的元信息存储在 per-room Blob Ref 中（`ext.media` 命名空间）：
 
 ```yaml
-ref.ext.annotations."media_meta:@system:local":
+ref.ext.media:
   blob_hash: "sha256:..."
   filename: "report.pdf"
   mime_type: "application/pdf"
@@ -993,12 +1042,14 @@ ref.ext.annotations."media_meta:@system:local":
 
 | 字段 | 值 |
 |------|---|
-| trigger.datatype | `blob_storage` |
+| trigger.datatype | `global_blob` |
 | trigger.event | `insert` |
 | priority | `20` |
 
 - [MUST] 计算 SHA-256 hash。
-- [MUST] 验证 blob 不存在时写入，已存在时直接引用（内容去重）。
+- [MUST] 查询全局 Blob Store：已存在时跳过内容上传（秒传），仅创建 per-room Blob Ref。
+- [MUST] 不存在时写入全局 Blob，然后创建 per-room Blob Ref。
+- [MUST] Relay 维护全局 Blob 的引用计数（详见 relay-spec §4.3）。
 
 ### §11.7 Indexes
 
@@ -1006,7 +1057,7 @@ ref.ext.annotations."media_meta:@system:local":
 
 | 字段 | 值 |
 |------|---|
-| input | timeline refs where `content_type == "blob"` |
+| input | `ezagent/{room_id}/ext/media/blob-ref/*` |
 | transform | `room_id → [{ref_id, blob_hash, mime_type, filename}]` |
 | refresh | `on_demand` |
 | operation_id | `GET /rooms/{room_id}/media` |
@@ -1015,14 +1066,16 @@ ref.ext.annotations."media_meta:@system:local":
 
 | 端点 | 说明 |
 |------|------|
-| `POST /blobs` | 上传 blob，返回 blob_hash |
-| `GET /blobs/{blob_hash}` | 下载 blob |
+| `POST /blobs` | 上传 blob，返回 blob_hash。Relay 自动去重 |
+| `GET /blobs/{blob_hash}` | 下载 blob。Relay 验证请求者属于引用该 blob 的 Room |
 
 ### §11.9 规则汇总
 
 - [MUST] Blob 写入后不可变。
-- [MUST] 相同内容的 blob 去重（同一 hash 只存一份）。
-- [SHOULD] 实现 SHOULD 限制单个 blob 的大小（推荐上限 50MB，可配置）。
+- [MUST] 相同内容的 blob 全局去重（同一 hash 只存一份）。
+- [MUST] Blob 读取需验证请求者至少属于一个引用该 blob 的 Room。
+- [SHOULD] 实现 SHOULD 限制单个 blob 的大小（由 Relay quota 控制，推荐上限 50MB）。
+- [MUST] Blob 的 `sync_strategy` 为 `lazy`——内容不主动推送，按需拉取。
 
 ---
 
@@ -1125,6 +1178,7 @@ dependencies: ["room"]
 | key_pattern | `ezagent/{room_id}/ext/draft/{entity_id}/{state\|updates}` |
 | persistent | `true` |
 | writer_rule | `signer == entity_id in key_pattern` |
+| sync_strategy | `{ mode: lazy }` |
 
 Draft Doc Schema：
 
@@ -1338,7 +1392,7 @@ dependencies: ["timeline", "reply-to"]
 
 Entity 在 Ref 上写入 watch annotation，声明关注该 Ref 的后续变化。
 
-**Annotation 位置**：`ref.ext.annotations."watch:@{entity_id}"`
+**Annotation 位置**：`ref.ext.watch.@{entity_id}`
 
 Schema：
 
@@ -1357,7 +1411,7 @@ Schema：
 
 Entity 在 Room Config 上写入 channel watch annotation，声明关注特定 channel 的新消息。
 
-**Annotation 位置**：`room_config.ext.annotations."channel_watch:@{entity_id}"`
+**Annotation 位置**：`room_config.ext.watch.@{entity_id}`
 
 Schema：
 
@@ -1376,10 +1430,10 @@ Schema：
 |------|---|
 | trigger.datatype | `timeline_index` |
 | trigger.event | `update` |
-| trigger.filter | `annotation type == watch` |
+| trigger.filter | `ext.watch changed` |
 | priority | `30` |
 
-- [MUST] 验证 annotation key 中的 entity_id == signer。
+- [MUST] 验证 key 中的 entity_id == signer。
 
 **pre_send: watch.set_channel**
 
@@ -1387,10 +1441,10 @@ Schema：
 |------|---|
 | trigger.datatype | `room_config` |
 | trigger.event | `update` |
-| trigger.filter | `annotation type == channel_watch` |
+| trigger.filter | `ext.watch changed` |
 | priority | `30` |
 
-- [MUST] 验证 annotation key 中的 entity_id == signer。
+- [MUST] 验证 key 中的 entity_id == signer。
 
 **after_write: watch.check_ref_watchers**
 
@@ -1404,8 +1458,8 @@ Schema：
 
 | 条件 | SSE Event | 要求 |
 |------|-----------|------|
-| 新 Ref 的 `ext.reply_to.ref_id` 指向一个有 watch annotation 的 Ref，且 `on_reply == true` | `watch.ref_reply_added` | MUST |
-| 新 Ref 的 `ext.thread.root` 指向一个有 watch annotation 的 Ref，且 `on_thread == true` | `watch.ref_thread_reply` | MUST |
+| 新 Ref 的 `ext.reply_to.ref_id` 指向一个有 `ext.watch` 的 Ref，且 `on_reply == true` | `watch.ref_reply_added` | MUST |
+| 新 Ref 的 `ext.thread.root` 指向一个有 `ext.watch` 的 Ref，且 `on_thread == true` | `watch.ref_thread_reply` | MUST |
 | 被 watch 的 Ref 的 status 变为 `"edited"`，且 `on_content_edit == true` | `watch.ref_content_edited` | MUST |
 | 被 watch 的 Ref 的 `ext.reactions` 变化，且 `on_reaction == true` | `watch.ref_reaction_changed` | SHOULD |
 
@@ -1437,7 +1491,7 @@ Schema：
 
 | 字段 | 值 |
 |------|---|
-| input | 所有 Ref/Room 上含当前 Entity 的 watch/channel_watch annotation |
+| input | 所有 Ref/Room Config 上 `ext.watch` 中含当前 Entity 的条目 |
 | transform | `entity_id → [{type: "ref", target, room_id}, {type: "channel", channels, scope}]` |
 | refresh | `on_change` |
 | operation_id | `GET /watches` |
@@ -1474,8 +1528,8 @@ POST body（Channel Watch）:
 }
 ```
 
-- [MUST] POST 内部通过 Annotation Store 在对应的 Ref 或 Room Config 上写入 watch annotation。
-- [MUST] DELETE 的 `watch_key` 格式为 `watch:@{entity_id}` 或 `channel_watch:@{entity_id}`。只能删除自己的 Watch。
+- [MUST] POST 内部在对应的 Ref 的 `ext.watch` 或 Room Config 的 `ext.watch` 上写入 watch 数据。
+- [MUST] DELETE 的 `watch_key` 格式为 `@{entity_id}`。只能删除自己的 Watch。
 
 ### §15.8 Agent 工作流
 
@@ -1484,8 +1538,8 @@ Watch 的典型 Agent 使用场景：
 ```
 1. Agent 通过 Profile (EXT-13) 被发现并邀请进 Room
 2. Agent 处理 message A
-   → 在 message A 上设置 watch annotation:
-     ext.annotations."watch:@agent-1:relay-a.com" = {
+   → 在 message A 上设置 watch:
+     ext.watch.@agent-1:relay-a.com = {
        on_content_edit: true,
        on_reply: true,
        on_thread: true,
@@ -1499,14 +1553,14 @@ Watch 的典型 Agent 使用场景：
 5. Author 发送 message B (reply_to A)
    → Agent 收到 watch.ref_reply_added
    → Agent 读取 B，结合 A 更新 C
-6. 任务完成后 Agent 可删除 watch annotation
+6. 任务完成后 Agent 可删除 watch 数据
 ```
 
 ### §15.8 规则汇总
 
-- [MUST] Watch annotation 是公开数据（存储在 Ref 的 ext.annotations 中）。
+- [MUST] Watch 数据是公开数据（存储在 Ref 的 `ext.watch` 中）。
 - [MUST] Entity 只能为自己设置和删除 watch。
-- [MUST] Peer 不支持 EXT-14 时，watch annotation 被保留但不触发通知。
+- [MUST] Peer 不支持 EXT-14 时，`ext.watch` 字段被保留但不触发通知。
 - [SHOULD] 实现 SHOULD 限制单个 Entity 的活跃 watch 数量（推荐上限 1000）。
 
 ---
@@ -1564,11 +1618,11 @@ dependencies: ["timeline", "room"]
 }
 ```
 
-#### §16.3.2 ext.command_result（独立 Annotation，附加于原 Ref）
+#### §16.3.2 ext.command.result（附加于原 Ref）
 
-命令执行完成后，处理方（Socialware）将结果写入原 Ref 的 Annotation。
+命令执行完成后，处理方（Socialware）将结果写入原 Ref 的 `ext.command` 命名空间。
 
-**Annotation 位置**：`ref.ext.annotations."command_result:{invoke_id}"`
+**Annotation 位置**：`ref.ext.command.result.{invoke_id}`
 
 | 字段 | 类型 | 必需 | 说明 |
 |------|------|------|------|
@@ -1578,16 +1632,16 @@ dependencies: ["timeline", "room"]
 | `error` | string | MAY | 当 status=error 时的错误描述 |
 | `handler` | string | MUST | 处理方 Entity ID |
 
-- [MUST] `command_result` 是 unsigned annotation，由命令处理方（Socialware Identity）写入。
+- [MUST] `command_result` 由命令处理方（Socialware Identity）写入 `ext.command` 命名空间。
 - [MUST] `invoke_id` MUST 匹配原 Ref 中的 `ext.command.invoke_id`。
 
 ### §16.4 Annotation
 
-#### §16.4.1 ext.command_manifest（on Socialware Identity Profile）
+#### §16.4.1 ext.command.manifest（on Socialware Identity Profile）
 
 每个提供命令的 Socialware 在其 Profile（EXT-13）上发布命令清单，供客户端发现和自动补全。
 
-**Annotation 位置**：`profile.ext.annotations."command_manifest:{sw_id}"`
+**Annotation 位置**：`profile.ext.command.manifest.{sw_id}`
 
 | 字段 | 类型 | 必需 | 说明 |
 |------|------|------|------|
@@ -1770,23 +1824,342 @@ POST body（发送命令）:
 
 ---
 
-## §17 Extension Interaction Rules
+## §17 EXT-16: Link Preview
 
-### §17.1 签名规则
+### §17.1 概述
+
+Link Preview 自动提取消息中 URL 的元信息（标题、描述、缩略图），以富预览形式展示在消息下方。
+
+### §17.2 声明
+
+```yaml
+id: "link-preview"
+version: "0.1.0"
+dependencies: ["message"]
+```
+
+### §17.3 Annotation
+
+**Annotation 位置**：`ref.ext.link-preview`
+
+Link Preview 数据作为 Annotation Pattern 嵌入在 Ref 的 `ext.link-preview` 命名空间中。
+
+Schema（Y.Map）：
+
+| 字段 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `url` | string | MUST | 原始 URL |
+| `title` | string | MAY | 页面标题 |
+| `description` | string | MAY | 页面描述 |
+| `image_url` | string | MAY | 预览图 URL |
+| `site_name` | string | MAY | 站点名称 |
+| `type` | enum | MUST | `article` / `image` / `video` / `generic` |
+| `fetched_at` | RFC 3339 | MUST | 抓取时间 |
+| `error` | string | MAY | 抓取失败时的错误描述 |
+
+当消息包含多个 URL 时，`ext.link-preview` 为 Y.Map，key 为 URL 的 SHA-256 hash 前 16 字符：
+
+```yaml
+ref.ext.link-preview:
+  "a1b2c3d4e5f67890":
+    url: "https://example.com/article"
+    title: "Example Article"
+    description: "..."
+    type: "article"
+    fetched_at: "2026-02-27T10:00:00Z"
+```
+
+### §17.4 Hooks
+
+**pre_send: link-preview.extract**
+
+| 字段 | 值 |
+|------|---|
+| trigger.datatype | `timeline_index` |
+| trigger.event | `insert` |
+| priority | `25` |
+
+- [MUST] 扫描消息 body 中的 URL。
+- [MUST] 找到 URL 时，在 `ext.link-preview` 中写入占位条目（`type: "generic"`, `fetched_at: null`）。
+- [MUST] 客户端看到占位条目时 SHOULD 显示 URL loading 状态。
+
+**after_write: link-preview.fetch**
+
+| 字段 | 值 |
+|------|---|
+| trigger.datatype | `timeline_index` |
+| trigger.event | `insert` |
+| trigger.filter | `ext.link-preview present` |
+| priority | `50` |
+
+- [SHOULD] 异步抓取 URL 的 Open Graph / meta 信息。
+- [MUST] 抓取完成后更新 `ext.link-preview` 中的对应条目。
+- [SHOULD] 抓取超时（推荐 10s）时，写入 `error` 字段。
+- [MUST] 更新由 `@system:local` 执行（pre_send Hook 产生的 annotation 由系统更新）。
+
+### §17.5 Indexes
+
+无独立 Index。Link Preview 数据嵌入在 Ref 中，随 Timeline 一同查询。
+
+### §17.6 规则汇总
+
+- [MUST] Link Preview 数据由 `@system:local` 写入，不纳入 author 签名（unsigned）。
+- [MUST] Peer 不支持 EXT-16 时，`ext.link-preview` 字段被保留但不渲染预览。
+- [SHOULD] 实现 SHOULD 缓存已抓取的 URL 预览信息，避免重复抓取。
+- [MAY] 实现 MAY 提供用户选项禁用特定 Room 的 Link Preview。
+
+---
+
+## §18 EXT-17: Runtime
+
+### §18.1 概述
+
+Runtime Extension 为 Socialware 运行提供协议层基础设施。它不实现任何 Socialware 逻辑，而是定义 Socialware Message 在协议层如何表现、路由和保留。
+
+**设计动机**：Socialware 作为应用层，不应直接操作 `ext.*` 命名空间或创建 Datatype。但 Socialware Message 需要协议层约定来确保跨节点一致性——哪些 Room 启用了哪些 Socialware、Socialware Message 的命名格式、未安装 Socialware 的节点如何处理这些 Message。Runtime Extension 封装这些约定。
+
+**类比**：EXT-15 Command 不实现任何具体命令，而是定义"命令调用"的协议层能力。Runtime 不实现任何具体 Socialware，而是定义"Socialware 在协议层如何存在"。
+
+### §18.2 声明
+
+```yaml
+id: "runtime"
+version: "0.1.0"
+dependencies: ["channels", "reply-to", "command"]
+```
+
+### §18.3 Room Config 字段
+
+#### §18.3.1 ext.runtime（unsigned，on Room Config）
+
+```yaml
+ext.runtime:
+  enabled:    [string]          # 启用的 Socialware namespace 列表
+  config:                       # per-Socialware 透传配置（协议层不解读内部结构）
+    {sw_namespace}: any         # Socialware Runtime 读取并处理
+```
+
+**示例**：
+
+```yaml
+ext.runtime:
+  enabled: ["ta", "ew", "rp"]
+  config:
+    ta:
+      default_roles:
+        "*": ["ta:worker"]
+        "@alice:relay-a.example.com": ["ta:publisher", "ta:reviewer"]
+    ew:
+      retention_days: 90
+```
+
+- [MUST] `enabled` 列表中的每个值是一个 Socialware namespace（短标识，如 `"ta"`, `"ew"`, `"rp"`）。
+- [MUST] `config.{ns}` 的内部结构由对应 Socialware 定义，Runtime Extension 不做 schema 验证。
+- [MUST] `ext.runtime` 的 writer_rule: `signer.power_level >= admin`（与 Room Config 其他管理字段一致）。
+- [MUST] 未安装 Runtime Extension 的 Peer 收到含 `ext.runtime` 的 Room Config 时，按 §3.3.1 保留规则保留该字段。
+
+### §18.4 content_type 命名约定
+
+#### §18.4.1 Socialware content_type 格式
+
+Socialware 发出的 Message MUST 使用以下 content_type 格式：
+
+```
+{ns}:{entity_type}.{action}
+```
+
+| 组成部分 | 说明 | 约束 |
+|---------|------|------|
+| `ns` | Socialware namespace | [MUST] 与 `ext.runtime.enabled` 中的值匹配 |
+| `entity_type` | 领域实体类型 | [MUST] 小写字母+连字符 |
+| `action` | 操作名称 | [MUST] 小写字母+连字符 |
+
+**示例**：
+
+```
+ta:task.propose          # TaskArena: 发布任务
+ta:task.claim            # TaskArena: 认领任务
+ta:task.submit           # TaskArena: 提交成果
+ta:verdict.approve       # TaskArena: 审批通过
+ta:role.grant            # TaskArena: 授予角色
+ew:branch.create         # EventWeaver: 创建分支
+rp:allocation.request    # ResPool: 请求资源分配
+```
+
+#### §18.4.2 系统 content_type
+
+以 `{ns}:_system.` 开头的 content_type 保留给 Socialware Runtime 内部使用：
+
+```
+ta:_system.conflict      # 冲突通知
+ta:_system.escalation    # 升级通知
+```
+
+- [MUST] content_type 包含 `:` 的 Message 视为 Socialware Message，受 Runtime Hook 管控。
+- [MUST] 不包含 `:` 的 content_type（如 `immutable`, `mutable`, `collab`, `blob`）为 Bus/Extension 保留值，Socialware MUST NOT 使用。
+- [MUST] Socialware Message 仍使用标准的 Ref 结构（ref_id, author, content_type, content_id, body 等），不引入新字段。
+
+### §18.5 Channel 命名空间保留
+
+```
+_sw:{ns}                 # Socialware 主 channel
+_sw:{ns}:{sub_channel}   # Socialware 子 channel
+```
+
+**示例**：
+
+```
+_sw:ta                   # TaskArena 主 channel
+_sw:ta:admin             # TaskArena 管理操作
+_sw:ta:system            # TaskArena 系统通知
+_sw:ew                   # EventWeaver 主 channel
+```
+
+- [MUST] `_sw:` 前缀的 channel tag 保留给 Socialware Message。
+- [SHOULD] Socialware Message SHOULD 设置 `ext.channels` 包含对应的 `_sw:{ns}` channel。
+- [SHOULD] 客户端默认不在主聊天 Timeline 中渲染 `_sw:*` channel 的 Message（参见 §18.10）。
+- [MUST] `_sw:` channel tag 遵循 EXT-06 的所有规则（签名、验证、Index 集成）。
+
+### §18.6 Hooks
+
+#### pre_send: runtime.namespace_check
+
+| 字段 | 值 |
+|------|---|
+| trigger.datatype | `timeline_index` |
+| trigger.event | `insert` |
+| trigger.filter | `content_type contains ':'` |
+| priority | `45` |
+
+逻辑：
+
+```
+IF content_type contains ':'
+  ns = content_type.split(':')[0]
+  IF ns NOT IN room_config.ext.runtime.enabled
+    REJECT("Socialware namespace '{ns}' not enabled in this room")
+```
+
+- [MUST] 此 Hook 拦截所有含 `:` 的 content_type，验证其 namespace 已在 Room 中启用。
+- [MUST] Room 未配置 `ext.runtime` 或 `ext.runtime.enabled` 为空时，所有 Socialware content_type MUST 被拒绝。
+
+#### pre_send: runtime.local_sw_check
+
+| 字段 | 值 |
+|------|---|
+| trigger.datatype | `timeline_index` |
+| trigger.event | `insert` |
+| trigger.filter | `content_type contains ':' AND is_local_write` |
+| priority | `46` |
+
+逻辑：
+
+```
+IF is_local_write AND content_type contains ':'
+  ns = content_type.split(':')[0]
+  IF local_node does NOT have Socialware with namespace == ns installed and running
+    REJECT("Cannot send: Socialware '{ns}' not installed locally")
+```
+
+- [MUST] 仅检查**本地发出**的 Message。远程 Peer 的 Message 通过 Signed Envelope 验证，不受此检查。
+- [MUST] 此规则确保只有安装了 Socialware 的节点才能发送该 Socialware 的 Message——因为只有安装了的节点才有 Role/Flow 检查 Hook（priority 100+）。
+
+#### after_write: runtime.sw_message_index
+
+| 字段 | 值 |
+|------|---|
+| trigger.datatype | `timeline_index` |
+| trigger.event | `insert` |
+| trigger.filter | `content_type contains ':'` |
+| priority | `50` |
+
+- [MUST] 更新 `socialware_messages` Index（§18.7）。
+
+### §18.7 Indexes
+
+#### socialware_messages
+
+| 字段 | 值 |
+|------|---|
+| input | `timeline_index refs WHERE content_type contains ':'` |
+| transform | `(room_id, ns) → refs list, sorted by CRDT order` |
+| refresh | `on_change` |
+| operation_id | `runtime.list_sw_messages` |
+
+此 Index 为 Socialware Runtime 提供高效的命名空间消息查询，用于 State Cache 重建。
+
+```python
+# Python API (auto-generated)
+refs = await ctx.runtime.list_sw_messages(room_id, ns="ta")
+# → [Ref(content_type="ta:task.propose", ...), Ref(content_type="ta:task.claim", ...), ...]
+```
+
+#### sw_enabled_rooms
+
+| 字段 | 值 |
+|------|---|
+| input | `room_config WHERE ext.runtime.enabled contains {ns}` |
+| transform | `ns → [room_id] list` |
+| refresh | `on_change` |
+| operation_id | `runtime.list_enabled_rooms` |
+
+```python
+rooms = await ctx.runtime.list_enabled_rooms(ns="ta")
+# → ["room-001", "room-002", ...]
+```
+
+### §18.8 SSE Events
+
+| Event Type | Trigger | Payload |
+|------------|---------|---------|
+| `runtime.sw_enabled` | Room Config 中 ext.runtime.enabled 列表新增 namespace | `{ room_id, ns }` |
+| `runtime.sw_disabled` | Room Config 中 ext.runtime.enabled 列表移除 namespace | `{ room_id, ns }` |
+
+### §18.9 API Endpoints
+
+| Endpoint | Method | 说明 | 写入模式 |
+|----------|--------|------|---------|
+| `/rooms/{room_id}/runtime/messages?ns={ns}` | GET | 查询 Room 中指定 namespace 的 Socialware Message | — |
+| `/rooms/{room_id}/runtime/enabled` | GET | 查询 Room 启用的 Socialware 列表 | — |
+| `/rooms/{room_id}/runtime/enabled` | PUT | 更新 Room 的 Socialware 启用列表 | A |
+
+### §18.10 客户端行为
+
+- [SHOULD] 客户端主聊天 Timeline 默认**折叠** `_sw:*` channel 的 Message，显示为类似 "TaskArena: 3 new activities" 的摘要行。
+- [MAY] 客户端在 Socialware 提供的 Tab（如 Kanban、DAG View）中完整渲染 `_sw:*` Message。
+- [MUST] 客户端对未知 content_type（含 `:`）的 Message MUST 显示 fallback UI（如 `[ta:task.propose] {body preview}`），不得隐藏或丢弃。
+- [SHOULD] 已安装对应 Socialware 的客户端 SHOULD 使用 Socialware UI Manifest（Part C）提供的 renderer 渲染 Message。
+
+### §18.11 规则汇总
+
+- [MUST] content_type 含 `:` 的 Message 受 Runtime namespace_check 管控。
+- [MUST] 本地发送 Socialware Message 需安装对应 Socialware。
+- [MUST] Room 未启用某 namespace 时，该 namespace 的 Message 不可写入。
+- [MUST] `_sw:` channel 前缀保留给 Socialware。
+- [MUST] `ext.runtime` 字段遵循 Room Config 的 admin writer_rule。
+- [SHOULD] 客户端默认折叠 `_sw:*` channel Message。
+- [MUST] 未知 Socialware content_type 的 Message 保留在 Timeline 中（CRDT 默认行为），不删除。
+
+---
+
+## §19 Extension Interaction Rules
+
+### §19.1 签名规则
 
 Extension 在 Ref 上注入的 `ext.*` 字段分为两类：
 
 | 类型 | 示例 | 签名规则 |
 |------|------|---------|
 | signed | `ext.reply_to`, `ext.channels`, `ext.thread`, `ext.command` | [MUST] 纳入 Ref author 的签名。写入后不可被他人修改 |
-| unsigned | `ext.reactions`, `ext.annotations` | [MUST NOT] 不纳入 author 签名。其他 Entity 可修改（遵循各自的 writer_rule） |
+| unsigned | `ext.reactions`, `ext.watch`, `ext.command.result`, `ext.link-preview`, `ext.media` | [MUST NOT] 不纳入 author 签名。其他 Entity 可修改（遵循各自的 writer_rule） |
+| unsigned (Room Config) | `ext.runtime` | [MUST NOT] Room Config 级别字段，admin 可修改 |
 
 判断原则：
 
 - 表达 **author 意图** 的字段（"我回复了谁"、"我打了什么 tag"）→ signed。
 - 表达 **他人行为** 的字段（"谁加了 reaction"、"谁在 watch"）→ unsigned。
 
-### §17.2 Hook 优先级约定
+### §19.2 Hook 优先级约定
 
 所有 Extension 的 Hook 优先级 MUST 遵循：
 
@@ -1796,21 +2169,21 @@ Extension 在 Ref 上注入的 `ext.*` 字段分为两类：
 | 10-19 | Built-in（Room membership check） |
 | 20-29 | Built-in（Timeline ref 生成，Message hash/validation） |
 | 30-39 | Extension pre_send 注入（reactions, reply_to, channels, threads, watch, command） |
-| 40-49 | Extension after_write 事件（SSE 生成, watch 检查, command dispatch） |
-| 50-59 | Extension after_write 索引更新（channel activity, read receipts） |
+| 40-49 | Extension pre_send 检查（runtime namespace_check, runtime local_sw_check） |
+| 50-59 | Extension after_write 事件（SSE 生成, watch 检查, command dispatch, runtime index） |
 | 60-69 | Extension after_read 合并（moderation overlay） |
 | 70-79 | Extension after_read 增强（read receipts auto-mark） |
 | 80-89 | 保留 |
 | 90-99 | 清理操作（draft 清除） |
 
-### §17.3 Extension 间依赖规则
+### §19.3 Extension 间依赖规则
 
 - [MUST] Extension 只能依赖 Built-in Datatypes 或 dependency 列表中声明的其他 Extension。
 - [MUST NOT] 循环依赖。
 - [MUST] 依赖的 Extension 未启用时，依赖它的 Extension MUST NOT 被启用。
 - [SHOULD] 最大依赖深度为 2（`Built-in → ExtA → ExtB`）。超过 2 层的深度链 SHOULD 被审视是否有设计简化的可能。
 
-### §17.4 content_type 升级路径
+### §19.4 content_type 升级路径
 
 ```
 immutable (Bus)
@@ -1824,7 +2197,7 @@ collab (EXT-02)
 - [MUST] 升级操作 MUST 由 Ref 的原始 author 执行。
 - [MUST] 升级时 content_id 更新为新 Doc 的 ID，content_type 更新为新类型。
 
-### §17.5 status 注册表
+### §19.5 status 注册表
 
 | 值 | 定义者 | 说明 |
 |---|--------|------|
@@ -1858,6 +2231,8 @@ collab (EXT-02)
 | `command.invoked` | EXT-15 Command | 命令被调用 |
 | `command.result` | EXT-15 Command | 命令执行结果返回 |
 | `command.timeout` | EXT-15 Command | 命令执行超时 |
+| `runtime.sw_enabled` | EXT-17 Runtime | Room 启用 Socialware |
+| `runtime.sw_disabled` | EXT-17 Runtime | Room 禁用 Socialware |
 
 ---
 
@@ -1892,6 +2267,9 @@ collab (EXT-02)
 | `/commands` | GET | EXT-15 | 平台所有可用命令 | — |
 | `/rooms/{room_id}/commands` | GET | EXT-15 | Room 可用命令 | — |
 | `/commands/{invoke_id}` | GET | EXT-15 | 命令执行结果 | — |
+| `/rooms/{room_id}/runtime/messages` | GET | EXT-17 | Socialware Message 查询 | — |
+| `/rooms/{room_id}/runtime/enabled` | GET | EXT-17 | 启用的 Socialware 列表 | — |
+| `/rooms/{room_id}/runtime/enabled` | PUT | EXT-17 | 更新启用列表 | A |
 
 > 写入模式 A = REST API 写入（经 Hook Pipeline）；B = 直接 CRDT 写入（经 Engine API）。见 §1.5。
 
@@ -1907,6 +2285,7 @@ collab (EXT-02)
 | `mutable` | EXT-01 | `uuid:{UUIDv7}` | `immutable` |
 | `collab` | EXT-02 | `uuid:{UUIDv7}` | `mutable` |
 | `blob` | EXT-10 | `sha256:{hex}` | — |
+| `{ns}:{entity}.{action}` | EXT-17 (Socialware) | varies | — |
 
 ### status 注册表
 
@@ -2209,4 +2588,48 @@ indexes:
   command_history:
     renderer:
       as_room_tab: false
+```
+
+### EXT-16: Link Preview
+
+```yaml
+annotations:
+  on_ref:
+    ext.link-preview:
+      renderer:
+        position: below
+        type: link_card
+        field_mapping:
+          title: title
+          description: description
+          image: image_url
+          site: site_name
+        loading_state: { when: "fetched_at == null", show: "url_skeleton" }
+```
+
+### EXT-17: Runtime
+
+```yaml
+# Socialware Message 的 fallback renderer（客户端未安装对应 Socialware 时使用）
+sw_message_fallback:
+  renderer:
+    position: full_width
+    type: sw_activity_summary
+    match: "content_type contains ':'"
+    field_mapping:
+      namespace: "content_type.split(':')[0]"
+      action: "content_type.split(':')[1]"
+      body_preview: "body | truncate(100)"
+    style:
+      collapsed: true                 # 默认折叠
+      expand_label: "Show activity"
+      icon: "puzzle-piece"            # 表示 Socialware 活动
+
+# Room Config 中 ext.runtime 的 renderer
+room_config:
+  ext.runtime:
+    renderer:
+      as_settings_panel: true         # 在 Room 设置中展示
+      type: socialware_manager
+      fields: [enabled, config]
 ```

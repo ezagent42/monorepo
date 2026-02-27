@@ -80,15 +80,25 @@ ezagent events --room <room_id>    # 按 Room 过滤
 
 ```bash
 ezagent status                     # 节点状态
-ezagent start                      # 启动 HTTP Server + Chat UI
+
+# 前台运行（开发/调试用，Ctrl+C 退出）
+ezagent start                      # 前台启动 API server，日志输出到 stdout
 ezagent start --port 9000          # 自定义端口
-ezagent start --no-ui              # 只启动 API
+
+# 后台 daemon（生产用，Tray/LaunchAgent 调用）
+ezagent serve                      # 启动后台 daemon
+ezagent serve --stop               # 停止 daemon
+ezagent serve --status             # 检查 daemon 状态
+ezagent serve --port 9000          # 自定义端口
 ```
 
 | 命令 | 参数 | 说明 |
 |------|------|------|
 | `ezagent status` | 无 | 显示连接状态、已同步 Room 数量、Relay 状态 |
-| `ezagent start` | `--port` (默认 8000), `--no-ui` | 启动 HTTP Server（详见 http-spec） |
+| `ezagent start` | `--port` (默认 8847) | 前台启动 API server，日志输出 stdout，Ctrl+C 退出。用于开发调试 |
+| `ezagent serve` | `--port` (默认 8847) | 后台 daemon 模式启动 API server。由 LaunchAgent 或 ezagent.app 调用 |
+| `ezagent serve --stop` | 无 | 停止后台 daemon (发送 SIGTERM) |
+| `ezagent serve --status` | 无 | 显示 daemon 状态：running/stopped, PID, uptime, port |
 
 ### §2.6 Command（EXT-15）
 
@@ -148,6 +158,37 @@ ezagent agent config "Review-Bot" --key model \
 | `ezagent agent config` | `<name>`, `--key`, `--value` | 修改 Agent 运行时配置 |
 
 > `ezagent agent spawn/destroy/wake/sleep` 等价于在 Room 中执行对应的 `/af:*` 命令。CLI 方式适合自动化脚本和批量操作。
+
+### §2.9 Extension 管理
+
+```bash
+ezagent ext list                              # 列出已安装 Extension 及状态
+ezagent ext info <ext_name>                   # 查看 Extension manifest 详情
+ezagent ext install <name_or_path>            # 安装 Extension
+ezagent ext remove <ext_name>                 # 卸载 Extension
+```
+
+| 命令 | 参数 | 说明 |
+|------|------|------|
+| `ezagent ext list` | `--json`, `--quiet` | 列出 `~/.ezagent/extensions/` 下所有 Extension 及加载状态 |
+| `ezagent ext info` | `<ext_name>` (必需) | 显示 manifest.toml 内容：version, api_version, datatypes, hooks, dependencies |
+| `ezagent ext install` | `<name_or_path>` (必需) | 安装 Extension（从 registry 下载或本地路径） |
+| `ezagent ext remove` | `<ext_name>` (必需), `--keep-data` (可选) | 卸载 Extension，删除 `~/.ezagent/extensions/{name}/` |
+
+### §2.10 Daemon 管理
+
+```bash
+# PID 文件位置
+~/.ezagent/ezagent.pid
+
+# macOS LaunchAgent
+~/Library/LaunchAgents/dev.ezagent.daemon.plist
+
+# Linux systemd (future)
+~/.config/systemd/user/ezagent.service
+```
+
+默认端口从 `8000` 改为 `8847`（避免与常见开发服务冲突）。App 启动时连接此端口，无需用户配置。
 
 ---
 
@@ -213,5 +254,6 @@ data_dir = "~/.ezagent/data"              # 本地 RocksDB 持久化路径
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 0.1.2 | 2026-02-27 | §2.5 重写（start 前台 / serve daemon，端口 8847）；新增 §2.9 Extension 管理、§2.10 Daemon 管理 |
 | 0.1.1 | 2026-02-26 | 新增 §2.6 Command, §2.7 Socialware 管理, §2.8 Agent 管理 (AgentForge) |
 | 0.1 | 2026-02-25 | 从 ezagent-py-spec v0.8 §8 提取为独立文档 |

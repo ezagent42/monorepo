@@ -6,7 +6,7 @@
 
 ```
 docs/
-├── specs/       → 协议规范（protocol, bus, extensions, socialware, py-sdk）
+├── specs/       → 协议规范（architecture, bus, extensions, socialware, py-sdk, relay, repo）
 ├── products/    → 产品文档（app PRD, chat-ui, http-api, cli）
 ├── plan/        → 实施计划（Phase 0–5, fixtures, foundations）
 ├── socialware/  → Socialware PRD（EventWeaver, TaskArena, ResPool, AgentForge）
@@ -30,13 +30,13 @@ docs/
 
 ### 交叉引用
 
-- 文档间使用相对路径链接：`[protocol](specs/protocol.md)`
+- 文档间使用相对路径链接：`[architecture](specs/architecture.md)`
 - 引用协议原语时使用反引号：`DataType`、`Hook`、`Room`
 - 引用 Extension 时标注编号：`EXT-15 Command`
 
 ## 阅读路径
 
-- **理解全貌** → `specs/protocol.md` → `specs/socialware-spec.md` → `README.md`
+- **理解全貌** → `specs/architecture.md` → `specs/socialware-spec.md` → `README.md`
 - **Rust 核心开发** → `specs/bus-spec.md` → `specs/extensions-spec.md`
 - **前端开发** → `products/app-prd.md` → `products/chat-ui-spec.md`
 - **写 Socialware** → `specs/socialware-spec.md` → `specs/py-spec.md` → 任意 PRD

@@ -45,10 +45,10 @@ ResPool 不拥有任何资源，也不执行任何资源的具体操作。它是
 **流程**：
 
 1. TaskArena 的 `ta:settle_reward` Hook 触发，向 Platform Bus 发送消息，请求 ResPool 分配奖励资源
-2. ResPool 收到请求，创建 `rp_request`：type=token, amount=50, currency=USDT
+2. ResPool 收到请求，发送 rp:allocation.request Message：type=token, amount=50, currency=USDT
 3. `rp:match_and_allocate` Hook 查询可用资源池：找到 Publisher 预存的 USDT 余额
-4. 创建 `rp_allocation`：从 Publisher 余额中扣除 50 USDT，分配给 Worker
-5. Worker 确认收到（写入 `rp:released` Annotation）
+4. 发送 rp:allocation.matched Message：从 Publisher 余额中扣除 50 USDT，分配给 Worker
+5. Worker 确认收到（写入 rp:allocation.released Message 字段）
 6. `rp:billing` Hook 生成 `rp:invoice` Annotation，记录完整结算凭证
 7. EventWeaver 收到 `resource_settled` 事件
 
@@ -65,10 +65,10 @@ ResPool 不拥有任何资源，也不执行任何资源的具体操作。它是
    - Provider A：4×A100, $8/GPU/hour, 即时可用
    - Provider B：4×A100, $6/GPU/hour, 30 分钟后可用
    - Provider C：2×A100, $7/GPU/hour, 即时可用（数量不足）
-3. Agent 选择 Provider A，创建 `rp_request`：type=compute, amount=4, unit=A100-hour, duration=2h, budget.max=64
-4. `rp:match_and_allocate` Hook 匹配 Provider A 的资源，创建 `rp_allocation`
-5. Agent 开始使用 GPU，每 15 分钟上报一次 `rp:usage` Annotation
-6. 2 小时后 Agent 写入 `rp:released` Annotation
+3. Agent 选择 Provider A，发送 rp:allocation.request Message：type=compute, amount=4, unit=A100-hour, duration=2h, budget.max=64
+4. `rp:match_and_allocate` Hook 匹配 Provider A 的资源，发送 rp:allocation.matched Message
+5. Agent 开始使用 GPU，每 15 分钟上报一次 rp:allocation.usage Message 字段
+6. 2 小时后 Agent 写入 rp:allocation.released Message 字段
 7. `rp:billing` Hook 根据实际用量（1h45min × 4GPU × $8）= $56 生成账单
 
 **价值**：统一的资源市场让 Agent 可以自动完成资源采购，无需人工干预。
@@ -79,12 +79,12 @@ ResPool 不拥有任何资源，也不执行任何资源的具体操作。它是
 
 **流程**：
 
-1. 客服 Socialware 通过 Platform Bus 向 ResPool 发送 `rp_request`：type=human_labor, amount=3, unit=person, skills=["customer_support", "mandarin"], duration=4h
+1. 客服 Socialware 通过 Platform Bus 向 ResPool 发送 rp:allocation.request Message：type=human_labor, amount=3, unit=person, skills=["customer_support", "mandarin"], duration=4h
 2. ResPool 查询已注册的 Human 劳动力资源（freelancer 在 ResPool 中注册了自己的可用时间和技能）
 3. 匹配到 5 个候选人，按 pricing 和 rating 排序
-4. 向前 3 名候选人发送分配邀请（写入 `rp_allocation` 并通知）
-5. 候选人接受邀请（写入 `rp:usage` Annotation 表示开始工作）
-6. 4 小时后工作结束，写入 `rp:released`
+4. 向前 3 名候选人发送分配邀请（发送 rp:allocation.matched Message 并通知）
+5. 候选人接受邀请（写入 rp:allocation.usage Message 字段 表示开始工作）
+6. 4 小时后工作结束，写入 rp:allocation.released Message
 7. 按小时计费结算
 
 **价值**：Human 劳动力与 GPU 算力使用完全相同的申请-分配-计量-结算流程。
@@ -100,9 +100,9 @@ ResPool 不拥有任何资源，也不执行任何资源的具体操作。它是
    - Channel B：type=channel, subtype=weibo, capacity=20 posts/day, pricing=fixed ¥15/post
    - Channel C：type=channel, subtype=linkedin, capacity=5 posts/day, pricing=per_engagement $0.01/interaction
 2. 营销 Socialware 申请：3 个渠道各 1 个 post slot
-3. ResPool 分配，生成 3 个 `rp_allocation`
+3. ResPool 分配，发送 3 个 rp:allocation.matched Message
 4. 营销 Socialware 使用分配的 slot 发布内容
-5. Channel C 的 engagement 数据持续更新到 `rp:usage` Annotation 中
+5. Channel C 的 engagement 数据持续更新到 rp:allocation.usage Message 字段 中
 6. 结算时 Channel A/B 按固定价格，Channel C 按实际互动量计费
 
 **价值**：不同定价模型在统一框架下共存。
@@ -116,7 +116,7 @@ ResPool 不拥有任何资源，也不执行任何资源的具体操作。它是
 1. Platform Admin 通过 `rp:quota_index` 查看该 Agent 的资源使用情况
 2. 发现：24 小时内申请了 200 GPU-hours，远超正常水平
 3. Admin 更新该 Agent 的配额限制（通过 Room Config Annotation）
-4. 该 Agent 的下一次 `rp_request` 被 `rp:validate_request` Hook 拦截：配额已满
+4. 该 Agent 的下一次 rp:allocation.request Message 被 `rp:validate_request` Hook 拦截：配额已满
 5. Agent 收到拒绝响应，可以申诉（向 Auditor 提交说明）
 
 **价值**：平台级的资源管控能力，防止滥用。
@@ -139,282 +139,220 @@ ResPool 不拥有任何资源，也不执行任何资源的具体操作。它是
 
 ---
 
-## 3. Part A: Bus 层声明
+## 3. Part A: 协议层约定
 
 ```yaml
 id: "respool"
-version: "0.1.0"
-dependencies: ["identity", "room", "timeline", "message"]
+namespace: "rp"
+version: "0.9.3"
+dependencies: ["channels", "reply-to", "command", "runtime"]
 ```
 
-### 3.1 Datatypes
+### 3.1 Content Types
 
-#### rp_resource — 资源描述
-
-| 字段 | 值 |
-|------|---|
-| id | `rp_resource` |
-| storage_type | `crdt_map` |
-| key_pattern | `ezagent/{room_id}/rp/resources/{resource_id}` |
-| persistent | `true` |
-| writer_rule | `signer ∈ room.members AND signer has capability(resource.register)` |
+#### rp:resource.register — 资源注册
 
 ```yaml
-rp_resource:
-  resource_id:    ULID
-  resource_type:  string             # "compute", "human_labor", "channel",
-                                     # "traffic", "storage", "api_quota", ...
-  provider:       Entity ID
+type: "rp:resource.register"
+required_capability: "resource.register"
+flow_subject: true
+body_schema:
+  resource_type:  string             # "compute", "human_labor", "channel", "storage", ...
   capacity:
     total:        number
-    unit:         string             # "A100-hour", "person-hour", "post", "GB", "call", ...
+    unit:         string             # "A100-hour", "person-hour", "post", "GB", ...
   pricing:
     model:        string             # "fixed", "per_unit", "tiered", "auction"
-    params:       any                # model-specific parameters
-    currency:     string             # "USDT", "CNY", "credit", ...
-  constraints:    [Constraint]       # 使用限制
+    params:       any
+    currency:     string
+  constraints:    [Constraint]
   availability:
-    schedule:     string | null      # cron expression, null = always available
-    lead_time:    string | null      # "0s", "30m", "24h", ...
+    schedule:     string | null
+    lead_time:    string | null
   metadata:
     description:  string
     tags:         [string]
-    rating:       number | null      # 0.0 - 5.0, from consumer reviews
-  created_at:     RFC 3339
-
-Constraint:
-  type:           string             # "max_duration", "min_amount", "region",
-                                     # "skill_required", "identity_whitelist"
-  value:          any
 ```
 
-#### rp_request — 资源申请
-
-| 字段 | 值 |
-|------|---|
-| id | `rp_request` |
-| storage_type | `crdt_map` |
-| key_pattern | `ezagent/{room_id}/rp/requests/{request_id}` |
-| persistent | `true` |
-| writer_rule | `signer ∈ room.members AND signer has capability(resource.request)` |
+#### rp:allocation.request — 资源申请
 
 ```yaml
-rp_request:
-  request_id:     ULID
+type: "rp:allocation.request"
+required_capability: "resource.request"
+flow_subject: true
+body_schema:
   resource_type:  string
-  amount:
-    value:        number
-    unit:         string
-  requester:      Entity ID
-  on_behalf_of:   Entity ID | null   # 代理申请（如 TaskArena 代 Publisher 申请）
+  amount:         { value: number, unit: string }
+  on_behalf_of:   Entity ID | null
   priority:       string             # "normal", "high", "critical"
-  duration:       string | null      # 租赁时长，如 "4h", "7d", null = one-shot
-  budget:
-    max:          number | null      # 预算上限, null = 不限
-    currency:     string
-  preferences:
-    provider:     Entity ID | null   # 指定 Provider, null = 由系统匹配
-    region:       string | null
-    min_rating:   number | null
-  created_at:     RFC 3339
+  duration:       string | null
+  budget:         { max: number | null, currency: string }
+  preferences:    { provider: Entity ID | null, region: string | null, min_rating: number | null }
 ```
 
-#### rp_allocation — 分配凭证
-
-| 字段 | 值 |
-|------|---|
-| id | `rp_allocation` |
-| storage_type | `crdt_map` |
-| key_pattern | `ezagent/{room_id}/rp/allocations/{alloc_id}` |
-| persistent | `true` |
-| writer_rule | `signer == @system:local OR signer has capability(merge.execute)` |
+#### rp:allocation.matched — 分配成功
 
 ```yaml
-rp_allocation:
-  alloc_id:       ULID
-  request_ref:    ULID               # 关联的 rp_request
-  resource_ref:   ULID               # 关联的 rp_resource
+type: "rp:allocation.matched"
+required_capability: "_system"       # 系统自动发送
+reply_to_type: "rp:allocation.request"
+flow_trigger: "pending → active"
+body_schema:
+  resource_ref:   ref_id             # 关联的 resource.register Message
   provider:       Entity ID
   consumer:       Entity ID
-  amount:
-    value:        number
-    unit:         string
-  lease:
-    start:        RFC 3339
-    end:          RFC 3339 | null     # null = 无限期 / one-shot
-  price:
-    unit_price:   number
-    estimated_total: number
-    currency:     string
-  created_at:     RFC 3339
+  amount:         { value: number, unit: string }
+  lease:          { start: RFC 3339, end: RFC 3339 | null }
+  price:          { unit_price: number, estimated_total: number, currency: string }
+```
+
+#### rp:allocation.failed — 分配失败
+
+```yaml
+type: "rp:allocation.failed"
+required_capability: "_system"
+reply_to_type: "rp:allocation.request"
+flow_trigger: "pending → failed"
+body_schema:
+  reason:         string             # "insufficient_capacity", "budget_exceeded", ...
+  candidates:     number
+```
+
+#### rp:usage.report — 用量上报
+
+```yaml
+type: "rp:usage.report"
+required_capability: "resource.use"
+reply_to_type: "rp:allocation.request"
+body_schema:
+  used:           number
+  unit:           string
+  period:         { from: RFC 3339, to: RFC 3339 }
+```
+
+#### rp:allocation.release — 释放资源
+
+```yaml
+type: "rp:allocation.release"
+required_capability: "resource.use"
+reply_to_type: "rp:allocation.request"
+flow_trigger: "active → released"
+body_schema:
+  final_usage:    number
+  release_reason: string             # "completed", "cancelled", "timeout"
+```
+
+#### rp:invoice.issue — 结算账单
+
+```yaml
+type: "rp:invoice.issue"
+required_capability: "_system"
+reply_to_type: "rp:allocation.request"
+flow_trigger: "released → settled"
+body_schema:
+  amount:         number
+  currency:       string
+  pricing_model:  string
+  breakdown:      any
+```
+
+#### rp:resource.review — 资源评价
+
+```yaml
+type: "rp:resource.review"
+required_capability: "resource.review"
+reply_to_type: "rp:resource.register"
+body_schema:
+  rating:         number             # 0.0 - 5.0
+  comment:        string | null
+  allocation_ref: ref_id
+```
+
+#### rp:role.grant / rp:role.revoke — 角色管理
+
+```yaml
+type: "rp:role.grant"
+required_capability: "role.manage"
+body_schema: { entity: Entity ID, role: string }
+
+type: "rp:role.revoke"
+required_capability: "role.manage"
+body_schema: { entity: Entity ID, role: string }
 ```
 
 ### 3.2 Hooks
 
-#### pre_send: rp:validate_request
+#### pre_send: rp:check_role (priority 100)
 
-| 字段 | 值 |
-|------|---|
-| trigger.datatype | `rp_request` |
-| trigger.event | `insert` |
-| priority | `30` |
+- [MUST] 验证 sender 拥有 content_type action 对应的 capability。
 
-- [MUST] 验证 requester 的活跃分配数量未超过全局配额限制（查询 `rp:quota_index`）。
-- [MUST] 验证 resource_type 在 `rp:available_index` 中存在至少一条记录。
-- [MAY] 验证 budget 与当前市场价格的合理性（可选的 sanity check）。
-- 验证失败时拒绝写入并返回错误原因。
+#### pre_send: rp:validate_request (priority 101)
 
-#### after_write: rp:match_and_allocate
+| trigger.filter | `content_type == 'rp:allocation.request'` |
 
-| 字段 | 值 |
-|------|---|
-| trigger.datatype | `rp_request` |
-| trigger.event | `insert` |
-| priority | `30` |
+- [MUST] 验证 requester 的活跃分配数量未超过全局配额限制（查询 State Cache）。
+- [MUST] 验证 resource_type 在 State Cache 中存在至少一条可用资源。
+- [MAY] 验证 budget 与当前市场价格的合理性。
 
-- [MUST] 查询 `rp:available_index` 匹配满足条件的资源：
-  - resource_type 匹配
-  - 剩余 capacity >= request.amount
-  - 所有 constraints 满足
-  - provider.rating >= request.preferences.min_rating（如设定）
-- [MUST] 按 pricing model 计算价格，验证不超过 budget.max。
-- 匹配成功时：
-  - [MUST] 创建 `rp_allocation`。
-  - [MUST] 生成 `rp.request.matched` Engine Event。
-- 匹配失败时：
-  - [MUST] 写入 `rp:no_match:{@system:local}` Annotation 到 request 上，附带原因。
-  - [MUST] 生成 `rp.request.failed` Engine Event。
+#### after_write: rp:advance_state (priority 100)
 
-#### after_write: rp:track_usage
+| trigger.filter | `content_type startswith 'rp:'` |
 
-| 字段 | 值 |
-|------|---|
-| trigger.datatype | `rp_allocation` |
-| trigger.event | `update` |
-| trigger.filter | `ext.annotations has new "rp:usage:*"` |
-| priority | `30` |
+- [MUST] 更新 State Cache：资源列表、分配状态、用量累计、容量追踪。
 
-- [MUST] 累计该 allocation 上所有 `rp:usage` Annotation 中的用量。
-- [MUST] 如果累计用量 >= allocation.amount，写入 `rp:exhausted:{@system:local}` Annotation。
-- [MAY] 在累计用量达到 80% 时写入 `rp:usage_warning:{@system:local}` Annotation。
+#### after_write: rp:match_and_allocate (priority 101)
 
-#### after_write: rp:billing
+| trigger.filter | `content_type == 'rp:allocation.request'` |
 
-| 字段 | 值 |
-|------|---|
-| trigger.datatype | `rp_allocation` |
-| trigger.event | `update` |
-| trigger.filter | `ext.annotations has "rp:released:*" OR "rp:exhausted:*"` |
-| priority | `40` |
+- [MUST] 从 State Cache 查询匹配资源。
+- 匹配成功：发送 rp:allocation.matched Message。
+- 匹配失败：发送 rp:allocation.failed Message。
 
-- [MUST] 根据 resource 的 pricing model 和 allocation 的实际用量计算最终费用。
-- [MUST] 写入 `rp:invoice:{@system:local}` Annotation 到 allocation 上。
-- [MUST] 向 EventWeaver 发送 `ew_event { event_type: "resource_settled" }`。
+#### after_write: rp:track_usage (priority 102)
 
-#### after_write: rp:capacity_sync
+| trigger.filter | `content_type == 'rp:usage.report'` |
 
-| 字段 | 值 |
-|------|---|
-| trigger.datatype | `rp_allocation` |
-| trigger.event | `insert` |
-| priority | `25` |
+- [MUST] 累计用量到 State Cache。
+- [MUST] 如果累计用量 >= allocation amount，发送 rp:_system.exhausted Message。
 
-- [MUST] 在 allocation 创建时，扣减对应 resource 的可用 capacity。
-- [MUST] 写入 `rp:capacity_update:{@system:local}` Annotation 到 resource 上。
+#### after_write: rp:billing (priority 103)
 
-### 3.3 Annotations
+| trigger.filter | `content_type == 'rp:allocation.release'` |
 
-```yaml
-annotations:
-  on_ref:
-    # ─── 附加到 rp_request 上 ───
-    "rp:no_match":                # key: "rp:no_match:{@system:local}"
-      value:
-        reason:       string      # "insufficient_capacity", "budget_exceeded",
-                                  # "constraint_mismatch", "resource_contention"
-        searched_at:  RFC 3339
-        candidates:   number      # 检索到的候选资源数量
+- [MUST] 根据 pricing model 和实际用量计算最终费用。
+- [MUST] 发送 rp:invoice.issue Message。
+- [MUST] 向 EventWeaver 发送 ew:event.record Message。
 
-    # ─── 附加到 rp_allocation 上 ───
-    "rp:usage":                   # key: "rp:usage:{consumer_entity_id}"
-      value:
-        used:         number
-        unit:         string
-        period:       { from: RFC 3339, to: RFC 3339 }
-        reported_at:  RFC 3339
+### 3.3 State Cache Schema
 
-    "rp:usage_warning":           # key: "rp:usage_warning:{@system:local}"
-      value:
-        percentage:   number      # e.g. 80
-        warned_at:    RFC 3339
-
-    "rp:released":                # key: "rp:released:{consumer_entity_id}"
-      value:
-        released_at:  RFC 3339
-        final_usage:  number
-        release_reason: string    # "completed", "cancelled", "timeout"
-
-    "rp:exhausted":               # key: "rp:exhausted:{@system:local}"
-      value:
-        exhausted_at: RFC 3339
-        total_used:   number
-
-    "rp:invoice":                 # key: "rp:invoice:{@system:local}"
-      value:
-        amount:       number
-        currency:     string
-        pricing_model: string
-        breakdown:    any          # model-specific breakdown
-        issued_at:    RFC 3339
-
-    # ─── 附加到 rp_resource 上 ───
-    "rp:capacity_update":         # key: "rp:capacity_update:{@system:local}"
-      value:
-        available:    number
-        reserved:     number
-        updated_at:   RFC 3339
-
-    "rp:review":                  # key: "rp:review:{reviewer_entity_id}"
-      value:
-        rating:       number      # 0.0 - 5.0
-        comment:      string | null
-        allocation_ref: ULID
-        reviewed_at:  RFC 3339
+```python
+class ResPoolState:
+    resources: dict[str, dict]               # resource_ref_id → resource info + available capacity
+    allocations: dict[str, dict]             # alloc_request_ref_id → allocation state
+    usage_totals: dict[str, float]           # alloc_request_ref_id → cumulative usage
+    quota_usage: dict[str, int]              # consumer_entity_id → active allocation count
+    market_stats: dict[str, dict]            # resource_type → aggregate stats
+    role_map: dict[tuple[str,str], set[str]]
 ```
 
 ### 3.4 Indexes
 
-```yaml
-indexes:
-  - id:           "rp:available_index"
-    input:        "All rp_resource, minus sum of active rp_allocation amounts"
-    transform:    "resource → { resource_id, type, available, pricing, rating, constraints }"
-    refresh:      on_change
-    operation_id: "rp.resources.available"
+```python
+@api("GET /rp/resources")
+async def available_resources(resource_type=None, min_rating=None):
+    """可用资源列表（从 State Cache 查询）"""
 
-  - id:           "rp:quota_index"
-    input:        "All active rp_allocation grouped by consumer"
-    transform:    "consumer → { active_count, total_amount_by_type }"
-    refresh:      on_change
-    operation_id: null               # 内部 Index，供 rp:validate_request hook 使用
+@api("GET /rp/allocations")
+async def allocation_history(consumer=None, provider=None):
+    """分配历史"""
 
-  - id:           "rp:allocation_history"
-    input:        "All rp_allocation with annotations"
-    transform:    "Sort by lease.start, include usage and invoice data"
-    refresh:      on_demand
-    operation_id: "rp.allocations.list"
+@api("GET /rp/provider/dashboard")
+async def provider_dashboard(provider_id):
+    """Provider 仪表盘"""
 
-  - id:           "rp:provider_dashboard"
-    input:        "All rp_resource and rp_allocation grouped by provider"
-    transform:    "provider → { resources, active_allocations, revenue_summary }"
-    refresh:      on_demand
-    operation_id: "rp.provider.dashboard"
-
-  - id:           "rp:market_stats"
-    input:        "All rp_resource and rp_allocation"
-    transform:    "type → { avg_price, total_capacity, utilization_rate, active_providers }"
-    refresh:      periodic (5min)
-    operation_id: "rp.market.stats"
+@api("GET /rp/market/stats")
+async def market_stats():
+    """市场统计"""
 ```
 
 ---
@@ -455,7 +393,7 @@ roles:
 
   # ─── 施加于 Message ───
   - id: rp:allocation_ticket
-    assignable_to: [Message where datatype == rp_allocation]
+    assignable_to: [Message where content_type == rp:allocation.matched]
     capabilities: [binding.resource_lock, authority.consume]
     description: "此 Message 是资源分配凭证，持有即可消费"
 
@@ -485,7 +423,7 @@ arenas:
 
   # ─── 内部 ───
   - id: rp:allocation_desk
-    over: [Room created per active rp_request that requires negotiation]
+    over: [Room created per active rp:allocation.request that requires negotiation]
     boundary: internal
     entry_policy: role_required(rp:provider with matching resource | rp:consumer with active request)
     purpose: "资源分配的协商空间（适用于非自动匹配的场景，
@@ -508,7 +446,7 @@ commitments:
     between: [Identity with role(rp:provider), Identity with role(rp:consumer)]
     obligation: "已分配资源在 lease 期间内不被单方面回收。
                  Provider 如需提前回收，必须提前 notice_period 通知"
-    triggered_by: "rp_allocation created"
+    triggered_by: "rp:allocation.matched Message 写入"
     expires: "lease.end reached OR rp:released annotation written"
     enforcement: "writer_rule 限制 Provider 不能删除 active allocation"
 
@@ -516,7 +454,7 @@ commitments:
     between: [Identity with role(rp:provider), Identity with role(rp:consumer)]
     obligation: "分配期间内，价格按 allocation 创建时锁定的 unit_price 执行，
                  不因市场波动而变更"
-    triggered_by: "rp_allocation created"
+    triggered_by: "rp:allocation.matched Message 写入"
     enforcement: "rp:billing hook 使用 allocation.price.unit_price 而非实时价格"
 
   # ─── Registry ↔ Consumer ───
@@ -524,7 +462,7 @@ commitments:
     between: [Room with role(rp:registry), Identity with role(rp:consumer)]
     obligation: "资源匹配请求在 5 分钟内给出响应
                  （matched 或 no_match），不静默丢弃"
-    triggered_by: "rp_request written"
+    triggered_by: "rp:allocation.request Message 写入"
     enforcement: "rp:match_and_allocate hook 的超时机制"
 
   # ─── Consumer ↔ Settlement ───
@@ -540,7 +478,7 @@ commitments:
               Identity with role(rp:provider),
               Identity with role(rp:consumer)]
     obligation: "此分配凭证代表双方的分配协议，不可篡改"
-    triggered_by: "rp_allocation created"
+    triggered_by: "rp:allocation.matched Message 写入"
     enforcement: "CRDT writer_rule + Entity 签名验证"
 ```
 
@@ -549,7 +487,7 @@ commitments:
 ```yaml
 flows:
   - id: rp:resource_lifecycle
-    subject: Message where datatype == rp_resource
+    subject_type: "rp:resource
     states: [registered, available, reserved, depleted, withdrawn]
     transitions:
       registered --[Provider confirms capacity]---------> available
@@ -562,7 +500,7 @@ flows:
       preemption: avoided_unless(priority == critical)
 
   - id: rp:request_lifecycle
-    subject: Message where datatype == rp_request
+    subject_type: "rp:request
     states: [submitted, matching, offered, accepted, active, completed, failed]
     transitions:
       submitted --[rp:match_and_allocate finds match]-------> offered
@@ -570,7 +508,7 @@ flows:
       offered   --[Consumer writes acceptance Annotation]---> accepted
       offered   --[Consumer rejects]------------------------> failed
       offered   --[auto_accept when budget OK]--------------> accepted
-      accepted  --[rp_allocation created]-------------------> active
+      accepted  --[rp:allocation.matched sent]-------------------> active
       active    --[rp:released written]---------------------> completed
       active    --[rp:exhausted written]--------------------> completed
       active    --[lease.end timeout]-----------------------> completed
@@ -581,7 +519,7 @@ flows:
       auto_accept: preferred_when(single candidate AND budget OK AND priority >= high)
 
   - id: rp:allocation_lifecycle
-    subject: Message where datatype == rp_allocation
+    subject_type: "rp:allocation
     states: [issued, active, usage_tracked, settling, settled, disputed]
     transitions:
       issued         --[Consumer begins use]--------------------> active
@@ -608,11 +546,11 @@ flows:
 GIVEN  ResPool 已初始化
        E-gpu-farm 拥有 rp:provider Role
 
-WHEN   E-gpu-farm 写入 rp_resource:
+WHEN   E-gpu-farm 发送 rp:resource.register Message:
        { resource_type: "compute", capacity: { total: 8, unit: "A100-hour" },
          pricing: { model: "per_unit", params: { unit_price: 8 }, currency: "USDT" } }
 
-THEN   rp_resource 写入成功
+THEN   rp:resource.register Message 写入成功
        await rp.resources.available(type="compute") 返回包含该资源
        rp:resource_lifecycle 状态 = registered
 ```
@@ -639,13 +577,13 @@ THEN   返回 R1 和 R3（R2 rating 不足被过滤）
 GIVEN  ResPool 包含 R1: 8×A100 available
        E-agent 拥有 rp:consumer Role
 
-WHEN   E-agent 写入 rp_request:
+WHEN   E-agent 发送 rp:allocation.request Message:
        { resource_type: "compute", amount: { value: 4, unit: "A100-hour" },
          priority: "normal", duration: "2h", budget: { max: 64, currency: "USDT" } }
 
 THEN   rp:validate_request hook 通过（配额未超限）
        rp:match_and_allocate hook 匹配 R1
-       rp_allocation 创建：provider=E-gpu-farm, consumer=E-agent,
+       rp:allocation.matched Message 发送：provider=E-gpu-farm, consumer=E-agent,
                           amount=4, unit_price=8, estimated_total=64
        rp:capacity_sync hook 更新 R1: available=4（从 8 扣减为 4）
        Engine Event rp.request.matched 发出
@@ -657,7 +595,7 @@ THEN   rp:validate_request hook 通过（配额未超限）
 GIVEN  E-agent 当前有 10 个 active allocations
        全局配额限制 max_active_allocations = 10
 
-WHEN   E-agent 写入 rp_request
+WHEN   E-agent 发送 rp:allocation.request Message
 
 THEN   rp:validate_request hook 检测配额已满 → 拒绝写入
        返回错误: "quota_exceeded: max_active_allocations=10, current=10"
@@ -668,7 +606,7 @@ THEN   rp:validate_request hook 检测配额已满 → 拒绝写入
 ```
 GIVEN  ResPool 中 compute 类型总可用量 = 2×A100
 
-WHEN   E-agent 写入 rp_request:
+WHEN   E-agent 发送 rp:allocation.request Message:
        { resource_type: "compute", amount: { value: 4, unit: "A100-hour" } }
 
 THEN   rp:match_and_allocate hook 匹配失败
@@ -683,7 +621,7 @@ THEN   rp:match_and_allocate hook 匹配失败
 ```
 GIVEN  ResPool 包含 R1: 4×A100, $8/hr
 
-WHEN   E-agent 写入 rp_request:
+WHEN   E-agent 发送 rp:allocation.request Message:
        { amount: { value: 4, unit: "A100-hour" }, duration: "2h",
          budget: { max: 30, currency: "USDT" } }
        # 实际需要 4×$8×2h = $64 > $30
@@ -697,9 +635,9 @@ THEN   rp:match_and_allocate 计算价格超预算 → 匹配失败
 #### TC-RP-020: 使用量上报与累计
 
 ```
-GIVEN  rp_allocation ALLOC-001: amount=4 A100-hours
+GIVEN  rp:allocation.matched ALLOC-001: amount=4 A100-hours
 
-WHEN   E-agent 写入 rp:usage Annotation:
+WHEN   E-agent 发送 rp:usage.report Message:
        { used: 1.5, unit: "A100-hour", period: { from: T1, to: T2 } }
        再写入:
        { used: 1.0, unit: "A100-hour", period: { from: T2, to: T3 } }
@@ -726,7 +664,7 @@ THEN   rp:track_usage hook 写入 rp:exhausted Annotation
 ```
 GIVEN  ALLOC-001: active, 累计 usage=3.0, unit_price=8
 
-WHEN   E-agent 写入 rp:released Annotation:
+WHEN   E-agent 发送 rp:allocation.release Message:
        { final_usage: 3.0, release_reason: "completed" }
 
 THEN   rp:billing hook 触发:
@@ -745,15 +683,15 @@ THEN   rp:billing hook 触发:
 ```
 GIVEN  TaskArena 的 ta:settle_reward hook 触发
        Task 奖励 = 50 USDT
-       Publisher 预存余额 = 200 USDT (as rp_resource type=token)
+       Publisher 预存余额 = 200 USDT (as rp:resource.register type=token)
 
 WHEN   TaskArena Identity 向 Platform Bus 发送消息
-       ResPool 收到并创建 rp_request:
+       ResPool 收到并发送 rp:allocation.request Message:
        { resource_type: "token", amount: { value: 50, unit: "USDT" },
          on_behalf_of: Publisher Entity ID }
 
 THEN   rp:match_and_allocate 匹配 Publisher 的余额资源
-       rp_allocation 创建: consumer=Worker, amount=50
+       rp:allocation.matched Message 发送: consumer=Worker, amount=50
        Worker 写入 rp:released（确认收到）
        rp:invoice 记录完整结算
        Publisher 余额: 200 - 50 = 150
@@ -768,14 +706,14 @@ GIVEN  Provider 注册 human_labor 资源:
        { resource_type: "human_labor", capacity: { total: 8, unit: "person-hour" },
          constraints: [{ type: "manual_confirm", value: true }] }
 
-WHEN   Consumer 提交 rp_request for human_labor
+WHEN   Consumer 发送 rp:allocation.request Message for human_labor
 
 THEN   rp:match_and_allocate 匹配成功
        但因 constraint "manual_confirm" = true
        → 不自动创建 allocation
        → 写入 rp:pending_confirm Annotation 到 request 上
        → Provider (Human) 进入 rp:allocation_desk Arena 查看并确认
-       → Provider 确认后 → rp_allocation 创建
+       → Provider 确认后 → rp:allocation.matched Message 发送
        → rp:request_lifecycle: offered → accepted → active
 ```
 
@@ -1011,7 +949,7 @@ class ResPool:
     async def on_command(self, event, ctx):
         cmd = event.ref.ext.command
         if cmd.action == "allocate":
-            pool = await ctx.data.get("rp_pool", cmd.params["pool_id"])
+            pool = self.state.resources.get(cmd.params["pool_id"])
             amount = float(cmd.params["amount"])
             # 检查配额
             quota = await self.check_entity_quota(

@@ -548,7 +548,7 @@ GIVEN  M-003 in R-alpha, E-agent1 是 member
 WHEN   E-agent1 写入 annotation:
        key = "watch:@code-reviewer:relay-a.example.com"
        value = { on_content_edit: true, on_reply: true, on_thread: false, on_reaction: false, reason: "processing_task" }
-       on M-003.ext.annotations
+       on M-003.ext.watch
 
 THEN   Annotation 写入成功
        GET /watches (for E-agent1) 包含 { type: "ref", target: M-003.ref_id, room_id: R-alpha }
@@ -703,7 +703,7 @@ GIVEN  CMD-001 已写入 Timeline（/ta:claim task-42 by E-alice）
        TaskArena Socialware Hook 处理完成
 
 WHEN   TaskArena 写入 command_result Annotation:
-       ref.ext.annotations."command_result:{invoke_id}" = {
+       ref.ext.command.result.{invoke_id} = {
          invoke_id: "...", status: "success",
          result: { task_id: "task-42", new_state: "claimed" },
          handler: "@task-arena:relay-a.example.com"
@@ -871,7 +871,7 @@ THEN   步骤 4: watch annotation 写入 M-003
 
 ```
 GIVEN  R-alpha 有 Level 2 Peer (E-alice) 和 Level 0 Peer (P-core-only)
-       E-alice 发送消息带 ext.reply_to, ext.channels, ext.reactions, ext.annotations
+       E-alice 发送消息带 ext.reply_to, ext.channels, ext.reactions, ext.watch
 
 WHEN   P-core-only 同步
 
@@ -886,3 +886,65 @@ THEN   P-core-only 保留所有 ext.* 字段
 
 ---
 
+
+### §5.17 EXT-17 Runtime
+
+#### TC-2-EXT17-001: Socialware 启用与 namespace 注册
+
+```
+GIVEN  R-alpha Room Config 中 ext.runtime.socialware = ["task-arena"]
+       TaskArena manifest: namespace = "ta"
+
+WHEN   EXT-17 Runtime 加载
+
+THEN   namespace "ta" 注册到 Room R-alpha
+       _sw:ta channel 自动可用
+       content_type 前缀 "ta:" 的 Message 允许写入
+```
+
+#### TC-2-EXT17-002: 非注册 namespace 被拒绝
+
+```
+GIVEN  R-alpha 仅启用 task-arena (namespace = "ta")
+
+WHEN   E-alice 尝试发送 content_type = "rp:resource.register" 的 Message
+
+THEN   EXT-17 pre_send namespace_check Hook 拒绝写入
+       错误: "namespace 'rp' not enabled in this Room"
+```
+
+#### TC-2-EXT17-003: _sw:* channel 保留
+
+```
+GIVEN  R-alpha 启用 task-arena
+
+WHEN   E-alice 尝试向 channel "_sw:ta" 发送普通 Message（无 ta: content_type）
+
+THEN   EXT-17 pre_send Hook 拒绝写入
+       错误: "_sw:* channels reserved for Socialware system messages"
+```
+
+#### TC-2-EXT17-004: State Cache 从 Timeline 重建
+
+```
+GIVEN  R-alpha 包含 10 条 ta:* content_type Message（task.propose, task.claim, ...）
+       Engine 重启
+
+WHEN   EXT-17 Runtime 重新加载 TaskArena
+
+THEN   State Cache 从 Timeline 完整重建
+       flow_states 与重启前一致
+       role_map 与重启前一致
+```
+
+#### TC-2-EXT17-005: socialware_messages Index 工作
+
+```
+GIVEN  R-alpha 启用 task-arena
+       Room 中有 5 条 ta:* Message 和 20 条普通 Message
+
+WHEN   查询 GET /rooms/{room_id}/ext/runtime/messages?namespace=ta
+
+THEN   返回 5 条 ta:* Message（按 Timeline 顺序）
+       不包含普通 Message
+```
