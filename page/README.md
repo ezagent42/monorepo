@@ -1,2 +1,3 @@
-# Ezagent.cloud
-Official Site for Ezagent
+# EZAgent.cloud
+
+Official website for EZAgent.
