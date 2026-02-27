@@ -1,0 +1,65 @@
+---
+import PageLayout from '../../../layouts/PageLayout.astro';
+import { useTranslations, type Lang } from '../../../i18n/ui';
+
+export function getStaticPaths() {
+  return [
+    { params: { lang: 'zh' } },
+    { params: { lang: 'en' } },
+  ];
+}
+
+const { lang } = Astro.params;
+const t = useTranslations(lang as Lang);
+---
+
+<PageLayout title={t('nav.blog')} lang={lang}>
+  <div class="blog-placeholder">
+    <div class="blog-inner">
+      <i class="ph-thin ph-newspaper"></i>
+      <h1>{t('nav.blog')}</h1>
+      <p class="coming-soon">{t('common.coming_soon')}</p>
+    </div>
+  </div>
+</PageLayout>
+
+<style>
+  .blog-placeholder {
+    min-height: 50vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .blog-inner {
+    padding: var(--sp-8);
+  }
+
+  .blog-inner i {
+    font-size: 3rem;
+    color: var(--mist);
+    display: block;
+    margin-bottom: var(--sp-4);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--sp-3);
+  }
+
+  .coming-soon {
+    font-size: 0.875rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--radius-sm);
+    background: rgba(201, 165, 90, 0.08);
+    color: var(--gold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+  }
+</style>

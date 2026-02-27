@@ -1,0 +1,21 @@
+/* Syntax highlighting — Eastern Clarity palette */
+.content-body pre {
+  background: var(--surface-inv);
+  color: var(--surface-inv-text);
+  padding: var(--sp-6);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-family: var(--font-code);
+  font-size: 0.8125rem;
+  line-height: 2;
+  margin: var(--sp-6) 0;
+}
+
+.content-body code:not(pre code) {
+  font-family: var(--font-code);
+  font-size: 0.82em;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+}

@@ -1,0 +1,132 @@
+---
+import { useTranslations, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: string;
+  compact?: boolean;
+}
+
+const { lang, compact = false } = Astro.props;
+const isZh = lang === 'zh';
+---
+
+<div class:list={['arch-diagram', { compact }]}>
+  <div class="arch-layer layer-socialware">
+    <div class="layer-label">{isZh ? 'Socialware 层' : 'Socialware Layer'}</div>
+    <div class="layer-desc">{isZh ? '正交维度，施加于实体' : 'Orthogonal dimensions on entities'}</div>
+    <div class="primitives">
+      <div class="prim"><i class="ph-duotone ph-shield"></i><span>Role</span></div>
+      <div class="prim"><i class="ph-duotone ph-cube"></i><span>Arena</span></div>
+      <div class="prim"><i class="ph-duotone ph-handshake"></i><span>Commitment</span></div>
+      <div class="prim"><i class="ph-duotone ph-git-branch"></i><span>Flow</span></div>
+    </div>
+  </div>
+  <div class="arch-arrow" aria-hidden="true"><i class="ph-thin ph-arrow-down"></i></div>
+  <div class="arch-layer layer-mid">
+    <div class="layer-label">{isZh ? 'Mid-layer' : 'Mid-layer'}</div>
+    <div class="layer-desc">{isZh ? '协作实体，由底层组合构成' : 'Entities composed from bottom primitives'}</div>
+    <div class="primitives">
+      <div class="prim"><i class="ph-duotone ph-user"></i><span>Identity</span></div>
+      <div class="prim"><i class="ph-duotone ph-squares-four"></i><span>Room</span></div>
+      <div class="prim"><i class="ph-duotone ph-chat-circle"></i><span>Message</span></div>
+      <div class="prim"><i class="ph-duotone ph-clock"></i><span>Timeline</span></div>
+    </div>
+  </div>
+  <div class="arch-arrow" aria-hidden="true"><i class="ph-thin ph-arrow-down"></i></div>
+  <div class="arch-layer layer-bottom">
+    <div class="layer-label">{isZh ? 'Bottom 层' : 'Bottom Layer'}</div>
+    <div class="layer-desc">{isZh ? '构造原语，不可再分' : 'Construction primitives, irreducible'}</div>
+    <div class="primitives">
+      <div class="prim"><i class="ph-duotone ph-database"></i><span>DataType</span></div>
+      <div class="prim"><i class="ph-duotone ph-webhooks-logo"></i><span>Hook</span></div>
+      <div class="prim"><i class="ph-duotone ph-tag"></i><span>Annotation</span></div>
+      <div class="prim"><i class="ph-duotone ph-magnifying-glass"></i><span>Index</span></div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .arch-diagram {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+
+  .arch-layer {
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    padding: var(--sp-6);
+    box-shadow: var(--shadow-md);
+  }
+
+  .compact .arch-layer {
+    padding: var(--sp-4);
+  }
+
+  .layer-label {
+    font-family: var(--font-display);
+    font-size: 0.8125rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: var(--sp-1);
+  }
+
+  .layer-socialware .layer-label { color: var(--vermillion); }
+  .layer-mid .layer-label { color: var(--celadon); }
+  .layer-bottom .layer-label { color: var(--gold); }
+
+  .layer-desc {
+    font-size: 0.75rem;
+    color: var(--smoke);
+    margin-bottom: var(--sp-4);
+  }
+
+  .compact .layer-desc {
+    display: none;
+  }
+
+  .primitives {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: var(--sp-3);
+  }
+
+  .prim {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--sp-1);
+    padding: var(--sp-3);
+    background: var(--bg-alt);
+    border-radius: var(--radius-sm);
+    text-align: center;
+  }
+
+  .prim i {
+    font-size: 1.25rem;
+  }
+
+  .layer-socialware .prim i { color: var(--vermillion); }
+  .layer-mid .prim i { color: var(--celadon); }
+  .layer-bottom .prim i { color: var(--gold); }
+
+  .prim span {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--ink);
+    font-family: var(--font-code);
+  }
+
+  .arch-arrow {
+    text-align: center;
+    padding: var(--sp-2) 0;
+    color: var(--mist);
+    font-size: 1rem;
+  }
+
+  @media (max-width: 480px) {
+    .primitives {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+</style>

@@ -1,0 +1,90 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { useTranslatedPath } from '../i18n/ui';
+
+const tp = useTranslatedPath('zh');
+---
+
+<BaseLayout title="404 — Page Not Found" lang="zh">
+  <Nav lang="zh" />
+  <main class="not-found">
+    <div class="not-found-inner">
+      <span class="not-found-code">404</span>
+      <h1>Page Not Found</h1>
+      <p>The page you're looking for doesn't exist or has been moved.</p>
+      <a href={tp('/')} class="btn btn-primary">
+        <i class="ph-thin ph-house"></i>
+        Back to Home
+      </a>
+    </div>
+  </main>
+  <Footer lang="zh" />
+</BaseLayout>
+
+<style>
+  .not-found {
+    min-height: calc(100vh - 64px - 200px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .not-found-inner {
+    padding: var(--sp-8);
+  }
+
+  .not-found-code {
+    font-family: var(--font-code);
+    font-size: 6rem;
+    font-weight: 700;
+    color: var(--border);
+    line-height: 1;
+    display: block;
+    margin-bottom: var(--sp-4);
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--sp-3);
+  }
+
+  p {
+    font-size: 0.9375rem;
+    color: var(--smoke);
+    margin: 0 0 var(--sp-8);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 22px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+
+  .btn-primary {
+    background: var(--surface-inv);
+    color: #fff;
+    border: 1px solid transparent;
+  }
+
+  :global(html[data-theme="dark"]) .btn-primary {
+    background: var(--celadon);
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+    color: #fff;
+  }
+</style>

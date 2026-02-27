@@ -1,0 +1,82 @@
+---
+interface Props {
+  code: string;
+  lang?: string;
+}
+
+const { code, lang = '' } = Astro.props;
+const id = `cb-${Math.random().toString(36).slice(2, 8)}`;
+---
+
+<div class="code-block">
+  {lang && <span class="code-lang">{lang}</span>}
+  <button class="code-copy" data-code-id={id} aria-label="Copy code">
+    <i class="ph-thin ph-copy"></i>
+  </button>
+  <pre id={id}><code>{code}</code></pre>
+</div>
+
+<script>
+  document.querySelectorAll('.code-copy').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.getAttribute('data-code-id');
+      const pre = document.getElementById(id!);
+      if (pre) {
+        await navigator.clipboard.writeText(pre.textContent || '');
+        const icon = btn.querySelector('i');
+        if (icon) {
+          icon.className = 'ph-thin ph-check';
+          setTimeout(() => { icon.className = 'ph-thin ph-copy'; }, 1500);
+        }
+      }
+    });
+  });
+</script>
+
+<style>
+  .code-block {
+    position: relative;
+    background: var(--surface-inv);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+
+  .code-lang {
+    position: absolute;
+    top: var(--sp-2);
+    left: var(--sp-4);
+    font-size: 0.6875rem;
+    font-family: var(--font-code);
+    color: var(--smoke);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .code-copy {
+    position: absolute;
+    top: var(--sp-2);
+    right: var(--sp-2);
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-1) var(--sp-2);
+    cursor: pointer;
+    color: var(--surface-inv-text);
+    font-size: 0.875rem;
+    transition: border-color var(--dur-fast) var(--ease-out);
+  }
+
+  .code-copy:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  pre {
+    margin: 0;
+    padding: var(--sp-8) var(--sp-6) var(--sp-6);
+    overflow-x: auto;
+    font-family: var(--font-code);
+    font-size: 0.8125rem;
+    line-height: 2;
+    color: var(--surface-inv-text);
+  }
+</style>

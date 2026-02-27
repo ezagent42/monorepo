@@ -1,0 +1,107 @@
+---
+import BaseLayout from './BaseLayout.astro';
+import Nav from '../components/Nav.astro';
+import Footer from '../components/Footer.astro';
+import { getCollection } from 'astro:content';
+import { useTranslatedPath, type Lang } from '../i18n/ui';
+
+interface Props {
+  title: string;
+  description?: string;
+  lang: string;
+}
+
+const { title, description, lang } = Astro.props;
+const tp = useTranslatedPath(lang as Lang);
+
+const devEntries = (await getCollection('dev'))
+  .filter(e => e.data.lang === lang)
+  .sort((a, b) => a.data.order - b.data.order);
+
+const currentPath = Astro.url.pathname;
+---
+
+<BaseLayout title={title} description={description} lang={lang}>
+  <Nav lang={lang} />
+  <div class="dev-layout">
+    <aside class="dev-sidebar" id="dev-sidebar">
+      <nav class="dev-nav">
+        {devEntries.map(entry => {
+          const href = entry.data.order === 0 ? tp('/dev') : tp(`/dev/${entry.id.split('/').pop()?.replace('.md', '')}`);
+          const isActive = currentPath === href || currentPath === href + '/';
+          return (
+            <a href={href} class:list={['dev-nav-link', { active: isActive }]}>
+              {entry.data.sidebar_label}
+            </a>
+          );
+        })}
+      </nav>
+    </aside>
+    <main class="dev-main">
+      <slot />
+    </main>
+  </div>
+  <Footer lang={lang} />
+</BaseLayout>
+
+<style>
+  .dev-layout {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: flex;
+    min-height: calc(100vh - 64px - 200px);
+  }
+
+  .dev-sidebar {
+    width: 200px;
+    flex-shrink: 0;
+    padding: var(--sp-8) var(--sp-4) var(--sp-8) var(--sp-6);
+    border-right: 1px solid var(--border-light);
+  }
+
+  .dev-nav {
+    position: sticky;
+    top: 80px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-1);
+  }
+
+  .dev-nav-link {
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--smoke);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    transition: all var(--dur-fast) var(--ease-out);
+  }
+
+  .dev-nav-link:hover {
+    color: var(--ink);
+    background: var(--bg-alt);
+  }
+
+  .dev-nav-link.active {
+    color: var(--vermillion);
+    border-left-color: var(--vermillion);
+    background: rgba(201, 64, 64, 0.04);
+  }
+
+  .dev-main {
+    flex: 1;
+    padding: var(--sp-8) var(--sp-8) var(--sp-16);
+    min-width: 0;
+  }
+
+  @media (max-width: 768px) {
+    .dev-sidebar {
+      display: none;
+    }
+
+    .dev-main {
+      padding: var(--sp-6) var(--sp-4) var(--sp-12);
+    }
+  }
+</style>

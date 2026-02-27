@@ -1,0 +1,137 @@
+---
+import { useTranslations, useTranslatedPath, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang as Lang);
+const tp = useTranslatedPath(lang as Lang);
+const base = import.meta.env.BASE_URL;
+---
+
+<section class="hero">
+  <div class="hero-pattern" style={`background-image: url('${base}/pattern-bg.jpg')`} aria-hidden="true"></div>
+  <div class="hero-inner">
+    <h1 class="hero-tagline">
+      {t('hero.tagline')}<br />
+      <span class="hero-highlight">{t('hero.tagline2')}</span>
+    </h1>
+    <p class="hero-subtitle">{t('hero.subtitle')}</p>
+    <div class="hero-actions">
+      <a href={tp('/vision')} class="btn btn-ghost">
+        <i class="ph-thin ph-book-open"></i>
+        {t('hero.cta_learn')}
+      </a>
+      <a href={tp('/dev')} class="btn btn-primary">
+        <i class="ph-thin ph-code"></i>
+        {t('hero.cta_build')}
+      </a>
+    </div>
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .hero-pattern {
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat;
+    background-position: center;
+    background-size: 200px;
+    opacity: 0.06;
+    pointer-events: none;
+  }
+
+  :global(html[data-theme="dark"]) .hero-pattern {
+    opacity: 0.03;
+  }
+
+  .hero-inner {
+    position: relative;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: var(--sp-24) var(--sp-6);
+    text-align: center;
+  }
+
+  .hero-tagline {
+    font-family: var(--font-brand);
+    font-size: clamp(1.75rem, 4vw, 3rem);
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    line-height: 1.4;
+    color: var(--ink);
+    margin: 0 0 var(--sp-6);
+  }
+
+  .hero-highlight {
+    color: var(--vermillion);
+  }
+
+  .hero-subtitle {
+    font-size: 1.0625rem;
+    color: var(--ink-light);
+    max-width: 560px;
+    margin: 0 auto var(--sp-8);
+    line-height: 1.9;
+  }
+
+  .hero-actions {
+    display: flex;
+    gap: var(--sp-4);
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 10px 22px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1;
+    text-decoration: none;
+    transition: all var(--dur-fast) var(--ease-out);
+    cursor: pointer;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+  }
+
+  .btn-ghost {
+    background: var(--bg);
+    color: var(--ink);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover {
+    border-color: var(--ink-light);
+    color: var(--ink);
+  }
+
+  .btn-primary {
+    background: var(--surface-inv);
+    color: #fff;
+    border: 1px solid transparent;
+  }
+
+  :global(html[data-theme="dark"]) .btn-primary {
+    background: var(--celadon);
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+    color: #fff;
+  }
+</style>

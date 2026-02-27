@@ -1,0 +1,107 @@
+---
+import DevLayout from '../../../layouts/DevLayout.astro';
+import { getCollection, render } from 'astro:content';
+import { useTranslations, type Lang } from '../../../i18n/ui';
+
+export function getStaticPaths() {
+  return [
+    { params: { lang: 'zh' } },
+    { params: { lang: 'en' } },
+  ];
+}
+
+const { lang } = Astro.params;
+const t = useTranslations(lang as Lang);
+
+const entry = (await getCollection('dev'))
+  .find(e => e.data.lang === lang && e.id === `${lang}/socialware-guide`);
+
+if (!entry) return Astro.redirect('/');
+const { Content } = await render(entry);
+---
+
+<DevLayout title={entry.data.title} description={entry.data.description} lang={lang}>
+  <h1 class="dev-title">{entry.data.title}</h1>
+  <div class="content-body">
+    <Content />
+  </div>
+</DevLayout>
+
+<style>
+  .dev-title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--sp-6);
+  }
+
+  .content-body :global(h2) {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: var(--sp-8) 0 var(--sp-3);
+  }
+
+  .content-body :global(h3) {
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: var(--sp-6) 0 var(--sp-2);
+  }
+
+  .content-body :global(p) {
+    font-size: 0.9375rem;
+    line-height: 1.9;
+    color: var(--ink-light);
+    margin: 0 0 var(--sp-4);
+  }
+
+  .content-body :global(ul), .content-body :global(ol) {
+    padding-left: var(--sp-6);
+    margin: 0 0 var(--sp-4);
+  }
+
+  .content-body :global(li) {
+    font-size: 0.9375rem;
+    line-height: 1.8;
+    color: var(--ink-light);
+    margin-bottom: var(--sp-2);
+  }
+
+  .content-body :global(strong) {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .content-body :global(a) {
+    color: var(--deep-sky);
+    text-decoration: none;
+  }
+
+  .content-body :global(a:hover) {
+    color: var(--celadon);
+  }
+
+  .content-body :global(pre) {
+    background: var(--surface-inv);
+    color: var(--surface-inv-text);
+    padding: var(--sp-6);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    font-family: var(--font-code);
+    font-size: 0.8125rem;
+    line-height: 2;
+    margin: var(--sp-6) 0;
+  }
+
+  .content-body :global(code:not(pre code)) {
+    font-family: var(--font-code);
+    font-size: 0.82em;
+    background: var(--bg-alt);
+    border: 1px solid var(--border);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+</style>

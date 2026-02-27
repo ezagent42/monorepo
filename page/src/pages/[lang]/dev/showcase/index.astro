@@ -1,0 +1,65 @@
+---
+import DevLayout from '../../../../layouts/DevLayout.astro';
+import ShowcaseCard from '../../../../components/ShowcaseCard.astro';
+import { getCollection } from 'astro:content';
+import { useTranslations, type Lang } from '../../../../i18n/ui';
+
+export function getStaticPaths() {
+  return [
+    { params: { lang: 'zh' } },
+    { params: { lang: 'en' } },
+  ];
+}
+
+const { lang } = Astro.params;
+const t = useTranslations(lang as Lang);
+const isZh = lang === 'zh';
+
+const showcaseEntries = (await getCollection('showcase'))
+  .filter(e => e.data.lang === lang);
+---
+
+<DevLayout title={isZh ? '开发者展示' : 'Developer Showcase'} description={t('sections.showcase_desc')} lang={lang}>
+  <h1 class="dev-title">{isZh ? '开发者展示' : 'Developer Showcase'}</h1>
+  <p class="dev-desc">{isZh ? '现有 Socialware 实现参考。每个 Socialware 都展示了不同的设计模式。' : 'Reference implementations of existing Socialware. Each showcases different design patterns.'}</p>
+  <div class="showcase-grid">
+    {showcaseEntries.map(entry => (
+      <ShowcaseCard
+        title={entry.data.title}
+        description={entry.data.description}
+        icon={entry.data.icon}
+        tags={entry.data.tags}
+        color={entry.data.color}
+      />
+    ))}
+  </div>
+</DevLayout>
+
+<style>
+  .dev-title {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--sp-3);
+  }
+
+  .dev-desc {
+    font-size: 0.9375rem;
+    color: var(--smoke);
+    line-height: 1.8;
+    margin: 0 0 var(--sp-8);
+  }
+
+  .showcase-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-6);
+  }
+
+  @media (max-width: 768px) {
+    .showcase-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

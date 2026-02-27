@@ -1,0 +1,97 @@
+---
+interface Props {
+  title: string;
+  description: string;
+  icon: string;
+  tags: string[];
+  color?: string;
+  href?: string;
+}
+
+const { title, description, icon, tags, color = '#6b8fa5', href } = Astro.props;
+const Tag = href ? 'a' : 'div';
+---
+
+<Tag href={href} class="showcase-card">
+  <div class="showcase-border" style={`background: ${color}`}></div>
+  <div class="showcase-content">
+    <div class="showcase-header">
+      <i class={icon} style={`color: ${color}`}></i>
+      <h3>{title}</h3>
+    </div>
+    <p>{description}</p>
+    <div class="showcase-tags">
+      {tags.map(tag => <span class="tag">{tag}</span>)}
+    </div>
+  </div>
+</Tag>
+
+<style>
+  .showcase-card {
+    display: flex;
+    background: var(--bg);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    transition: transform var(--dur-fast) var(--ease-out),
+                box-shadow var(--dur-fast) var(--ease-out);
+  }
+
+  .showcase-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .showcase-border {
+    width: 3px;
+    flex-shrink: 0;
+  }
+
+  .showcase-content {
+    padding: var(--sp-6);
+    flex: 1;
+  }
+
+  .showcase-header {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-3);
+    margin-bottom: var(--sp-3);
+  }
+
+  .showcase-header i {
+    font-size: 1.5rem;
+  }
+
+  .showcase-header h3 {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 600;
+    margin: 0;
+    color: var(--ink);
+  }
+
+  p {
+    font-size: 0.875rem;
+    color: var(--ink-light);
+    margin: 0 0 var(--sp-3);
+    line-height: 1.7;
+  }
+
+  .showcase-tags {
+    display: flex;
+    gap: var(--sp-2);
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 0.6875rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    background: var(--bg-alt);
+    color: var(--smoke);
+  }
+</style>

@@ -1,0 +1,92 @@
+---
+import PageLayout from '../../layouts/PageLayout.astro';
+import DownloadCard from '../../components/DownloadCard.astro';
+import { getCollection } from 'astro:content';
+import { useTranslations, type Lang } from '../../i18n/ui';
+
+export function getStaticPaths() {
+  return [
+    { params: { lang: 'zh' } },
+    { params: { lang: 'en' } },
+  ];
+}
+
+const { lang } = Astro.params;
+const t = useTranslations(lang as Lang);
+const isZh = lang === 'zh';
+
+const entry = (await getCollection('pages'))
+  .find(e => e.data.lang === lang && e.id === `${lang}/download`);
+
+if (!entry) return Astro.redirect('/');
+---
+
+<PageLayout title={entry.data.title} description={entry.data.description} lang={lang}>
+  <div class="content-page">
+    <div class="content-inner">
+      <h1 class="page-title">{entry.data.title}</h1>
+      <p class="page-desc">{entry.data.description}</p>
+      <div class="download-grid">
+        <DownloadCard
+          title={isZh ? '桌面应用' : 'Desktop App'}
+          description={isZh ? '完整图形界面。内置 Python 引擎 + React WebView。支持 macOS / Windows / Linux。' : 'Full GUI experience. Built-in Python engine + React WebView. Supports macOS / Windows / Linux.'}
+          icon="ph-duotone ph-desktop"
+          available={false}
+        />
+        <DownloadCard
+          title={isZh ? '命令行工具' : 'CLI Tool'}
+          description={isZh ? '面向开发者的命令行界面。' : 'Developer-oriented command line interface.'}
+          icon="ph-duotone ph-terminal"
+          code="pip install ezagent"
+          available={true}
+        />
+        <DownloadCard
+          title="Homebrew"
+          description={isZh ? 'macOS 用户的快捷安装。' : 'Quick install for macOS users.'}
+          icon="ph-duotone ph-beer-bottle"
+          code="brew install ezagent"
+          available={false}
+        />
+      </div>
+    </div>
+  </div>
+</PageLayout>
+
+<style>
+  .content-page {
+    padding: var(--sp-12) 0 var(--sp-16);
+  }
+
+  .content-inner {
+    max-width: 840px;
+    margin: 0 auto;
+    padding: 0 var(--sp-6);
+  }
+
+  .page-title {
+    font-family: var(--font-display);
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--sp-3);
+  }
+
+  .page-desc {
+    font-size: 1.0625rem;
+    color: var(--smoke);
+    line-height: 1.8;
+    margin: 0 0 var(--sp-8);
+  }
+
+  .download-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--sp-6);
+  }
+
+  @media (max-width: 768px) {
+    .download-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
