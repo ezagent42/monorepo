@@ -1,0 +1,43 @@
+name: Sync Subtrees to Sub-repos
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout monorepo (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Add remotes
+        run: |
+          git remote add specs   https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/specs
+          git remote add ezagent https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/ezagent
+          git remote add relay   https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/relay
+          git remote add page    https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/ezagent.cloud
+
+      - name: Sync specs
+        if: contains(github.event.head_commit.modified, 'specs/')
+        run: git subtree push --prefix=specs specs main --squash
+
+      - name: Sync ezagent
+        if: contains(github.event.head_commit.modified, 'ezagent/')
+        run: git subtree push --prefix=ezagent ezagent main --squash
+
+      - name: Sync relay
+        if: contains(github.event.head_commit.modified, 'relay/')
+        run: git subtree push --prefix=relay relay main --squash
+
+      - name: Sync page
+        if: contains(github.event.head_commit.modified, 'page/')
+        run: git subtree push --prefix=page page main --squash
