@@ -1,0 +1,83 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+/* Map Eastern Clarity tokens to Tailwind v4 theme */
+@theme {
+  /* Colors */
+  --color-ink: var(--ink);
+  --color-ink-light: var(--ink-light);
+  --color-bg: var(--bg);
+  --color-bg-alt: var(--bg-alt);
+  --color-border: var(--border);
+  --color-border-light: var(--border-light);
+  --color-vermillion: var(--vermillion);
+  --color-celadon: var(--celadon);
+  --color-gold: var(--gold);
+  --color-pine: var(--pine);
+  --color-amber: var(--amber);
+  --color-deep-sky: var(--deep-sky);
+  --color-smoke: var(--smoke);
+  --color-mist: var(--mist);
+  --color-surface-inv: var(--surface-inv);
+  --color-surface-inv-text: var(--surface-inv-text);
+
+  /* Fonts */
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+  --font-code: var(--font-code);
+  --font-brand: var(--font-brand);
+
+  /* Radii */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+/* Base styles */
+html {
+  font-family: var(--font-body);
+  color: var(--ink);
+  background: var(--bg-alt);
+  line-height: 1.8;
+}
+
+body {
+  margin: 0;
+  font-size: 0.9375rem; /* 15px */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--celadon);
+  outline-offset: 2px;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--celadon);
+  border-color: var(--celadon);
+}
+
+/* Inline code */
+code:not(pre code) {
+  font-family: var(--font-code);
+  font-size: 0.82em;
+  background: var(--bg-alt);
+  border: 1px solid var(--border);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* Links */
+a {
+  color: var(--deep-sky);
+  text-decoration: none;
+  transition: color var(--dur-fast) var(--ease-out);
+}
+
+a:hover {
+  color: var(--celadon);
+}

@@ -1,0 +1,39 @@
+---
+import { languages, getOtherLang, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const otherLang = getOtherLang(lang as Lang);
+const currentPath = Astro.url.pathname;
+
+// Replace /zh/ or /en/ prefix with other language
+const otherPath = currentPath.replace(`/${lang}/`, `/${otherLang}/`) || `/${otherLang}/`;
+---
+
+<a href={otherPath} class="lang-switch" aria-label={`Switch to ${languages[otherLang]}`}>
+  {languages[otherLang]}
+</a>
+
+<style>
+  .lang-switch {
+    display: flex;
+    align-items: center;
+    padding: var(--sp-1) var(--sp-2);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--smoke);
+    text-decoration: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    transition: color var(--dur-fast) var(--ease-out),
+                border-color var(--dur-fast) var(--ease-out);
+  }
+
+  .lang-switch:hover {
+    color: var(--ink);
+    border-color: var(--ink-light);
+  }
+</style>

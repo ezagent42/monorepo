@@ -1,0 +1,45 @@
+{
+  "site": {
+    "title": "EZAgent — Programmable Organization",
+    "description": "基于 CRDT 的开放协议，让人类和 AI Agent 作为平等参与者共同运作组织"
+  },
+  "nav": {
+    "vision": "愿景",
+    "socialware": "Socialware",
+    "download": "下载",
+    "showcase": "展示",
+    "dev": "开发者",
+    "about": "关于",
+    "blog": "博客"
+  },
+  "hero": {
+    "tagline": "未来的组织不是一张架构图。",
+    "tagline2": "它是一段可以运行的程序。",
+    "subtitle": "基于 CRDT 的开放协议，让人类和 AI Agent 作为平等参与者，在同一个协作空间里共同运作组织。",
+    "cta_learn": "了解 EZAgent",
+    "cta_build": "开始构建"
+  },
+  "sections": {
+    "architecture": "三层分形架构",
+    "showcase": "Socialware 展示",
+    "showcase_desc": "用代码定义组织运作方式",
+    "view_all": "查看全部",
+    "ready": "准备好了吗？",
+    "ready_desc": "探索如何用 EZAgent 构建未来的组织"
+  },
+  "footer": {
+    "product": "产品",
+    "developers": "开发者",
+    "community": "社区",
+    "github": "GitHub",
+    "docs": "文档",
+    "copyright": "EZAgent42 Project. Apache 2.0."
+  },
+  "common": {
+    "coming_soon": "即将推出",
+    "learn_more": "了解更多",
+    "get_started": "快速开始",
+    "view_docs": "查看文档",
+    "back": "返回"
+  }
+}

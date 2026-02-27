@@ -1,0 +1,227 @@
+---
+import LangSwitch from './LangSwitch.astro';
+import ThemeToggle from './ThemeToggle.astro';
+import { useTranslations, useTranslatedPath, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang as Lang);
+const tp = useTranslatedPath(lang as Lang);
+
+const userLinks = [
+  { href: tp('/vision'), label: t('nav.vision') },
+  { href: tp('/socialware'), label: t('nav.socialware') },
+  { href: tp('/showcase'), label: t('nav.showcase') },
+  { href: tp('/download'), label: t('nav.download') },
+];
+
+const devLinks = [
+  { href: tp('/dev'), label: t('nav.dev') },
+];
+
+const currentPath = Astro.url.pathname;
+---
+
+<header class="nav-header">
+  <div class="nav-inner">
+    <a href={tp('/')} class="nav-logo" aria-label="EZAgent Home">
+      <img src="/ezagent-logo.svg" alt="" width="28" height="28" />
+      <span class="nav-logo-text">EZAgent</span>
+    </a>
+
+    <nav class="nav-links" id="nav-links">
+      {userLinks.map(link => (
+        <a href={link.href} class:list={['nav-link', { active: currentPath.startsWith(link.href) }]}>
+          {link.label}
+        </a>
+      ))}
+      <span class="nav-divider" aria-hidden="true"></span>
+      {devLinks.map(link => (
+        <a href={link.href} class:list={['nav-link nav-link--dev', { active: currentPath.startsWith(link.href) }]}>
+          <i class="ph-thin ph-code"></i>
+          {link.label}
+        </a>
+      ))}
+    </nav>
+
+    <div class="nav-actions">
+      <LangSwitch lang={lang} />
+      <ThemeToggle />
+      <button class="nav-hamburger" id="nav-hamburger" aria-label="Toggle menu" aria-expanded="false">
+        <i class="ph-thin ph-list" id="hamburger-icon"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Mobile menu -->
+  <div class="nav-mobile" id="nav-mobile" hidden>
+    {userLinks.map(link => (
+      <a href={link.href} class="nav-mobile-link">{link.label}</a>
+    ))}
+    <hr class="nav-mobile-divider" />
+    {devLinks.map(link => (
+      <a href={link.href} class="nav-mobile-link">
+        <i class="ph-thin ph-code"></i> {link.label}
+      </a>
+    ))}
+    <a href={tp('/about')} class="nav-mobile-link">{t('nav.about')}</a>
+  </div>
+</header>
+
+<script>
+  const hamburger = document.getElementById('nav-hamburger');
+  const mobile = document.getElementById('nav-mobile');
+  const icon = document.getElementById('hamburger-icon');
+
+  hamburger?.addEventListener('click', () => {
+    const open = mobile?.hasAttribute('hidden');
+    if (open) {
+      mobile?.removeAttribute('hidden');
+      icon?.setAttribute('class', 'ph-thin ph-x');
+      hamburger?.setAttribute('aria-expanded', 'true');
+    } else {
+      mobile?.setAttribute('hidden', '');
+      icon?.setAttribute('class', 'ph-thin ph-list');
+      hamburger?.setAttribute('aria-expanded', 'false');
+    }
+  });
+</script>
+
+<style>
+  .nav-header {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-sticky);
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px);
+  }
+
+  .nav-inner {
+    max-width: 1080px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    height: 64px;
+    padding: 0 var(--sp-6);
+    gap: var(--sp-6);
+  }
+
+  .nav-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink);
+    text-decoration: none;
+    flex-shrink: 0;
+  }
+
+  .nav-logo img {
+    width: 28px;
+    height: 28px;
+  }
+
+  .nav-logo-text {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.125rem;
+    letter-spacing: -0.01em;
+  }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+    flex: 1;
+  }
+
+  .nav-link {
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--ink-light);
+    text-decoration: none;
+    transition: color var(--dur-fast) var(--ease-out),
+                background var(--dur-fast) var(--ease-out);
+    white-space: nowrap;
+  }
+
+  .nav-link:hover {
+    color: var(--ink);
+    background: var(--bg-alt);
+  }
+
+  .nav-link.active {
+    color: var(--vermillion);
+  }
+
+  .nav-link--dev {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-1);
+  }
+
+  .nav-divider {
+    width: 1px;
+    height: 20px;
+    background: var(--border);
+    margin: 0 var(--sp-2);
+  }
+
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    flex-shrink: 0;
+  }
+
+  .nav-hamburger {
+    display: none;
+    background: none;
+    border: none;
+    padding: var(--sp-2);
+    cursor: pointer;
+    color: var(--ink);
+    font-size: 1.25rem;
+  }
+
+  .nav-mobile {
+    padding: var(--sp-4) var(--sp-6);
+    border-top: 1px solid var(--border-light);
+    background: var(--bg);
+  }
+
+  .nav-mobile-link {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    padding: var(--sp-3) 0;
+    color: var(--ink-light);
+    text-decoration: none;
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+
+  .nav-mobile-link:hover {
+    color: var(--ink);
+  }
+
+  .nav-mobile-divider {
+    border: none;
+    border-top: 1px solid var(--border-light);
+    margin: var(--sp-2) 0;
+  }
+
+  @media (max-width: 768px) {
+    .nav-links {
+      display: none;
+    }
+    .nav-hamburger {
+      display: block;
+    }
+  }
+</style>

@@ -1,0 +1,169 @@
+---
+import { useTranslations, useTranslatedPath, type Lang } from '../i18n/ui';
+
+interface Props {
+  lang: string;
+}
+
+const { lang } = Astro.props;
+const t = useTranslations(lang as Lang);
+const tp = useTranslatedPath(lang as Lang);
+---
+
+<footer class="footer">
+  <div class="footer-pattern" aria-hidden="true"></div>
+  <div class="footer-inner">
+    <div class="footer-grid">
+      <div class="footer-brand">
+        <a href={tp('/')} class="footer-logo">
+          <img src="/ezagent-logo.svg" alt="" width="24" height="24" />
+          <span>EZAgent</span>
+        </a>
+        <p class="footer-tagline">Programmable Organization</p>
+      </div>
+
+      <div class="footer-col">
+        <h4>{t('footer.product')}</h4>
+        <a href={tp('/vision')}>{t('nav.vision')}</a>
+        <a href={tp('/socialware')}>{t('nav.socialware')}</a>
+        <a href={tp('/download')}>{t('nav.download')}</a>
+        <a href={tp('/showcase')}>{t('nav.showcase')}</a>
+      </div>
+
+      <div class="footer-col">
+        <h4>{t('footer.developers')}</h4>
+        <a href={tp('/dev')}>{t('common.get_started')}</a>
+        <a href={tp('/dev/architecture')}>Architecture</a>
+        <a href={tp('/dev/socialware-guide')}>Socialware Guide</a>
+        <a href={tp('/dev/resources')}>Resources</a>
+      </div>
+
+      <div class="footer-col">
+        <h4>{t('footer.community')}</h4>
+        <a href="https://github.com/ezagent42" target="_blank" rel="noopener">{t('footer.github')}</a>
+        <a href={tp('/about')}>{t('nav.about')}</a>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2025 {t('footer.copyright')}</p>
+    </div>
+  </div>
+</footer>
+
+<style>
+  .footer {
+    position: relative;
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .footer-pattern {
+    position: absolute;
+    inset: 0;
+    background: url('/pattern-bg.jpg') repeat center/200px;
+    opacity: 0.06;
+    pointer-events: none;
+  }
+
+  :global(html[data-theme="dark"]) .footer-pattern {
+    opacity: 0.03;
+  }
+
+  .footer-inner {
+    position: relative;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: var(--sp-16) var(--sp-6) var(--sp-8);
+  }
+
+  .footer-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr 1fr 1fr;
+    gap: var(--sp-8);
+  }
+
+  .footer-brand {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .footer-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    color: var(--ink);
+    text-decoration: none;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1rem;
+  }
+
+  .footer-logo img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .footer-tagline {
+    color: var(--smoke);
+    font-size: 0.8125rem;
+    margin: 0;
+  }
+
+  .footer-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-2);
+  }
+
+  .footer-col h4 {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--ink);
+    margin: 0 0 var(--sp-1) 0;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .footer-col a {
+    color: var(--smoke);
+    text-decoration: none;
+    font-size: 0.8125rem;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+
+  .footer-col a:hover {
+    color: var(--ink);
+  }
+
+  .footer-bottom {
+    margin-top: var(--sp-12);
+    padding-top: var(--sp-6);
+    border-top: 1px solid var(--border-light);
+  }
+
+  .footer-bottom p {
+    color: var(--smoke);
+    font-size: 0.75rem;
+    margin: 0;
+  }
+
+  @media (max-width: 768px) {
+    .footer-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: var(--sp-8) var(--sp-6);
+    }
+
+    .footer-brand {
+      grid-column: 1 / -1;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .footer-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
