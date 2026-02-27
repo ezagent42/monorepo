@@ -28,7 +28,7 @@ const currentPath = Astro.url.pathname;
 <header class="nav-header">
   <div class="nav-inner">
     <a href={tp('/')} class="nav-logo" aria-label="EZAgent Home">
-      <img src="/ezagent-logo.svg" alt="" width="28" height="28" />
+      <img src={`${import.meta.env.BASE_URL}/ezagent-logo.svg`} alt="" width="28" height="28" />
       <span class="nav-logo-text">EZAgent</span>
     </a>
 

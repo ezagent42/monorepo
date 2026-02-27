@@ -1,3 +1,4 @@
 ---
-return Astro.redirect('/zh/');
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+return Astro.redirect(`${base}/zh/`);
 ---
