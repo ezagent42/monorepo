@@ -8,11 +8,11 @@
 
 ```
 monorepo/                         → 主开发仓库（唯一工作入口）
-├── specs/                        → 产品规格与设计文档 (subtree, CC0-1.0)
+├── docs/                         → 产品规格与设计文档 (subtree, CC0-1.0)
 ├── ezagent/                      → EZAgent 核心代码 (subtree, Apache 2.0)
 ├── relay/                        → Relay 服务代码 (subtree, Apache 2.0)
 ├── page/                         → 官网/落地页代码 (subtree, Apache 2.0)
-├── docs/plans/                   → 设计文档与实施计划
+├── app/                          → App 客户端代码 (subtree, Apache 2.0)
 ├── .claude/                      → Claude Code 项目配置（skills, plugins）
 ├── .github/workflows/            → CI/CD（subtree 自动同步）
 └── MONOREPO.md                   → 本文件
@@ -23,10 +23,11 @@ monorepo/                         → 主开发仓库（唯一工作入口）
 | 仓库 | 用途 | URL |
 |------|------|-----|
 | **monorepo** | 主开发仓库（日常工作入口） | git@github.com:ezagent42/monorepo.git |
-| **specs** | 产品规格（发布镜像） | git@github.com:ezagent42/specs.git |
+| **docs** | 产品规格与设计文档（发布镜像） | git@github.com:ezagent42/docs.git |
 | **ezagent** | EZAgent 核心（发布镜像） | git@github.com:ezagent42/ezagent.git |
 | **relay** | Relay 服务（发布镜像） | git@github.com:ezagent42/relay.git |
 | **page** | 官网（发布镜像） | git@github.com:ezagent42/ezagent.cloud.git |
+| **app** | App 客户端（发布镜像） | git@github.com:ezagent42/app.git |
 
 > **核心原则**：所有开发工作只在 monorepo 进行，子仓库是单向的发布镜像，不在子仓库直接提交代码。
 
@@ -41,10 +42,11 @@ git clone git@github.com:ezagent42/monorepo.git
 cd monorepo
 
 # 添加 remote 别名
-git remote add specs   git@github.com:ezagent42/specs.git
+git remote add docs    git@github.com:ezagent42/docs.git
 git remote add ezagent git@github.com:ezagent42/ezagent.git
 git remote add relay   git@github.com:ezagent42/relay.git
 git remote add page    git@github.com:ezagent42/ezagent.cloud.git
+git remote add app     git@github.com:ezagent42/app.git
 
 # 验证
 git remote -v
@@ -56,13 +58,12 @@ git remote -v
 以下命令仅在 2026-02-26 首次初始化时执行过，记录备查：
 
 ```bash
-git subtree add --prefix=specs git@github.com:ezagent42/specs.git main --squash
+git subtree add --prefix=docs git@github.com:ezagent42/docs.git main --squash
 git subtree add --prefix=ezagent git@github.com:ezagent42/ezagent.git main --squash
 git subtree add --prefix=relay git@github.com:ezagent42/relay.git main --squash
 git subtree add --prefix=page git@github.com:ezagent42/ezagent.cloud.git main --squash
+git subtree add --prefix=app git@github.com:ezagent42/app.git main --squash
 ```
-
-详见 `docs/plans/2026-02-26-monorepo-init-design.md`。
 </details>
 
 ---
@@ -90,8 +91,8 @@ git push origin main
 当需要将 monorepo 的更新推送到对应的独立子仓库时：
 
 ```bash
-# 同步 specs
-git subtree push --prefix=specs specs main
+# 同步 docs
+git subtree push --prefix=docs docs main
 
 # 同步 ezagent
 git subtree push --prefix=ezagent ezagent main
@@ -101,6 +102,9 @@ git subtree push --prefix=relay relay main
 
 # 同步 page
 git subtree push --prefix=page page main
+
+# 同步 app
+git subtree push --prefix=app app main
 ```
 
 > **注意**：`--squash` 用于 `subtree add` 和 `subtree pull`，是强制规范，不能混用。`subtree push` 不支持也不需要 `--squash` 参数。
@@ -136,14 +140,15 @@ jobs:
       - name: Add remotes
         # CI 环境使用 HTTPS + Token 推送，本地开发使用 SSH（见初始化章节）
         run: |
-          git remote add specs   https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/specs
+          git remote add docs    https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/docs
           git remote add ezagent https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/ezagent
           git remote add relay   https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/relay
           git remote add page    https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/ezagent.cloud
+          git remote add app     https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/app
 
-      - name: Sync specs
-        if: contains(github.event.head_commit.modified, 'specs/')
-        run: git subtree push --prefix=specs specs main
+      - name: Sync docs
+        if: contains(github.event.head_commit.modified, 'docs/')
+        run: git subtree push --prefix=docs docs main
 
       - name: Sync ezagent
         if: contains(github.event.head_commit.modified, 'ezagent/')
@@ -156,10 +161,14 @@ jobs:
       - name: Sync page
         if: contains(github.event.head_commit.modified, 'page/')
         run: git subtree push --prefix=page page main
+
+      - name: Sync app
+        if: contains(github.event.head_commit.modified, 'app/')
+        run: git subtree push --prefix=app app main
 ```
 
 **配置要求**：
-- GitHub → Settings → Secrets → Actions 中需配置 `GH_TOKEN`（Fine-grained PAT，对 4 个子仓库有 Contents 写权限）
+- GitHub → Settings → Secrets → Actions 中需配置 `GH_TOKEN`（Fine-grained PAT，对 5 个子仓库有 Contents 写权限）
 - 已于 2026-02-27 配置完成并验证通过
 
 ---

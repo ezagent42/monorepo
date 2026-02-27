@@ -2,22 +2,23 @@
 
 ## 项目概述
 
-EZAgent42 是一个 AI agent 框架项目。本 monorepo 是唯一的开发入口，使用 git subtree 管理 4 个子项目。
+EZAgent42 是一个 AI agent 框架项目。本 monorepo 是唯一的开发入口，使用 git subtree 管理 5 个子项目。
 
 ## 关键文档
 
 - **MONOREPO.md** — Monorepo 管理指南（subtree 操作、CI 同步、分支策略）。所有 subtree 相关操作必须参考此文件。
 - **CONTRIBUTING.md** — 开发规范（Commit 格式、PR 流程、代码风格）
-- **docs/plans/** — 设计文档与实施计划
+- **docs/plan/** — 设计文档与实施计划
 
 ## 仓库结构
 
 | 目录 | 说明 | License | subtree remote |
 |------|------|---------|----------------|
-| `specs/` | 产品规格与设计文档 | CC0-1.0 | `specs` → specs.git |
+| `docs/` | 产品规格与设计文档 | CC0-1.0 | `docs` → docs.git |
 | `ezagent/` | EZAgent 核心代码 | Apache 2.0 | `ezagent` → ezagent.git |
 | `relay/` | Relay 服务代码 | Apache 2.0 | `relay` → relay.git |
 | `page/` | 官网 (ezagent.cloud) | Apache 2.0 | `page` → ezagent.cloud.git |
+| `app/` | App 客户端代码 | Apache 2.0 | `app` → app.git |
 
 ## 核心规则
 

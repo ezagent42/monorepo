@@ -18,14 +18,14 @@
 
 ### Scope（可选）
 
-使用子项目名：`ezagent`, `relay`, `page`, `specs`
+使用子项目名：`ezagent`, `relay`, `page`, `docs`, `app`
 
 ### 示例
 
 ```
 feat(ezagent): add agent routing logic
 fix(relay): handle websocket reconnection
-docs(specs): update protocol specification
+docs(docs): update protocol specification
 ci: improve subtree sync workflow
 chore: update dependencies
 ```
