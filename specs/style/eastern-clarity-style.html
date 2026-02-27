@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eastern Clarity v1 — ezagent Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Noto+Sans+SC:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+  :root {
+    --ink:#2c3340; --ink-light:#3d4a5c; --bg:#ffffff; --bg-alt:#f7f7f5;
+    --border:#e3e2de; --border-light:#f1f1ef;
+    --vermillion:#c94040; --celadon:#6b8fa5; --gold:#c9a55a;
+    --pine:#4a6b5a; --amber:#d4a04b; --deep-sky:#4a6e82;
+    --smoke:#787774; --mist:#c5bfb3;
+
+    --font-display:'DM Sans','Noto Sans SC',sans-serif;
+    --font-body:'DM Sans','Noto Sans SC',sans-serif;
+    --font-code:'JetBrains Mono','SF Mono','Fira Code',Consolas,monospace;
+    --font-brand:'Noto Serif SC',serif;
+
+    --sp-1:4px;--sp-2:8px;--sp-3:12px;--sp-4:16px;--sp-6:24px;--sp-8:32px;--sp-12:48px;--sp-16:64px;--sp-24:96px;
+    --shadow-sm:0 1px 2px rgba(44,51,64,0.04);
+    --shadow-md:0 2px 8px rgba(44,51,64,0.06);
+    --shadow-lg:0 8px 24px rgba(44,51,64,0.08);
+    --shadow-L1:0 2px 8px rgba(44,51,64,0.06);
+    --shadow-L2:0 1px 3px rgba(44,51,64,0.04);
+    --radius-sm:4px;--radius-md:8px;--radius-lg:12px;
+
+    /* Motion tokens */
+    --ease-out:cubic-bezier(0,0,0.2,1);
+    --ease-in-out:cubic-bezier(0.4,0,0.2,1);
+    --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+    --dur-instant:75ms;--dur-fast:150ms;--dur-normal:200ms;--dur-slow:300ms;--dur-page:500ms;
+
+    /* Z-index */
+    --z-base:0;--z-sticky:100;--z-dropdown:200;--z-overlay:300;--z-modal:400;--z-toast:500;
+
+    /* Inverted surface — always dark, never flips */
+    --surface-inv:#2c3340;
+    --surface-inv-text:#d5d2ca;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{font-family:var(--font-body);background:var(--bg-alt);color:var(--ink);line-height:1.7;-webkit-font-smoothing:antialiased;}
+
+  /* ===== TAB NAVIGATION ===== */
+  .tab-nav{position:sticky;top:0;z-index:var(--z-sticky);background:var(--bg);border-bottom:1px solid var(--border);display:flex;justify-content:center;gap:0;padding:0 var(--sp-4);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);background:rgba(255,255,255,0.92);}
+  .tab-btn{padding:12px 20px;font-family:var(--font-body);font-size:0.78rem;font-weight:500;color:var(--smoke);background:none;border:none;cursor:pointer;border-bottom:2px solid transparent;transition:color var(--dur-fast) var(--ease-out),border-color var(--dur-fast) var(--ease-out);}
+  .tab-btn:hover{color:var(--ink);}
+  .tab-btn.active{color:var(--ink);font-weight:600;border-bottom-color:var(--vermillion);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  @media(max-width:768px){.tab-btn{padding:10px 12px;font-size:0.7rem;}}
+
+  /* ===== LAYOUT ===== */
+  .page{max-width:1080px;margin:0 auto;padding:0 var(--sp-8);}
+  .section{padding:var(--sp-24) 0;} .section+.section{border-top:1px solid var(--border-light);}
+
+  /* ===== HERO ===== */
+  .hero{padding:var(--sp-16) 0 0;text-align:center;position:relative;overflow:hidden;}
+  .hero-bg{position:absolute;inset:0;opacity:0.06;background:url('pattern-bg.jpg') repeat center/200px;pointer-events:none;}
+  .hero-logo{width:56px;height:56px;border-radius:var(--radius-md);margin:0 auto var(--sp-6);display:block;box-shadow:var(--shadow-md);}
+  .hero h1{font-size:clamp(2rem,4vw,3rem);font-weight:700;letter-spacing:-0.02em;margin-bottom:var(--sp-2);position:relative;}
+  .hero h1 span{color:var(--celadon);}
+  .hero .sub{font-size:0.95rem;color:var(--smoke);margin-bottom:var(--sp-6);position:relative;}
+  .hero .ver{font-family:var(--font-code);font-size:0.7rem;color:var(--celadon);border:1px solid var(--border);padding:2px 8px;border-radius:var(--radius-sm);position:relative;}
+  .hero-illust{max-width:720px;width:100%;margin:var(--sp-12) auto 0;border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);position:relative;}
+  .divider{width:32px;height:2px;background:var(--vermillion);margin:var(--sp-12) auto;border-radius:1px;}
+
+  /* ===== SECTION HEADER ===== */
+  .sh{display:flex;align-items:baseline;gap:var(--sp-4);margin-bottom:var(--sp-8);}
+  .sh-num{font-size:2.2rem;font-weight:700;color:var(--border);line-height:1;}
+  .sh-group{border-left:3px solid var(--vermillion);padding-left:var(--sp-4);}
+  .sh-title{font-size:1.4rem;font-weight:700;letter-spacing:-0.01em;}
+  .sh-sub{font-size:0.82rem;color:var(--smoke);}
+  .sh-desc{font-size:0.92rem;color:var(--ink-light);max-width:700px;margin-bottom:var(--sp-8);line-height:1.9;}
+
+  /* ===== CARD ===== */
+  .card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:var(--sp-6);overflow:hidden;}
+  .card-hd{padding:var(--sp-4) var(--sp-6);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:var(--sp-3);}
+  .card-hd h3{font-size:0.95rem;font-weight:700;}
+  .card-bd{padding:var(--sp-6);}
+
+  .badge{font-family:var(--font-code);font-size:0.58rem;font-weight:500;padding:2px 7px;border-radius:3px;text-transform:uppercase;letter-spacing:0.06em;}
+  .b-red{background:rgba(201,64,64,0.08);color:var(--vermillion);}
+  .b-blue{background:rgba(107,143,165,0.08);color:var(--celadon);}
+  .b-gold{background:rgba(201,165,90,0.08);color:var(--gold);}
+  .b-green{background:rgba(74,107,90,0.08);color:var(--pine);}
+  .b-gray{background:var(--bg-alt);color:var(--smoke);}
+  .note{font-size:0.85rem;color:var(--ink-light);line-height:1.9;margin-bottom:var(--sp-6);} .note strong{color:var(--ink);}
+
+  /* ===== GRIDS ===== */
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:var(--sp-6);}
+  .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--sp-6);}
+  .g4{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:var(--sp-6);}
+  @media(max-width:768px){.g2,.g3{grid-template-columns:1fr;}}
+
+  /* ===== COLOR SWATCH ===== */
+  .swatch{border-radius:var(--radius-md);overflow:hidden;box-shadow:var(--shadow-sm);}
+  .swatch-color{height:72px;position:relative;}
+  .swatch-color::after{content:attr(data-hex);position:absolute;bottom:6px;right:8px;font-family:var(--font-code);font-size:0.65rem;color:rgba(255,255,255,0.7);}
+  .swatch-color.lt::after{color:rgba(0,0,0,0.3);}
+  .swatch-info{padding:var(--sp-3);background:var(--bg);}
+  .swatch-name{font-size:0.82rem;font-weight:600;}
+  .swatch-role{font-size:0.68rem;color:var(--smoke);margin-top:1px;}
+
+  /* ===== TYPOGRAPHY SHOWCASE ===== */
+  .type-row{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--sp-6);margin-bottom:var(--sp-4);}
+  .type-label{font-family:var(--font-code);font-size:0.62rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--celadon);font-weight:500;margin-bottom:var(--sp-2);}
+  .type-meta{font-family:var(--font-code);font-size:0.68rem;color:var(--smoke);border-top:1px solid var(--border-light);padding-top:var(--sp-3);margin-top:var(--sp-3);line-height:1.9;}
+
+  /* ===== CODE BLOCK ===== */
+  .codeblock{background:var(--surface-inv);border-radius:var(--radius-md);padding:var(--sp-6);font-family:var(--font-code);font-size:0.75rem;line-height:2;color:var(--surface-inv-text);overflow-x:auto;margin-bottom:var(--sp-6);}
+  .codeblock .cm{color:#5e6e7e;} .codeblock .kw{color:#6b8fa5;} .codeblock .fn{color:#c9a55a;} .codeblock .vl{color:#c9a55a;} .codeblock .st{color:#8aad7e;} .codeblock .nr{color:#c94040;} .codeblock .op{color:#8c9196;}
+  code.inline{font-family:var(--font-code);font-size:0.82em;background:var(--bg-alt);border:1px solid var(--border);padding:1px 5px;border-radius:3px;}
+
+  /* ===== SPACING VIS ===== */
+  .sp-row{display:flex;align-items:center;gap:var(--sp-4);margin-bottom:var(--sp-2);}
+  .sp-label{width:60px;font-family:var(--font-code);font-size:0.68rem;color:var(--smoke);text-align:right;flex-shrink:0;}
+  .sp-bar{height:18px;background:linear-gradient(90deg,var(--celadon),rgba(107,143,165,0.2));border-radius:2px;}
+  .sp-px{font-family:var(--font-code);font-size:0.62rem;color:var(--smoke);width:32px;flex-shrink:0;}
+
+  /* ===== NESTING ===== */
+  .nest-L0{background:var(--bg-alt);border:2px dashed var(--border);border-radius:var(--radius-lg);padding:var(--sp-6);position:relative;}
+  .nest-tag{position:absolute;top:-9px;left:var(--sp-4);background:inherit;padding:0 var(--sp-2);font-family:var(--font-code);font-size:0.62rem;color:var(--smoke);}
+  .nest-L1{background:var(--bg);border-radius:var(--radius-md);padding:var(--sp-6);box-shadow:var(--shadow-L1);margin-top:var(--sp-3);position:relative;} .nest-L1>.nest-tag{background:var(--bg);}
+  .nest-L2{background:var(--bg-alt);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--sp-6);margin-top:var(--sp-3);position:relative;} .nest-L2>.nest-tag{background:var(--bg-alt);}
+  .nest-L3{background:var(--bg);border-radius:var(--radius-sm);padding:var(--sp-4);margin-top:var(--sp-3);border-left:3px solid var(--celadon);position:relative;} .nest-L3>.nest-tag{background:var(--bg);}
+  .nest-txt{font-size:0.78rem;color:var(--smoke);margin-top:var(--sp-2);} .nest-txt strong{color:var(--ink-light);font-weight:500;}
+
+  /* ===== ICON GRID ===== */
+  .icon-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:2px;}
+  .icon-cell{display:flex;flex-direction:column;align-items:center;padding:12px 4px 8px;border-radius:var(--radius-md);cursor:default;}
+  .icon-cell:hover{background:var(--bg-alt);}
+  .icon-cell i{font-size:22px;color:var(--ink);margin-bottom:4px;height:24px;display:flex;align-items:center;}
+  .icon-cell span{font-family:var(--font-code);font-size:0.55rem;color:var(--smoke);text-align:center;}
+
+  /* ===== SIDEBAR / MINI CARD ===== */
+  .sidebar{background:var(--bg-alt);border:1px solid var(--border);border-radius:var(--radius-md);padding:var(--sp-3);}
+  .sb-label{font-family:var(--font-code);font-size:0.58rem;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:var(--smoke);padding-left:8px;margin-bottom:6px;}
+  .sb-item{display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:4px;font-size:0.78rem;}
+  .sb-item:hover{background:rgba(0,0,0,0.025);} .sb-item.active{background:rgba(0,0,0,0.04);font-weight:500;}
+  .sb-item i{font-size:16px;width:18px;text-align:center;}
+  .mc{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-md);padding:10px 12px;display:flex;align-items:center;gap:10px;border-left:3px solid transparent;margin-bottom:6px;}
+  .mc-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .mc-icon i{font-size:15px;} .mc h5{font-size:0.75rem;font-weight:600;margin-bottom:1px;} .mc p{font-size:0.65rem;color:var(--smoke);line-height:1.4;}
+
+  /* ===== BUTTONS ===== */
+  .btn-row{display:flex;gap:var(--sp-3);flex-wrap:wrap;align-items:center;}
+  .btn{display:inline-flex;align-items:center;gap:5px;padding:8px 18px;border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.82rem;font-weight:500;border:none;cursor:pointer;line-height:1;} .btn i{font-size:15px;}
+  .btn-ink{background:var(--surface-inv);color:#fff;} .btn-ghost{background:var(--bg);color:var(--ink);border:1px solid var(--border);} .btn-danger{background:rgba(201,64,64,0.06);color:var(--vermillion);border:1px solid rgba(201,64,64,0.15);}
+
+  /* ===== PROMPT CARD ===== */
+  .prompt{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:var(--sp-6);}
+  .prompt-hd{padding:var(--sp-3) var(--sp-6);background:var(--surface-inv);display:flex;align-items:center;gap:var(--sp-3);}
+  .prompt-hd h4{color:#fff;font-size:0.88rem;font-weight:600;} .prompt-hd .tag{font-family:var(--font-code);font-size:0.6rem;color:var(--gold);}
+  .prompt-bd{padding:var(--sp-6);}
+  .prompt-text{font-family:var(--font-code);font-size:0.75rem;line-height:1.9;color:var(--ink-light);background:var(--bg-alt);padding:var(--sp-6);border-radius:var(--radius-md);border-left:3px solid var(--gold);margin-bottom:var(--sp-4);white-space:pre-wrap;}
+  .prompt-notes{font-size:0.78rem;color:var(--smoke);line-height:1.8;} .prompt-notes strong{color:var(--ink-light);}
+  .prompt-preview{margin-top:var(--sp-4);border:1px solid var(--border-light);border-radius:var(--radius-md);overflow:hidden;background:var(--bg-alt);padding:var(--sp-4);text-align:center;}
+  .prompt-preview img{max-width:100%;height:auto;border-radius:var(--radius-sm);}
+  .prompt-preview-label{font-family:var(--font-code);font-size:0.6rem;color:var(--smoke);margin-top:var(--sp-2);text-transform:uppercase;letter-spacing:0.06em;}
+
+  /* ===== DARK SECTION ===== */
+  .dark-sec{background:var(--surface-inv);border-radius:var(--radius-lg);padding:var(--sp-8);margin-top:var(--sp-8);}
+  .dark-sec h3{color:#fff;font-size:1rem;font-weight:700;margin-bottom:var(--sp-6);}
+  .dark-sidebar{background:rgba(255,255,255,0.04);border-radius:var(--radius-md);padding:var(--sp-3);}
+  .dark-sidebar .sb-label{color:rgba(255,255,255,0.3);}
+  .dsb-item{display:flex;align-items:center;gap:9px;padding:5px 8px;border-radius:4px;font-size:0.78rem;color:rgba(255,255,255,0.6);}
+  .dsb-item:hover{background:rgba(255,255,255,0.04);} .dsb-item.active{background:rgba(255,255,255,0.06);color:#fff;font-weight:500;}
+  .dsb-item i{font-size:16px;width:18px;text-align:center;}
+  .dark-mc{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:var(--radius-md);padding:10px 12px;display:flex;align-items:center;gap:10px;border-left:3px solid transparent;margin-bottom:6px;}
+  .dark-mc h5{font-size:0.75rem;font-weight:600;color:#fff;margin-bottom:1px;} .dark-mc p{font-size:0.65rem;color:rgba(255,255,255,0.4);line-height:1.4;}
+
+  /* ===== GAP ANALYSIS ===== */
+  .gap-card{border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:var(--sp-4);}
+  .gap-hd{padding:var(--sp-4) var(--sp-6);display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);}
+  .gap-hd h4{font-size:0.92rem;font-weight:700;}
+  .gap-bd{padding:var(--sp-6);}
+  .gap-row{display:flex;align-items:flex-start;gap:var(--sp-3);margin-bottom:var(--sp-3);font-size:0.82rem;line-height:1.7;}
+  .gap-row i{font-size:16px;margin-top:3px;flex-shrink:0;}
+  .gap-covered{color:var(--pine);} .gap-partial{color:var(--amber);} .gap-missing{color:var(--vermillion);}
+
+  /* ===== TABLE ===== */
+  table{width:100%;border-collapse:collapse;font-size:0.8rem;}
+  th{text-align:left;padding:8px 14px;background:var(--bg-alt);font-size:0.65rem;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;color:var(--smoke);border-bottom:1px solid var(--border);}
+  td{padding:8px 14px;border-bottom:1px solid var(--border-light);line-height:1.6;vertical-align:top;}
+  td code{font-family:var(--font-code);font-size:0.7rem;background:var(--bg-alt);padding:1px 4px;border-radius:3px;}
+
+  /* ===== MOTION DEMO ===== */
+  .motion-demo{display:flex;gap:var(--sp-4);flex-wrap:wrap;margin-bottom:var(--sp-6);}
+  .motion-box{width:72px;height:72px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.58rem;color:var(--smoke);cursor:pointer;border:1px solid var(--border);background:var(--bg);}
+  .motion-box:hover{background:var(--celadon);color:#fff;border-color:var(--celadon);}
+  .motion-box.ease-out{transition:all 150ms var(--ease-out);}
+  .motion-box.ease-in-out{transition:all 200ms var(--ease-in-out);}
+  .motion-box.ease-spring{transition:all 300ms var(--ease-spring);}
+  .motion-box.ease-slow{transition:all 500ms var(--ease-in-out);}
+  .motion-label{font-family:var(--font-code);font-size:0.58rem;color:var(--smoke);text-align:center;margin-top:var(--sp-1);}
+
+  /* ===== BREAKPOINT VIS ===== */
+  .bp-bar{display:flex;height:36px;border-radius:var(--radius-md);overflow:hidden;margin-bottom:var(--sp-4);border:1px solid var(--border);}
+  .bp-seg{display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.58rem;font-weight:500;border-right:1px solid var(--border);} .bp-seg:last-child{border-right:none;}
+
+  /* ===== FOCUS DEMO ===== */
+  .focus-demo{display:flex;gap:var(--sp-4);flex-wrap:wrap;align-items:center;margin-bottom:var(--sp-6);}
+  .focus-box{padding:8px 18px;border-radius:var(--radius-sm);font-family:var(--font-body);font-size:0.82rem;font-weight:500;border:1px solid var(--border);background:var(--bg);cursor:pointer;outline:none;color:var(--ink);}
+  .focus-box:focus-visible{outline:2px solid var(--celadon);outline-offset:2px;}
+
+  /* ===== Z-INDEX VIS ===== */
+  .z-stack{position:relative;height:220px;margin-bottom:var(--sp-6);}
+  .z-layer{position:absolute;border-radius:var(--radius-md);font-family:var(--font-code);font-size:0.65rem;display:flex;align-items:flex-start;padding:8px 12px;gap:6px;box-shadow:0 2px 12px rgba(0,0,0,0.1);}
+
+  /* ===== TOKEN PAIRS ===== */
+  .token-pair{display:flex;align-items:stretch;border:1px solid var(--border);border-radius:var(--radius-md);overflow:hidden;margin-bottom:var(--sp-2);}
+  .token-light,.token-dark{flex:1;padding:10px 14px;font-size:0.78rem;display:flex;align-items:center;gap:8px;}
+  .token-light{background:var(--bg);} .token-dark{background:var(--surface-inv);color:rgba(255,255,255,0.85);}
+  .token-dot{width:16px;height:16px;border-radius:3px;flex-shrink:0;border:1px solid rgba(0,0,0,0.08);}
+  .token-name{font-family:var(--font-code);font-size:0.68rem;color:var(--smoke);} .token-dark .token-name{color:rgba(255,255,255,0.4);}
+
+  /* ===== FOOTER ===== */
+  .footer{text-align:center;padding:var(--sp-16) 0 var(--sp-8);position:relative;}
+  .footer-bg{position:absolute;inset:0;opacity:0.04;background:url('pattern-bg.jpg') repeat center/200px;pointer-events:none;}
+  .footer p{font-size:0.75rem;color:var(--smoke);position:relative;}
+
+  /* ===== THEME TOGGLE ===== */
+  .theme-toggle{margin-left:auto;width:36px;height:36px;border-radius:50%;border:1px solid var(--border);background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--smoke);transition:all var(--dur-fast) var(--ease-out);flex-shrink:0;}
+  .theme-toggle:hover{color:var(--ink);border-color:var(--ink);background:var(--bg-alt);}
+  .theme-toggle i{font-size:16px;}
+
+  /* ===== DARK MODE ===== */
+  html[data-theme="dark"]{
+    --ink:#ededeb;--ink-light:rgba(255,255,255,0.75);
+    --bg:#1e2128;--bg-alt:#15181e;
+    --border:rgba(255,255,255,0.12);--border-light:rgba(255,255,255,0.07);
+    --smoke:rgba(255,255,255,0.52);--mist:rgba(255,255,255,0.18);
+    --surface-inv:#282c34;--surface-inv-text:#d5d2ca;
+    --shadow-sm:0 1px 3px rgba(0,0,0,0.3);
+    --shadow-md:0 2px 10px rgba(0,0,0,0.35);
+    --shadow-lg:0 8px 28px rgba(0,0,0,0.45);
+    --shadow-L1:0 2px 10px rgba(0,0,0,0.35);
+    --shadow-L2:0 1px 4px rgba(0,0,0,0.25);
+  }
+  html[data-theme="dark"] body{background:var(--bg-alt);color:var(--ink);}
+
+  /* Nav */
+  html[data-theme="dark"] .tab-nav{background:rgba(30,33,40,0.95);border-bottom-color:var(--border);}
+  html[data-theme="dark"] .tab-btn{color:var(--smoke);} html[data-theme="dark"] .tab-btn:hover{color:var(--ink);} html[data-theme="dark"] .tab-btn.active{color:var(--ink);}
+  html[data-theme="dark"] .theme-toggle{background:var(--bg);border-color:var(--border);color:var(--smoke);} html[data-theme="dark"] .theme-toggle:hover{color:var(--gold);border-color:var(--gold);}
+
+  /* Section headers */
+  html[data-theme="dark"] .sh-num{color:rgba(255,255,255,0.15);}
+  html[data-theme="dark"] .sh-sub{color:var(--smoke);}
+  html[data-theme="dark"] .sh-desc{color:var(--ink-light);}
+  html[data-theme="dark"] .divider{background:var(--vermillion);opacity:0.7;}
+  html[data-theme="dark"] .section+.section{border-top-color:var(--border);}
+
+  /* Cards */
+  html[data-theme="dark"] .card{background:var(--bg);border-color:var(--border);}
+  html[data-theme="dark"] .card-hd{border-bottom-color:var(--border);}
+
+  /* Tables */
+  html[data-theme="dark"] th{background:rgba(255,255,255,0.04);color:var(--smoke);border-bottom-color:var(--border);}
+  html[data-theme="dark"] td{border-bottom-color:var(--border-light);}
+  html[data-theme="dark"] td code{background:rgba(255,255,255,0.06);border-color:var(--border);color:var(--ink-light);}
+  html[data-theme="dark"] code.inline{background:rgba(255,255,255,0.06);border-color:var(--border);color:var(--ink-light);}
+
+  /* Badges — boost background opacity for dark */
+  html[data-theme="dark"] .b-red{background:rgba(201,64,64,0.15);} 
+  html[data-theme="dark"] .b-blue{background:rgba(107,143,165,0.15);}
+  html[data-theme="dark"] .b-gold{background:rgba(201,165,90,0.15);}
+  html[data-theme="dark"] .b-green{background:rgba(74,107,90,0.15);}
+  html[data-theme="dark"] .b-gray{background:rgba(255,255,255,0.08);color:var(--smoke);}
+
+  /* Type */
+  html[data-theme="dark"] .type-row{background:var(--bg);border-color:var(--border);}
+  html[data-theme="dark"] .type-label{color:var(--celadon);}
+  html[data-theme="dark"] .type-meta{border-top-color:var(--border-light);color:var(--smoke);}
+
+  /* Swatches */
+  html[data-theme="dark"] .swatch{box-shadow:0 1px 4px rgba(0,0,0,0.3);}
+  html[data-theme="dark"] .swatch-info{background:var(--bg);}
+  html[data-theme="dark"] .swatch-role{color:var(--smoke);}
+
+  /* Spacing vis */
+  html[data-theme="dark"] .sp-bar{background:linear-gradient(90deg,var(--celadon),rgba(107,143,165,0.15));}
+
+  /* Nesting */
+  html[data-theme="dark"] .nest-L0{background:var(--bg-alt);border-color:rgba(255,255,255,0.15);}
+  html[data-theme="dark"] .nest-L1{background:var(--bg);box-shadow:var(--shadow-L1);}
+  html[data-theme="dark"] .nest-L2{background:var(--bg-alt);border-color:var(--border);}
+  html[data-theme="dark"] .nest-L3{background:var(--bg);}
+  html[data-theme="dark"] .nest-tag{color:var(--smoke);}
+  html[data-theme="dark"] .nest-txt{color:var(--smoke);} html[data-theme="dark"] .nest-txt strong{color:var(--ink-light);}
+
+  /* Sidebar */
+  html[data-theme="dark"] .sidebar{background:rgba(255,255,255,0.03);border-color:var(--border);}
+  html[data-theme="dark"] .sb-label{color:var(--smoke);}
+  html[data-theme="dark"] .sb-item{color:var(--ink-light);} html[data-theme="dark"] .sb-item:hover{background:rgba(255,255,255,0.05);} html[data-theme="dark"] .sb-item.active{background:rgba(255,255,255,0.08);color:var(--ink);}
+
+  /* Mini cards */
+  html[data-theme="dark"] .mc{background:var(--bg);border-color:var(--border);}
+  html[data-theme="dark"] .mc h5{color:var(--ink);} html[data-theme="dark"] .mc p{color:var(--smoke);}
+  html[data-theme="dark"] .mc-icon{border:1px solid var(--border);}
+
+  /* Buttons */
+  html[data-theme="dark"] .btn-ink{background:var(--celadon);color:#fff;}
+  html[data-theme="dark"] .btn-ghost{background:var(--bg);color:var(--ink);border-color:var(--border);}
+  html[data-theme="dark"] .btn-danger{background:rgba(201,64,64,0.15);border-color:rgba(201,64,64,0.25);}
+
+  /* Icons */
+  html[data-theme="dark"] .icon-cell:hover{background:rgba(255,255,255,0.05);}
+  html[data-theme="dark"] .icon-cell i{color:var(--ink);}
+  html[data-theme="dark"] .icon-cell span{color:var(--smoke);}
+
+  /* Notes */
+  html[data-theme="dark"] .note{color:var(--ink-light);} html[data-theme="dark"] .note strong{color:var(--ink);}
+
+  /* Prompts */
+  /* Prompts — prompt-hd uses --surface-inv, stays dark automatically */
+  html[data-theme="dark"] .prompt{border-color:var(--border);}
+  html[data-theme="dark"] .prompt-bd{background:var(--bg);}
+  html[data-theme="dark"] .prompt-text{background:rgba(255,255,255,0.04);color:var(--ink-light);border-left-color:rgba(201,165,90,0.5);}
+  html[data-theme="dark"] .prompt-notes{color:var(--smoke);} html[data-theme="dark"] .prompt-notes strong{color:var(--ink-light);}
+  html[data-theme="dark"] .prompt-preview{background:rgba(255,255,255,0.03);border-color:var(--border);}
+  html[data-theme="dark"] .prompt-preview-label{color:var(--smoke);}
+
+  /* Gap analysis */
+  html[data-theme="dark"] .gap-card{border-color:var(--border);}
+  html[data-theme="dark"] .gap-hd{border-bottom-color:var(--border);}
+  html[data-theme="dark"] .gap-row{color:var(--ink-light);}
+
+  /* Motion demo */
+  html[data-theme="dark"] .motion-box{background:var(--bg);border-color:var(--border);color:var(--smoke);}
+  html[data-theme="dark"] .motion-label{color:var(--smoke);}
+  html[data-theme="dark"] .bp-seg{border-color:var(--border);}
+
+  /* Focus demo */
+  html[data-theme="dark"] .focus-box{background:var(--bg);border-color:var(--border);color:var(--ink);}
+
+  /* Z-index */
+  html[data-theme="dark"] .z-layer{box-shadow:0 2px 12px rgba(0,0,0,0.4);}
+
+  /* Token pairs — keep as-is since they show both light and dark */
+
+  /* Hero */
+  html[data-theme="dark"] .hero-illust{box-shadow:var(--shadow-lg);}
+  html[data-theme="dark"] .hero .sub{color:var(--smoke);}
+  html[data-theme="dark"] .hero .ver{color:var(--celadon);border-color:var(--border);}
+  html[data-theme="dark"] .hero-logo{box-shadow:var(--shadow-lg);}
+
+  /* Color ratio bar */
+  html[data-theme="dark"] .swatch-color.lt::after{color:rgba(0,0,0,0.5);}
+
+  /* Dark-sec inline section — invert when in global dark mode */
+  html[data-theme="dark"] .dark-sec{background:var(--bg);border:1px solid var(--border);}
+  html[data-theme="dark"] .dark-sec h3{color:var(--ink);}
+  html[data-theme="dark"] .dark-sidebar{background:rgba(255,255,255,0.03);}
+  html[data-theme="dark"] .dark-sidebar .sb-label{color:var(--smoke);}
+  html[data-theme="dark"] .dsb-item{color:var(--ink-light);} html[data-theme="dark"] .dsb-item.active{color:var(--ink);background:rgba(255,255,255,0.06);}
+  html[data-theme="dark"] .dark-mc{background:rgba(255,255,255,0.03);border-color:var(--border);}
+  html[data-theme="dark"] .dark-mc h5{color:var(--ink);} html[data-theme="dark"] .dark-mc p{color:var(--smoke);}
+
+  /* Footer */
+  html[data-theme="dark"] .footer p{color:var(--smoke);}
+
+  /* Transition for theme switch */
+  html{transition:background-color var(--dur-slow) var(--ease-in-out),color var(--dur-slow) var(--ease-in-out);}
+  body,.card,.tab-nav,.type-row,.sidebar,.mc,.nest-L0,.nest-L1,.nest-L2,.nest-L3,.prompt,.prompt-bd,.prompt-text,.gap-card,.motion-box,.focus-box,.theme-toggle,.btn{transition:background-color var(--dur-slow) var(--ease-in-out),color var(--dur-slow) var(--ease-in-out),border-color var(--dur-slow) var(--ease-in-out);}
+</style>
+</head>
+<body>
+
+<!-- ===== TAB NAVIGATION ===== -->
+<nav class="tab-nav">
+  <button class="tab-btn active" data-tab="tab-visual">色彩 · 字体</button>
+  <button class="tab-btn" data-tab="tab-layout">布局 · 图标</button>
+  <button class="tab-btn" data-tab="tab-assets">插画 · 标识</button>
+  <button class="tab-btn" data-tab="tab-foundation">基础补充</button>
+  <button class="tab-btn" data-tab="tab-ref">参考 · 评估</button>
+  <button class="theme-toggle" id="themeToggle" title="切换 Light / Dark">
+    <i class="ph-thin ph-sun" id="themeIcon"></i>
+  </button>
+</nav>
+
+<div class="page">
+
+
+
+<!-- ========================================================
+     TAB 1: COLOR + TYPOGRAPHY
+     ======================================================== -->
+<div id="tab-visual" class="tab-panel active">
+
+<section class="section">
+  <div class="sh"><span class="sh-num">01</span><div class="sh-group"><h2 class="sh-title">配色</h2><div class="sh-sub">Color Palette</div></div></div>
+  <p class="sh-desc">
+    纯白 + 暖灰底色，墨色文字搭配三色 accent（朱印/天青/琉璃金）。
+    东方意韵仅体现在色板命名，视觉上是简约现代的 SaaS 风格。
+  </p>
+  <div class="g4">
+    <div class="swatch"><div class="swatch-color" style="background:#2c3340;" data-hex="#2c3340"></div><div class="swatch-info"><div class="swatch-name">墨色 Ink</div><div class="swatch-role">Primary text · headings · dark bg</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#3d4a5c;" data-hex="#3d4a5c"></div><div class="swatch-info"><div class="swatch-name">淡墨 Light Ink</div><div class="swatch-role">Body text · secondary</div></div></div>
+    <div class="swatch"><div class="swatch-color lt" style="background:#ffffff;border:1px solid #e3e2de;" data-hex="#ffffff"></div><div class="swatch-info"><div class="swatch-name">素纸 White</div><div class="swatch-role">Card surface · primary bg</div></div></div>
+    <div class="swatch"><div class="swatch-color lt" style="background:#f7f7f5;" data-hex="#f7f7f5"></div><div class="swatch-info"><div class="swatch-name">暖灰 Warm Gray</div><div class="swatch-role">Page bg · alt surface · L2 nesting</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#c94040;" data-hex="#c94040"></div><div class="swatch-info"><div class="swatch-name">朱印 Vermillion</div><div class="swatch-role">CTA · error · destructive</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#6b8fa5;" data-hex="#6b8fa5"></div><div class="swatch-info"><div class="swatch-name">天青 Celadon</div><div class="swatch-role">Links · info · ≥18px bold only</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#c9a55a;" data-hex="#c9a55a"></div><div class="swatch-info"><div class="swatch-name">琉璃金 Gold</div><div class="swatch-role">Premium · pending · decorative</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#787774;" data-hex="#787774"></div><div class="swatch-info"><div class="swatch-name">烟墨 Smoke</div><div class="swatch-role">Helper text · placeholder</div></div></div>
+    <div class="swatch"><div class="swatch-color lt" style="background:#e3e2de;" data-hex="#e3e2de"></div><div class="swatch-info"><div class="swatch-name">云白 Border</div><div class="swatch-role">Dividers · card borders</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#4a6b5a;" data-hex="#4a6b5a"></div><div class="swatch-info"><div class="swatch-name">松绿 Pine</div><div class="swatch-role">Success</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#d4a04b;" data-hex="#d4a04b"></div><div class="swatch-info"><div class="swatch-name">晨琥珀 Amber</div><div class="swatch-role">Warning</div></div></div>
+    <div class="swatch"><div class="swatch-color" style="background:#4a6e82;" data-hex="#4a6e82"></div><div class="swatch-info"><div class="swatch-name">深天 Deep Sky</div><div class="swatch-role">Celadon hover · small text fallback</div></div></div>
+  </div>
+
+  <div class="card" style="margin-top:var(--sp-8);">
+    <div class="card-bd">
+      <div style="font-size:0.88rem;font-weight:600;margin-bottom:var(--sp-4);">配色比例 60-30-10</div>
+      <div style="display:flex;height:36px;border-radius:var(--radius-md);overflow:hidden;margin-bottom:var(--sp-3);">
+        <div style="flex:60;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.6rem;color:var(--smoke);">60%</div>
+        <div style="flex:20;background:var(--surface-inv);display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.6rem;color:#fff;">20%</div>
+        <div style="flex:10;background:var(--smoke);display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.6rem;color:#fff;">10%</div>
+        <div style="flex:5;background:var(--vermillion);display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.6rem;color:#fff;">5%</div>
+        <div style="flex:3;background:var(--celadon);display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.55rem;color:#fff;">3</div>
+        <div style="flex:2;background:var(--gold);display:flex;align-items:center;justify-content:center;font-family:var(--font-code);font-size:0.55rem;color:#fff;">2</div>
+      </div>
+      <div style="font-size:0.72rem;color:var(--smoke);line-height:1.8;">White bg → Ink text/dark → Smoke neutral → Vermillion accent → Celadon info → Gold decorative</div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="sh"><span class="sh-num">02</span><div class="sh-group"><h2 class="sh-title">字体</h2><div class="sh-sub">Typography</div></div></div>
+  <p class="sh-desc">
+    产品界面全面无衬线：DM Sans (EN) + Noto Sans SC (CN)。代码 JetBrains Mono。
+    宋体 (Noto Serif SC) 仅限品牌/营销大标题。
+  </p>
+  <div class="type-row">
+    <div class="type-label">Display · 36-48px</div>
+    <div style="font-family:var(--font-display);font-size:2.2rem;font-weight:700;letter-spacing:-0.02em;">Programmable Organization</div>
+    <div style="font-family:'Noto Sans SC',sans-serif;font-size:1.8rem;font-weight:700;letter-spacing:0.01em;margin-top:var(--sp-1);">可编程的组织</div>
+    <div class="type-meta">EN: DM Sans Bold -0.02em · CN: Noto Sans SC Bold · line-height: 1.2-1.4</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">H1 · 24-28px</div>
+    <div style="font-family:var(--font-display);font-size:1.5rem;font-weight:700;letter-spacing:-0.01em;">Multi-Agent Collaborative Architecture</div>
+    <div class="type-meta">DM Sans Bold / Noto Sans SC SemiBold</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">Body · 15-16px</div>
+    <div style="font-size:0.95rem;color:var(--ink-light);line-height:1.9;margin-bottom:var(--sp-2);">
+      在 ezagent 中，每个节点是一个自给自足的 P2P 实例。Agent 之间的高频通信走本地直连（延迟 &lt;1ms），而非绕道云端。
+    </div>
+    <div class="type-meta">CN: Noto Sans SC Regular, line-height: 1.9 · EN: DM Sans Regular, line-height: 1.8</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">Code · 14-15px</div>
+    <div class="codeblock" style="margin-bottom:var(--sp-3);">
+<span class="cm">// Hook: after_write phase</span>
+<span class="kw">@room</span>.<span class="fn">hook</span>(phase=<span class="st">"after_write"</span>, trigger=<span class="st">"message.insert"</span>)
+<span class="kw">async def</span> <span class="fn">auto_review</span>(event, ctx):
+    <span class="kw">if</span> event.ref.author <span class="op">!=</span> agent_r1:
+        <span class="kw">await</span> ctx.messages.<span class="fn">send</span>(body=<span class="st">"Reviewing now."</span>)
+    </div>
+    <div class="type-meta">JetBrains Mono 400 · Syntax: kw=天青, fn=琉璃金, str=松绿, num=朱印 · Inline: <code class="inline">code</code> on bg-alt + border</div>
+  </div>
+  <div class="type-row">
+    <div class="type-label">Brand Display · 营销专用</div>
+    <div style="font-family:var(--font-brand);font-size:1.8rem;font-weight:700;letter-spacing:0.05em;">大音希声 大象无形</div>
+    <div class="type-meta">Noto Serif SC Bold · 仅用于 landing page hero、文档封面。产品 UI 不使用。</div>
+  </div>
+</section>
+
+</div><!-- /tab-visual -->
+
+<!-- ========================================================
+     TAB 2: LAYOUT + ICONS
+     ======================================================== -->
+<div id="tab-layout" class="tab-panel">
+
+<section class="section">
+  <div class="sh"><span class="sh-num">03</span><div class="sh-group"><h2 class="sh-title">布局</h2><div class="sh-sub">Spacing · Layout · Nesting</div></div></div>
+  <div class="g2" style="margin-bottom:var(--sp-8);">
+    <div>
+      <p class="sh-desc" style="margin-bottom:var(--sp-6);">间距体系 Tailwind-style, 4px base。留白充裕：section 间 64-96px, 组件内 padding ≥ 24px。</p>
+      <div class="sp-row"><span class="sp-label">--sp-1</span><div class="sp-bar" style="width:4px;"></div><span class="sp-px">4</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-2</span><div class="sp-bar" style="width:8px;"></div><span class="sp-px">8</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-3</span><div class="sp-bar" style="width:12px;"></div><span class="sp-px">12</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-4</span><div class="sp-bar" style="width:16px;"></div><span class="sp-px">16</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-6</span><div class="sp-bar" style="width:24px;"></div><span class="sp-px">24</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-8</span><div class="sp-bar" style="width:32px;"></div><span class="sp-px">32</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-12</span><div class="sp-bar" style="width:48px;"></div><span class="sp-px">48</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-16</span><div class="sp-bar" style="width:64px;"></div><span class="sp-px">64</span></div>
+      <div class="sp-row"><span class="sp-label">--sp-24</span><div class="sp-bar" style="width:96px;"></div><span class="sp-px">96</span></div>
+    </div>
+    <div>
+      <div style="font-size:0.88rem;font-weight:600;margin-bottom:var(--sp-4);">布局原则</div>
+      <div style="font-size:0.82rem;color:var(--ink-light);line-height:2;">
+        <strong>留白即呼吸</strong> — 外围 margin ≥48px, section 间 64-96px<br>
+        <strong>卡片化承载</strong> — 白色卡片在 #f7f7f5 灰底上, shadow-md, radius 8-12px<br>
+        <strong>不对称平衡</strong> — 主内容 60-65%, 呼吸空间 35-40%<br>
+        <strong>竖向节奏</strong> — 4px base grid, 段落间 24px, section 间 64-96px<br>
+        <strong>彩色标识条</strong> — 卡片 border-left 3px 用语义色区分
+      </div>
+    </div>
+  </div>
+  <div style="font-size:0.88rem;font-weight:600;margin-bottom:var(--sp-4);">嵌套层级 · Nesting Hierarchy</div>
+  <p class="note">白 ↔ 灰交替 + 递减阴影 + 彩色边条。最多 3 层，超过用折叠/导航。</p>
+  <div class="nest-L0">
+    <span class="nest-tag">L0 · Page · #f7f7f5</span>
+    <div class="nest-L1">
+      <span class="nest-tag">L1 · Card · #ffffff + shadow-L1</span>
+      <div class="nest-txt"><strong>Room: feature-review</strong></div>
+      <div class="nest-L2">
+        <span class="nest-tag">L2 · Block · #f7f7f5 + border</span>
+        <div class="nest-txt"><strong>Tab: Code Review</strong></div>
+        <div class="nest-L3"><span class="nest-tag">L3 · Item · #fff + left-bar</span><div class="nest-txt"><strong>Message card</strong> — 天青标识条</div></div>
+        <div class="nest-L3" style="border-left-color:var(--vermillion);"><div class="nest-txt"><strong>Alert</strong> — 朱印标识条</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="sh"><span class="sh-num">04</span><div class="sh-group"><h2 class="sh-title">图标</h2><div class="sh-sub">Phosphor Icons · Thin + Duotone Strategy</div></div></div>
+  <p class="sh-desc">
+    使用 Phosphor Icons，按语义角色分配 weight：导航/结构用 Thin（1px, 瘦金体感），状态/通知用 Duotone（2px + 填充, 语义色锚点）。
+  </p>
+  <div class="card">
+    <div class="card-hd"><h3>Weight 分配规则</h3></div>
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>角色</th><th>Weight</th><th>Color</th><th>场景</th></tr></thead>
+        <tbody>
+          <tr><td><strong>导航 / 结构</strong></td><td><code>thin</code></td><td><code>--ink</code> / <code>--smoke</code></td><td>侧边栏, Tab 栏, 面包屑, toolbar</td></tr>
+          <tr><td><strong>状态 / 通知</strong></td><td><code>duotone</code></td><td>语义色 (朱印/天青/琉璃金/松绿)</td><td>卡片 status, Toast, Badge</td></tr>
+          <tr><td><strong>按钮内</strong></td><td><code>thin</code></td><td>继承按钮文字色</td><td>CTA, secondary btn</td></tr>
+          <tr><td><strong>Feature 展示</strong></td><td><code>duotone</code></td><td>品牌色 (天青/琉璃金)</td><td>Feature section, landing page</td></tr>
+          <tr><td><strong>Hero / ≥32px</strong></td><td><code>thin</code></td><td><code>--ink</code></td><td>大尺寸展示性用途</td></tr>
+          <tr><td><strong>Dark mode</strong></td><td>同上规则</td><td>white@85% / 语义色不变</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><h3>ezagent 概念映射</h3><span class="badge b-gray">Thin</span></div>
+    <div class="card-bd">
+      <div class="icon-grid">
+        <div class="icon-cell"><i class="ph-thin ph-squares-four"></i><span>Room</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-user"></i><span>Identity</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-chat-circle"></i><span>Message</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-clock"></i><span>Timeline</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-git-branch"></i><span>Flow</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-webhooks-logo"></i><span>Hook</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-tag"></i><span>Annotation</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-magnifying-glass"></i><span>Index</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-shield"></i><span>Role</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-cube"></i><span>Arena</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-handshake"></i><span>Commit.</span></div>
+        <div class="icon-cell"><i class="ph-thin ph-database"></i><span>DataType</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd"><h3>UI 场景模拟</h3></div>
+    <div class="card-bd">
+      <div class="g2">
+        <div>
+          <div class="sidebar">
+            <div class="sb-label">Rooms</div>
+            <div class="sb-item active"><i class="ph-thin ph-squares-four" style="color:var(--ink);"></i> feature-review</div>
+            <div class="sb-item"><i class="ph-thin ph-chat-circle" style="color:var(--smoke);"></i> general</div>
+            <div class="sb-item"><i class="ph-thin ph-git-branch" style="color:var(--smoke);"></i> ci-pipeline</div>
+            <div class="sb-item"><i class="ph-thin ph-users" style="color:var(--smoke);"></i> team-alpha</div>
+            <div class="sb-item" style="margin-top:8px;color:var(--smoke);font-size:0.75rem;"><i class="ph-thin ph-plus" style="font-size:14px;"></i> New Room</div>
+          </div>
+          <div style="margin-top:var(--sp-4);">
+            <div style="font-family:var(--font-code);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--smoke);margin-bottom:var(--sp-2);">Buttons · Thin</div>
+            <div class="btn-row">
+              <button class="btn btn-ink"><i class="ph-thin ph-plus"></i> New Task</button>
+              <button class="btn btn-ghost"><i class="ph-thin ph-download-simple"></i> Export</button>
+              <button class="btn btn-danger"><i class="ph-thin ph-trash"></i> Delete</button>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div style="font-family:var(--font-code);font-size:0.6rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--smoke);margin-bottom:var(--sp-2);">Status Cards · Duotone</div>
+          <div class="mc" style="border-left-color:var(--vermillion);"><div class="mc-icon" style="background:rgba(201,64,64,0.06);"><i class="ph-duotone ph-warning" style="color:var(--vermillion);"></i></div><div><h5>Escalation Triggered</h5><p>TL-C PTO timeout → backup</p></div></div>
+          <div class="mc" style="border-left-color:var(--celadon);"><div class="mc-icon" style="background:rgba(107,143,165,0.08);"><i class="ph-duotone ph-check-circle" style="color:var(--celadon);"></i></div><div><h5>Review Complete</h5><p>Agent-R1 approved PR #427</p></div></div>
+          <div class="mc" style="border-left-color:var(--gold);"><div class="mc-icon" style="background:rgba(201,165,90,0.08);"><i class="ph-duotone ph-clock" style="color:var(--gold);"></i></div><div><h5>GPU-hours Settled</h5><p>ResPool: 2.4h by agent-r1</p></div></div>
+          <div class="mc" style="border-left-color:var(--pine);"><div class="mc-icon" style="background:rgba(74,107,90,0.06);"><i class="ph-duotone ph-rocket-launch" style="color:var(--pine);"></i></div><div><h5>Deploy Success</h5><p>v0.9.1 live on 3 nodes</p></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Dark mode -->
+  <div class="dark-sec">
+    <h3>Dark Mode</h3>
+    <div class="g2">
+      <div class="dark-sidebar">
+        <div class="sb-label">Workspace</div>
+        <div class="dsb-item active"><i class="ph-thin ph-squares-four" style="color:rgba(255,255,255,0.9);"></i> feature-review</div>
+        <div class="dsb-item"><i class="ph-thin ph-chat-circle" style="color:rgba(255,255,255,0.35);"></i> general</div>
+        <div class="dsb-item"><i class="ph-thin ph-git-branch" style="color:rgba(255,255,255,0.35);"></i> ci-pipeline</div>
+      </div>
+      <div>
+        <div class="dark-mc" style="border-left-color:var(--vermillion);"><div class="mc-icon" style="background:rgba(201,64,64,0.12);"><i class="ph-duotone ph-warning" style="color:var(--vermillion);font-size:15px;"></i></div><div><h5>Escalation</h5><p>TL-C PTO timeout</p></div></div>
+        <div class="dark-mc" style="border-left-color:var(--celadon);"><div class="mc-icon" style="background:rgba(107,143,165,0.12);"><i class="ph-duotone ph-check-circle" style="color:var(--celadon);font-size:15px;"></i></div><div><h5>Review Done</h5><p>PR #427 approved</p></div></div>
+        <div class="dark-mc" style="border-left-color:var(--gold);"><div class="mc-icon" style="background:rgba(201,165,90,0.1);"><i class="ph-duotone ph-clock" style="color:var(--gold);font-size:15px;"></i></div><div><h5>GPU Settled</h5><p>2.4h consumed</p></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /tab-layout -->
+
+<!-- ========================================================
+     TAB 3: ILLUSTRATIONS & ASSETS
+     ======================================================== -->
+<div id="tab-assets" class="tab-panel">
+
+<section class="section">
+  <div class="sh"><span class="sh-num">05</span><div class="sh-group"><h2 class="sh-title">标识</h2><div class="sh-sub">Logo &amp; Brand Assets</div></div></div>
+  <p class="sh-desc">
+    EZAgent 标识采用极简几何风格，以 SVG 格式交付，确保任意尺寸下清晰锐利。
+  </p>
+
+  <div class="card">
+    <div class="card-hd"><h3>Logo</h3><span class="badge b-blue">SVG</span></div>
+    <div class="card-bd">
+      <div style="display:flex;gap:var(--sp-8);justify-content:center;align-items:end;flex-wrap:wrap;padding:var(--sp-8) 0;">
+        <div style="text-align:center;">
+          <div style="width:80px;height:80px;color:var(--ink);"><svg xmlns="http://www.w3.org/2000/svg" 
+     viewBox="0 0 1850 2000" 
+     fill="currentColor">
+  <title>ezagent logo</title>
+  <g transform="translate(0,2000) scale(0.1,-0.1)">
+    <path d="M9065 17474 c-157 -10 -393 -52 -538 -95 -39 -12 -128 -44 -197 -71 -358 -141 -693 -374 -940 -653 -235 -265 -401 -550 -510 -875 -80 -239 -109 -364 -138 -602 l-17 -143 0 -1820 0 -1820 753 -3 752 -2 0 1752 0 1753 15 105 c8 58 23 141 35 184 20 76 100 249 155 337 36 56 179 203 234 241 214 144 448 200 686 164 209 -31 349 -102 500 -251 107 -105 160 -180 225 -319 93 -199 120 -322 120 -554 l0 -152 753 2 752 3 -2 202 c-2 245 -26 435 -84 673 -50 200 -99 339 -189 527 -148 309 -336 560 -594 793 -236 212 -427 331 -741 464 -151 63 -382 122 -575 146 -95 11 -363 20 -455 14z"/>
+    <path d="M2770 10343 l0 -4043 1835 0 1835 0 0 780 0 780 -1082 2 -1083 3 -3 847 -2 848 2457 2 2458 3 0 780 0 780 -2457 3 -2458 2 0 845 0 845 1083 2 1082 3 0 780 0 779 -1832 1 -1833 0 0 -4042z"/>
+    <path d="M11748 14382 l-2268 -2 0 -780 0 -780 2255 0 c1240 0 2255 -4 2255 -8 0 -11 -90 -178 -240 -447 -107 -191 -202 -363 -312 -564 -16 -29 -50 -90 -75 -135 -25 -44 -82 -148 -128 -231 -45 -82 -125 -226 -177 -320 -263 -470 -329 -590 -392 -705 -38 -69 -101 -183 -141 -255 -40 -71 -123 -222 -186 -335 -62 -113 -144 -261 -182 -330 -38 -69 -91 -166 -118 -216 l-49 -91 0 -1441 0 -1442 1865 0 c1026 0 1868 -1 1873 -2 4 -2 8 349 10 780 l2 782 -1349 0 c-743 0 -1352 4 -1355 8 -2 4 14 41 38 82 47 83 121 217 213 385 33 61 75 137 93 170 59 107 381 697 443 810 33 61 76 139 97 175 20 36 44 79 52 95 8 17 39 75 70 130 30 55 88 161 128 235 40 74 105 194 145 265 96 173 122 220 190 350 32 61 66 121 75 135 9 14 79 140 155 280 126 234 194 356 341 620 62 112 141 259 151 280 4 8 21 40 38 70 18 30 56 100 85 155 29 55 61 112 71 127 11 14 19 28 19 30 0 3 27 54 61 114 34 60 87 159 119 219 31 61 71 133 89 161 l31 51 0 786 0 787 -862 2 c-475 2 -1883 2 -3130 0z"/>
+    <path d="M8512 13603 l3 -778 338 -3 c265 -2 337 0 339 10 1 7 2 358 2 780 l1 768 -343 0 -342 0 2 -777z"/>
+    <path d="M10200 9210 l0 -3350 -16 -92 c-29 -167 -122 -393 -201 -488 -193 -232 -407 -355 -666 -382 -305 -33 -581 71 -798 298 -156 164 -238 335 -274 576 l-15 98 0 1715 0 1715 -192 2 c-106 0 -445 1 -753 2 l-560 1 -3 -1725 c-2 -1179 1 -1766 8 -1855 26 -314 68 -503 174 -785 161 -426 488 -851 864 -1121 37 -26 83 -59 102 -73 105 -77 362 -200 542 -260 309 -103 510 -131 871 -123 251 6 370 20 554 68 160 41 286 89 461 176 301 149 536 329 768 589 227 253 441 637 520 931 71 266 71 269 102 452 l17 106 0 3435 0 3435 -752 3 -753 2 0 -3350z"/>
+    <path d="M8512 7083 l3 -778 703 -3 702 -2 0 780 0 780 -705 0 -705 0 2 -777z"/>
+  </g>
+</svg></div>
+          <div style="font-family:var(--font-code);font-size:0.6rem;color:var(--smoke);margin-top:var(--sp-2);">80px · 墨色</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:80px;height:80px;color:var(--vermillion);"><svg xmlns="http://www.w3.org/2000/svg" 
+     viewBox="0 0 1850 2000" 
+     fill="currentColor">
+  <title>ezagent logo</title>
+  <g transform="translate(0,2000) scale(0.1,-0.1)">
+    <path d="M9065 17474 c-157 -10 -393 -52 -538 -95 -39 -12 -128 -44 -197 -71 -358 -141 -693 -374 -940 -653 -235 -265 -401 -550 -510 -875 -80 -239 -109 -364 -138 -602 l-17 -143 0 -1820 0 -1820 753 -3 752 -2 0 1752 0 1753 15 105 c8 58 23 141 35 184 20 76 100 249 155 337 36 56 179 203 234 241 214 144 448 200 686 164 209 -31 349 -102 500 -251 107 -105 160 -180 225 -319 93 -199 120 -322 120 -554 l0 -152 753 2 752 3 -2 202 c-2 245 -26 435 -84 673 -50 200 -99 339 -189 527 -148 309 -336 560 -594 793 -236 212 -427 331 -741 464 -151 63 -382 122 -575 146 -95 11 -363 20 -455 14z"/>
+    <path d="M2770 10343 l0 -4043 1835 0 1835 0 0 780 0 780 -1082 2 -1083 3 -3 847 -2 848 2457 2 2458 3 0 780 0 780 -2457 3 -2458 2 0 845 0 845 1083 2 1082 3 0 780 0 779 -1832 1 -1833 0 0 -4042z"/>
+    <path d="M11748 14382 l-2268 -2 0 -780 0 -780 2255 0 c1240 0 2255 -4 2255 -8 0 -11 -90 -178 -240 -447 -107 -191 -202 -363 -312 -564 -16 -29 -50 -90 -75 -135 -25 -44 -82 -148 -128 -231 -45 -82 -125 -226 -177 -320 -263 -470 -329 -590 -392 -705 -38 -69 -101 -183 -141 -255 -40 -71 -123 -222 -186 -335 -62 -113 -144 -261 -182 -330 -38 -69 -91 -166 -118 -216 l-49 -91 0 -1441 0 -1442 1865 0 c1026 0 1868 -1 1873 -2 4 -2 8 349 10 780 l2 782 -1349 0 c-743 0 -1352 4 -1355 8 -2 4 14 41 38 82 47 83 121 217 213 385 33 61 75 137 93 170 59 107 381 697 443 810 33 61 76 139 97 175 20 36 44 79 52 95 8 17 39 75 70 130 30 55 88 161 128 235 40 74 105 194 145 265 96 173 122 220 190 350 32 61 66 121 75 135 9 14 79 140 155 280 126 234 194 356 341 620 62 112 141 259 151 280 4 8 21 40 38 70 18 30 56 100 85 155 29 55 61 112 71 127 11 14 19 28 19 30 0 3 27 54 61 114 34 60 87 159 119 219 31 61 71 133 89 161 l31 51 0 786 0 787 -862 2 c-475 2 -1883 2 -3130 0z"/>
+    <path d="M8512 13603 l3 -778 338 -3 c265 -2 337 0 339 10 1 7 2 358 2 780 l1 768 -343 0 -342 0 2 -777z"/>
+    <path d="M10200 9210 l0 -3350 -16 -92 c-29 -167 -122 -393 -201 -488 -193 -232 -407 -355 -666 -382 -305 -33 -581 71 -798 298 -156 164 -238 335 -274 576 l-15 98 0 1715 0 1715 -192 2 c-106 0 -445 1 -753 2 l-560 1 -3 -1725 c-2 -1179 1 -1766 8 -1855 26 -314 68 -503 174 -785 161 -426 488 -851 864 -1121 37 -26 83 -59 102 -73 105 -77 362 -200 542 -260 309 -103 510 -131 871 -123 251 6 370 20 554 68 160 41 286 89 461 176 301 149 536 329 768 589 227 253 441 637 520 931 71 266 71 269 102 452 l17 106 0 3435 0 3435 -752 3 -753 2 0 -3350z"/>
+    <path d="M8512 7083 l3 -778 703 -3 702 -2 0 780 0 780 -705 0 -705 0 2 -777z"/>
+  </g>
+</svg></div>
+          <div style="font-family:var(--font-code);font-size:0.6rem;color:var(--smoke);margin-top:var(--sp-2);">80px · 朱印</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:32px;height:32px;color:var(--ink);"><svg xmlns="http://www.w3.org/2000/svg" 
+     viewBox="0 0 1850 2000" 
+     fill="currentColor">
+  <title>ezagent logo</title>
+  <g transform="translate(0,2000) scale(0.1,-0.1)">
+    <path d="M9065 17474 c-157 -10 -393 -52 -538 -95 -39 -12 -128 -44 -197 -71 -358 -141 -693 -374 -940 -653 -235 -265 -401 -550 -510 -875 -80 -239 -109 -364 -138 -602 l-17 -143 0 -1820 0 -1820 753 -3 752 -2 0 1752 0 1753 15 105 c8 58 23 141 35 184 20 76 100 249 155 337 36 56 179 203 234 241 214 144 448 200 686 164 209 -31 349 -102 500 -251 107 -105 160 -180 225 -319 93 -199 120 -322 120 -554 l0 -152 753 2 752 3 -2 202 c-2 245 -26 435 -84 673 -50 200 -99 339 -189 527 -148 309 -336 560 -594 793 -236 212 -427 331 -741 464 -151 63 -382 122 -575 146 -95 11 -363 20 -455 14z"/>
+    <path d="M2770 10343 l0 -4043 1835 0 1835 0 0 780 0 780 -1082 2 -1083 3 -3 847 -2 848 2457 2 2458 3 0 780 0 780 -2457 3 -2458 2 0 845 0 845 1083 2 1082 3 0 780 0 779 -1832 1 -1833 0 0 -4042z"/>
+    <path d="M11748 14382 l-2268 -2 0 -780 0 -780 2255 0 c1240 0 2255 -4 2255 -8 0 -11 -90 -178 -240 -447 -107 -191 -202 -363 -312 -564 -16 -29 -50 -90 -75 -135 -25 -44 -82 -148 -128 -231 -45 -82 -125 -226 -177 -320 -263 -470 -329 -590 -392 -705 -38 -69 -101 -183 -141 -255 -40 -71 -123 -222 -186 -335 -62 -113 -144 -261 -182 -330 -38 -69 -91 -166 -118 -216 l-49 -91 0 -1441 0 -1442 1865 0 c1026 0 1868 -1 1873 -2 4 -2 8 349 10 780 l2 782 -1349 0 c-743 0 -1352 4 -1355 8 -2 4 14 41 38 82 47 83 121 217 213 385 33 61 75 137 93 170 59 107 381 697 443 810 33 61 76 139 97 175 20 36 44 79 52 95 8 17 39 75 70 130 30 55 88 161 128 235 40 74 105 194 145 265 96 173 122 220 190 350 32 61 66 121 75 135 9 14 79 140 155 280 126 234 194 356 341 620 62 112 141 259 151 280 4 8 21 40 38 70 18 30 56 100 85 155 29 55 61 112 71 127 11 14 19 28 19 30 0 3 27 54 61 114 34 60 87 159 119 219 31 61 71 133 89 161 l31 51 0 786 0 787 -862 2 c-475 2 -1883 2 -3130 0z"/>
+    <path d="M8512 13603 l3 -778 338 -3 c265 -2 337 0 339 10 1 7 2 358 2 780 l1 768 -343 0 -342 0 2 -777z"/>
+    <path d="M10200 9210 l0 -3350 -16 -92 c-29 -167 -122 -393 -201 -488 -193 -232 -407 -355 -666 -382 -305 -33 -581 71 -798 298 -156 164 -238 335 -274 576 l-15 98 0 1715 0 1715 -192 2 c-106 0 -445 1 -753 2 l-560 1 -3 -1725 c-2 -1179 1 -1766 8 -1855 26 -314 68 -503 174 -785 161 -426 488 -851 864 -1121 37 -26 83 -59 102 -73 105 -77 362 -200 542 -260 309 -103 510 -131 871 -123 251 6 370 20 554 68 160 41 286 89 461 176 301 149 536 329 768 589 227 253 441 637 520 931 71 266 71 269 102 452 l17 106 0 3435 0 3435 -752 3 -753 2 0 -3350z"/>
+    <path d="M8512 7083 l3 -778 703 -3 702 -2 0 780 0 780 -705 0 -705 0 2 -777z"/>
+  </g>
+</svg></div>
+          <div style="font-family:var(--font-code);font-size:0.6rem;color:var(--smoke);margin-top:var(--sp-2);">32px</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:16px;height:16px;color:var(--ink);"><svg xmlns="http://www.w3.org/2000/svg" 
+     viewBox="0 0 1850 2000" 
+     fill="currentColor">
+  <title>ezagent logo</title>
+  <g transform="translate(0,2000) scale(0.1,-0.1)">
+    <path d="M9065 17474 c-157 -10 -393 -52 -538 -95 -39 -12 -128 -44 -197 -71 -358 -141 -693 -374 -940 -653 -235 -265 -401 -550 -510 -875 -80 -239 -109 -364 -138 -602 l-17 -143 0 -1820 0 -1820 753 -3 752 -2 0 1752 0 1753 15 105 c8 58 23 141 35 184 20 76 100 249 155 337 36 56 179 203 234 241 214 144 448 200 686 164 209 -31 349 -102 500 -251 107 -105 160 -180 225 -319 93 -199 120 -322 120 -554 l0 -152 753 2 752 3 -2 202 c-2 245 -26 435 -84 673 -50 200 -99 339 -189 527 -148 309 -336 560 -594 793 -236 212 -427 331 -741 464 -151 63 -382 122 -575 146 -95 11 -363 20 -455 14z"/>
+    <path d="M2770 10343 l0 -4043 1835 0 1835 0 0 780 0 780 -1082 2 -1083 3 -3 847 -2 848 2457 2 2458 3 0 780 0 780 -2457 3 -2458 2 0 845 0 845 1083 2 1082 3 0 780 0 779 -1832 1 -1833 0 0 -4042z"/>
+    <path d="M11748 14382 l-2268 -2 0 -780 0 -780 2255 0 c1240 0 2255 -4 2255 -8 0 -11 -90 -178 -240 -447 -107 -191 -202 -363 -312 -564 -16 -29 -50 -90 -75 -135 -25 -44 -82 -148 -128 -231 -45 -82 -125 -226 -177 -320 -263 -470 -329 -590 -392 -705 -38 -69 -101 -183 -141 -255 -40 -71 -123 -222 -186 -335 -62 -113 -144 -261 -182 -330 -38 -69 -91 -166 -118 -216 l-49 -91 0 -1441 0 -1442 1865 0 c1026 0 1868 -1 1873 -2 4 -2 8 349 10 780 l2 782 -1349 0 c-743 0 -1352 4 -1355 8 -2 4 14 41 38 82 47 83 121 217 213 385 33 61 75 137 93 170 59 107 381 697 443 810 33 61 76 139 97 175 20 36 44 79 52 95 8 17 39 75 70 130 30 55 88 161 128 235 40 74 105 194 145 265 96 173 122 220 190 350 32 61 66 121 75 135 9 14 79 140 155 280 126 234 194 356 341 620 62 112 141 259 151 280 4 8 21 40 38 70 18 30 56 100 85 155 29 55 61 112 71 127 11 14 19 28 19 30 0 3 27 54 61 114 34 60 87 159 119 219 31 61 71 133 89 161 l31 51 0 786 0 787 -862 2 c-475 2 -1883 2 -3130 0z"/>
+    <path d="M8512 13603 l3 -778 338 -3 c265 -2 337 0 339 10 1 7 2 358 2 780 l1 768 -343 0 -342 0 2 -777z"/>
+    <path d="M10200 9210 l0 -3350 -16 -92 c-29 -167 -122 -393 -201 -488 -193 -232 -407 -355 -666 -382 -305 -33 -581 71 -798 298 -156 164 -238 335 -274 576 l-15 98 0 1715 0 1715 -192 2 c-106 0 -445 1 -753 2 l-560 1 -3 -1725 c-2 -1179 1 -1766 8 -1855 26 -314 68 -503 174 -785 161 -426 488 -851 864 -1121 37 -26 83 -59 102 -73 105 -77 362 -200 542 -260 309 -103 510 -131 871 -123 251 6 370 20 554 68 160 41 286 89 461 176 301 149 536 329 768 589 227 253 441 637 520 931 71 266 71 269 102 452 l17 106 0 3435 0 3435 -752 3 -753 2 0 -3350z"/>
+    <path d="M8512 7083 l3 -778 703 -3 702 -2 0 780 0 780 -705 0 -705 0 2 -777z"/>
+  </g>
+</svg></div>
+          <div style="font-family:var(--font-code);font-size:0.6rem;color:var(--smoke);margin-top:var(--sp-2);">16px</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:var(--sp-8);justify-content:center;align-items:end;flex-wrap:wrap;padding:var(--sp-6);background:var(--surface-inv);border-radius:var(--radius-md);margin-top:var(--sp-4);">
+        <div style="text-align:center;">
+          <div style="width:80px;height:80px;color:#ffffff;"><svg xmlns="http://www.w3.org/2000/svg" 
+     viewBox="0 0 1850 2000" 
+     fill="currentColor">
+  <title>ezagent logo</title>
+  <g transform="translate(0,2000) scale(0.1,-0.1)">
+    <path d="M9065 17474 c-157 -10 -393 -52 -538 -95 -39 -12 -128 -44 -197 -71 -358 -141 -693 -374 -940 -653 -235 -265 -401 -550 -510 -875 -80 -239 -109 -364 -138 -602 l-17 -143 0 -1820 0 -1820 753 -3 752 -2 0 1752 0 1753 15 105 c8 58 23 141 35 184 20 76 100 249 155 337 36 56 179 203 234 241 214 144 448 200 686 164 209 -31 349 -102 500 -251 107 -105 160 -180 225 -319 93 -199 120 -322 120 -554 l0 -152 753 2 752 3 -2 202 c-2 245 -26 435 -84 673 -50 200 -99 339 -189 527 -148 309 -336 560 -594 793 -236 212 -427 331 -741 464 -151 63 -382 122 -575 146 -95 11 -363 20 -455 14z"/>
+    <path d="M2770 10343 l0 -4043 1835 0 1835 0 0 780 0 780 -1082 2 -1083 3 -3 847 -2 848 2457 2 2458 3 0 780 0 780 -2457 3 -2458 2 0 845 0 845 1083 2 1082 3 0 780 0 779 -1832 1 -1833 0 0 -4042z"/>
+    <path d="M11748 14382 l-2268 -2 0 -780 0 -780 2255 0 c1240 0 2255 -4 2255 -8 0 -11 -90 -178 -240 -447 -107 -191 -202 -363 -312 -564 -16 -29 -50 -90 -75 -135 -25 -44 -82 -148 -128 -231 -45 -82 -125 -226 -177 -320 -263 -470 -329 -590 -392 -705 -38 -69 -101 -183 -141 -255 -40 -71 -123 -222 -186 -335 -62 -113 -144 -261 -182 -330 -38 -69 -91 -166 -118 -216 l-49 -91 0 -1441 0 -1442 1865 0 c1026 0 1868 -1 1873 -2 4 -2 8 349 10 780 l2 782 -1349 0 c-743 0 -1352 4 -1355 8 -2 4 14 41 38 82 47 83 121 217 213 385 33 61 75 137 93 170 59 107 381 697 443 810 33 61 76 139 97 175 20 36 44 79 52 95 8 17 39 75 70 130 30 55 88 161 128 235 40 74 105 194 145 265 96 173 122 220 190 350 32 61 66 121 75 135 9 14 79 140 155 280 126 234 194 356 341 620 62 112 141 259 151 280 4 8 21 40 38 70 18 30 56 100 85 155 29 55 61 112 71 127 11 14 19 28 19 30 0 3 27 54 61 114 34 60 87 159 119 219 31 61 71 133 89 161 l31 51 0 786 0 787 -862 2 c-475 2 -1883 2 -3130 0z"/>
+    <path d="M8512 13603 l3 -778 338 -3 c265 -2 337 0 339 10 1 7 2 358 2 780 l1 768 -343 0 -342 0 2 -777z"/>
+    <path d="M10200 9210 l0 -3350 -16 -92 c-29 -167 -122 -393 -201 -488 -193 -232 -407 -355 -666 -382 -305 -33 -581 71 -798 298 -156 164 -238 335 -274 576 l-15 98 0 1715 0 1715 -192 2 c-106 0 -445 1 -753 2 l-560 1 -3 -1725 c-2 -1179 1 -1766 8 -1855 26 -314 68 -503 174 -785 161 -426 488 -851 864 -1121 37 -26 83 -59 102 -73 105 -77 362 -200 542 -260 309 -103 510 -131 871 -123 251 6 370 20 554 68 160 41 286 89 461 176 301 149 536 329 768 589 227 253 441 637 520 931 71 266 71 269 102 452 l17 106 0 3435 0 3435 -752 3 -753 2 0 -3350z"/>
+    <path d="M8512 7083 l3 -778 703 -3 702 -2 0 780 0 780 -705 0 -705 0 2 -777z"/>
+  </g>
+</svg></div>
+          <div style="font-family:var(--font-code);font-size:0.6rem;color:rgba(255,255,255,0.5);margin-top:var(--sp-2);">Dark bg · 白色</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:80px;height:80px;color:var(--gold);"><svg xmlns="http://www.w3.org/2000/svg" 
+     viewBox="0 0 1850 2000" 
+     fill="currentColor">
+  <title>ezagent logo</title>
+  <g transform="translate(0,2000) scale(0.1,-0.1)">
+    <path d="M9065 17474 c-157 -10 -393 -52 -538 -95 -39 -12 -128 -44 -197 -71 -358 -141 -693 -374 -940 -653 -235 -265 -401 -550 -510 -875 -80 -239 -109 -364 -138 -602 l-17 -143 0 -1820 0 -1820 753 -3 752 -2 0 1752 0 1753 15 105 c8 58 23 141 35 184 20 76 100 249 155 337 36 56 179 203 234 241 214 144 448 200 686 164 209 -31 349 -102 500 -251 107 -105 160 -180 225 -319 93 -199 120 -322 120 -554 l0 -152 753 2 752 3 -2 202 c-2 245 -26 435 -84 673 -50 200 -99 339 -189 527 -148 309 -336 560 -594 793 -236 212 -427 331 -741 464 -151 63 -382 122 -575 146 -95 11 -363 20 -455 14z"/>
+    <path d="M2770 10343 l0 -4043 1835 0 1835 0 0 780 0 780 -1082 2 -1083 3 -3 847 -2 848 2457 2 2458 3 0 780 0 780 -2457 3 -2458 2 0 845 0 845 1083 2 1082 3 0 780 0 779 -1832 1 -1833 0 0 -4042z"/>
+    <path d="M11748 14382 l-2268 -2 0 -780 0 -780 2255 0 c1240 0 2255 -4 2255 -8 0 -11 -90 -178 -240 -447 -107 -191 -202 -363 -312 -564 -16 -29 -50 -90 -75 -135 -25 -44 -82 -148 -128 -231 -45 -82 -125 -226 -177 -320 -263 -470 -329 -590 -392 -705 -38 -69 -101 -183 -141 -255 -40 -71 -123 -222 -186 -335 -62 -113 -144 -261 -182 -330 -38 -69 -91 -166 -118 -216 l-49 -91 0 -1441 0 -1442 1865 0 c1026 0 1868 -1 1873 -2 4 -2 8 349 10 780 l2 782 -1349 0 c-743 0 -1352 4 -1355 8 -2 4 14 41 38 82 47 83 121 217 213 385 33 61 75 137 93 170 59 107 381 697 443 810 33 61 76 139 97 175 20 36 44 79 52 95 8 17 39 75 70 130 30 55 88 161 128 235 40 74 105 194 145 265 96 173 122 220 190 350 32 61 66 121 75 135 9 14 79 140 155 280 126 234 194 356 341 620 62 112 141 259 151 280 4 8 21 40 38 70 18 30 56 100 85 155 29 55 61 112 71 127 11 14 19 28 19 30 0 3 27 54 61 114 34 60 87 159 119 219 31 61 71 133 89 161 l31 51 0 786 0 787 -862 2 c-475 2 -1883 2 -3130 0z"/>
+    <path d="M8512 13603 l3 -778 338 -3 c265 -2 337 0 339 10 1 7 2 358 2 780 l1 768 -343 0 -342 0 2 -777z"/>
+    <path d="M10200 9210 l0 -3350 -16 -92 c-29 -167 -122 -393 -201 -488 -193 -232 -407 -355 -666 -382 -305 -33 -581 71 -798 298 -156 164 -238 335 -274 576 l-15 98 0 1715 0 1715 -192 2 c-106 0 -445 1 -753 2 l-560 1 -3 -1725 c-2 -1179 1 -1766 8 -1855 26 -314 68 -503 174 -785 161 -426 488 -851 864 -1121 37 -26 83 -59 102 -73 105 -77 362 -200 542 -260 309 -103 510 -131 871 -123 251 6 370 20 554 68 160 41 286 89 461 176 301 149 536 329 768 589 227 253 441 637 520 931 71 266 71 269 102 452 l17 106 0 3435 0 3435 -752 3 -753 2 0 -3350z"/>
+    <path d="M8512 7083 l3 -778 703 -3 702 -2 0 780 0 780 -705 0 -705 0 2 -777z"/>
+  </g>
+</svg></div>
+          <div style="font-family:var(--font-code);font-size:0.6rem;color:rgba(255,255,255,0.5);margin-top:var(--sp-2);">Dark bg · 琉璃金</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="border-left:3px solid var(--gold);">
+    <div class="card-bd">
+      <div style="font-size:0.88rem;font-weight:600;margin-bottom:var(--sp-3);">使用规则</div>
+      <div class="note" style="margin-bottom:0;">
+        <strong>Logo</strong> &mdash; 日常用墨色 (#2c3340)，品牌场景可选朱印 (#c94040)，暗色背景用白色或琉璃金。最小尺寸 16px<br>
+        <strong>Pattern</strong> &mdash; 仅 hero 区和 footer，opacity &le; 6%，dark mode 下 opacity 降到 3%<br>
+        <strong>插画风格</strong> &mdash; 简洁扁平等距向量图，墨灰/天青/琉璃金配色，大量留白，构图松弛
+      </div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /tab-assets -->
+
+<!-- ========================================================
+     TAB 4: FOUNDATION SUPPLEMENT (S1-S6)
+     ======================================================== -->
+<div id="tab-foundation" class="tab-panel">
+
+<!-- S1 MOTION -->
+<section class="section">
+  <div class="sh"><span class="sh-num">S1</span><div class="sh-group"><h2 class="sh-title">动效规范</h2><div class="sh-sub">Motion &amp; Timing</div></div></div>
+  <p class="sh-desc">动效遵循"感知到但不注意到"原则——快速、克制、有目的。所有时间和曲线通过 CSS variables 统一管理。</p>
+
+  <div class="card">
+    <div class="card-hd"><h3>Easing Curves</h3></div>
+    <div class="card-bd">
+      <div class="note">三条核心曲线覆盖 95% 场景。hover 鼠标体验：</div>
+      <div class="motion-demo">
+        <div><div class="motion-box ease-out">ease-out</div><div class="motion-label">进入/出现</div></div>
+        <div><div class="motion-box ease-in-out">in-out</div><div class="motion-label">位移/变形</div></div>
+        <div><div class="motion-box ease-spring">spring</div><div class="motion-label">弹性/强调</div></div>
+        <div><div class="motion-box ease-slow">slow</div><div class="motion-label">页面级切换</div></div>
+      </div>
+      <table>
+        <thead><tr><th>Token</th><th>Value</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>--ease-out</code></td><td><code>cubic-bezier(0, 0, 0.2, 1)</code></td><td>元素进入/出现（fade in, slide in, scale up）</td></tr>
+          <tr><td><code>--ease-in-out</code></td><td><code>cubic-bezier(0.4, 0, 0.2, 1)</code></td><td>位移/变形（sidebar expand, panel resize）</td></tr>
+          <tr><td><code>--ease-spring</code></td><td><code>cubic-bezier(0.34, 1.56, 0.64, 1)</code></td><td>强调/弹性（toast bounce, button press）</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>Duration 梯度</h3></div>
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>Token</th><th>Value</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>--dur-instant</code></td><td><code>75ms</code></td><td>状态切换（checkbox, toggle, color change）</td></tr>
+          <tr><td><code>--dur-fast</code></td><td><code>150ms</code></td><td>Hover/focus 反馈、tooltip、小元素 fade</td></tr>
+          <tr><td><code>--dur-normal</code></td><td><code>200ms</code></td><td>Dropdown 展开、卡片 hover lift</td></tr>
+          <tr><td><code>--dur-slow</code></td><td><code>300ms</code></td><td>Modal/Sheet 进出、侧边栏展开/收起</td></tr>
+          <tr><td><code>--dur-page</code></td><td><code>500ms</code></td><td>页面级过渡、大面积布局变化</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>动效模式 Patterns</h3></div>
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>Pattern</th><th>配方</th><th>场景</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Fade In</strong></td><td><code>opacity 0→1, dur-fast, ease-out</code></td><td>Toast、Tooltip、Dropdown</td></tr>
+          <tr><td><strong>Slide Up</strong></td><td><code>translateY(8px→0) + fade, dur-normal, ease-out</code></td><td>卡片入场、列表 stagger (50ms/item)</td></tr>
+          <tr><td><strong>Scale In</strong></td><td><code>scale(0.95→1) + fade, dur-normal, ease-out</code></td><td>Modal、Popover、Context menu</td></tr>
+          <tr><td><strong>Slide Right</strong></td><td><code>translateX(-100%→0), dur-slow, ease-in-out</code></td><td>侧边栏展开、Sheet 入场</td></tr>
+          <tr><td><strong>Hover Lift</strong></td><td><code>translateY(-2px) + shadow-lg, dur-fast, ease-out</code></td><td>可交互卡片 hover</td></tr>
+          <tr><td><strong>Press</strong></td><td><code>scale(0.97), dur-instant, ease-spring</code></td><td>Button :active</td></tr>
+          <tr><td><strong>Skeleton Pulse</strong></td><td><code>opacity 0.4↔0.7, 1.5s infinite, ease-in-out</code></td><td>骨架屏加载态</td></tr>
+          <tr><td><strong>Stagger</strong></td><td><code>Slide Up × n, delay: n × 50ms, max 5</code></td><td>列表/网格批量入场</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>Reduce Motion</h3></div>
+    <div class="card-bd">
+      <div class="codeblock" style="margin-bottom:0;">
+<span class="cm">/* 尊重系统级辅助功能设置 */</span>
+<span class="kw">@media</span> (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: <span class="vl">0.01ms</span> !important;
+    animation-iteration-count: <span class="vl">1</span> !important;
+    transition-duration: <span class="vl">0.01ms</span> !important;
+  }
+}
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- S2 BREAKPOINTS -->
+<section class="section">
+  <div class="sh"><span class="sh-num">S2</span><div class="sh-group"><h2 class="sh-title">响应式断点</h2><div class="sh-sub">Breakpoints &amp; Grid</div></div></div>
+  <p class="sh-desc">Mobile-first 断点体系，与 Tailwind 默认值对齐。</p>
+
+  <div class="bp-bar">
+    <div class="bp-seg" style="flex:375;background:rgba(201,64,64,0.06);color:var(--vermillion);">sm<br>0–639</div>
+    <div class="bp-seg" style="flex:128;background:rgba(107,143,165,0.06);color:var(--celadon);">md<br>640–767</div>
+    <div class="bp-seg" style="flex:256;background:rgba(201,165,90,0.06);color:var(--gold);">lg<br>768–1023</div>
+    <div class="bp-seg" style="flex:256;background:rgba(74,107,90,0.06);color:var(--pine);">xl<br>1024–1279</div>
+    <div class="bp-seg" style="flex:200;background:var(--bg-alt);color:var(--smoke);">2xl<br>1280+</div>
+  </div>
+
+  <div class="card">
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>Token</th><th>Min-width</th><th>Container</th><th>Columns</th><th>Gutter</th><th>Padding</th></tr></thead>
+        <tbody>
+          <tr><td><code>sm</code></td><td>0</td><td>100%</td><td>4</td><td>16px</td><td>16px</td></tr>
+          <tr><td><code>md</code></td><td>640px</td><td>100%</td><td>8</td><td>24px</td><td>24px</td></tr>
+          <tr><td><code>lg</code></td><td>768px</td><td>100%</td><td>12</td><td>24px</td><td>32px</td></tr>
+          <tr><td><code>xl</code></td><td>1024px</td><td>1080px</td><td>12</td><td>24px</td><td>auto</td></tr>
+          <tr><td><code>2xl</code></td><td>1280px</td><td>1080px</td><td>12</td><td>24px</td><td>auto</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>布局行为规则</h3></div>
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>元素</th><th>sm (手机)</th><th>md (平板竖)</th><th>lg (平板横)</th><th>xl+ (桌面)</th></tr></thead>
+        <tbody>
+          <tr><td><strong>侧边栏</strong></td><td>Drawer 呼出</td><td>Drawer 呼出</td><td>收起态 64px</td><td>展开态 240px</td></tr>
+          <tr><td><strong>内容网格</strong></td><td>单栏</td><td>双栏</td><td>双栏</td><td>三栏</td></tr>
+          <tr><td><strong>Section 间距</strong></td><td>48px</td><td>64px</td><td>64px</td><td>96px</td></tr>
+          <tr><td><strong>卡片网格</strong></td><td>单栏</td><td>2 列</td><td>2 列</td><td>3 列</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- S3 MOBILE -->
+<section class="section">
+  <div class="sh"><span class="sh-num">S3</span><div class="sh-group"><h2 class="sh-title">移动端基础适配</h2><div class="sh-sub">Mobile Foundations</div></div></div>
+  <p class="sh-desc">适用于所有移动端组件的底层约束：尺寸下限、字号调整、安全区域。</p>
+
+  <div class="card">
+    <div class="card-hd"><h3>Touch Target 最小尺寸</h3></div>
+    <div class="card-bd">
+      <div class="note">遵循 WCAG 2.2 / Apple HIG：<strong>所有可交互元素点击区域 ≥ 44×44px</strong>。视觉可以更小，通过 padding 或伪元素扩展热区。</div>
+      <table>
+        <thead><tr><th>元素</th><th>视觉尺寸</th><th>点击区域</th><th>实现</th></tr></thead>
+        <tbody>
+          <tr><td>Button</td><td>36px height</td><td>44×44px</td><td>padding 扩展</td></tr>
+          <tr><td>Icon Button</td><td>32×32px</td><td>44×44px</td><td>::after 伪元素</td></tr>
+          <tr><td>List Item</td><td>44px height</td><td>全行可点击</td><td>padding: 10px 16px</td></tr>
+          <tr><td>链接间距</td><td>—</td><td>上下 ≥ 8px</td><td>margin/padding</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>移动端字号调整</h3></div>
+    <div class="card-bd">
+      <div class="note">移动端 (sm) 相对桌面整体缩小一档，body text 不变。最小字号<strong>不低于 12px</strong>。</div>
+      <table>
+        <thead><tr><th>层级</th><th>Desktop</th><th>Mobile</th><th>差异</th></tr></thead>
+        <tbody>
+          <tr><td>Display</td><td>36-48px</td><td>28-36px</td><td>-20%</td></tr>
+          <tr><td>H1</td><td>24-28px</td><td>22-24px</td><td>-12%</td></tr>
+          <tr><td>Body</td><td>15-16px</td><td>15-16px</td><td><strong>不变</strong></td></tr>
+          <tr><td>Caption</td><td>12-13px</td><td>12px</td><td>下限</td></tr>
+        </tbody>
+      </table>
+      <div class="codeblock" style="margin-top:var(--sp-4);margin-bottom:0;">
+<span class="cm">/* clamp 实现平滑缩放 */</span>
+.display { font-size: <span class="vl">clamp(1.75rem, 4vw, 3rem)</span>; }
+.h1      { font-size: <span class="vl">clamp(1.375rem, 2.5vw, 1.75rem)</span>; }
+.body    { font-size: <span class="vl">0.9375rem</span>; }  <span class="cm">/* 15px 固定 */</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>Safe Area 适配</h3></div>
+    <div class="card-bd">
+      <div class="codeblock" style="margin-bottom:0;">
+<span class="cm">/* 底部固定元素 */</span>
+.bottom-fixed {
+  padding-bottom: <span class="vl">calc(var(--sp-3) + env(safe-area-inset-bottom))</span>;
+}
+
+<span class="cm">/* 必须在 HTML meta 中启用 */</span>
+&lt;meta name="viewport" content="..., <span class="st">viewport-fit=cover</span>"&gt;
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- S4 FOCUS / A11Y -->
+<section class="section">
+  <div class="sh"><span class="sh-num">S4</span><div class="sh-group"><h2 class="sh-title">Focus &amp; Accessibility</h2><div class="sh-sub">键盘导航 · 状态 · 对比度</div></div></div>
+
+  <div class="card">
+    <div class="card-hd"><h3>Focus Ring</h3></div>
+    <div class="card-bd">
+      <div class="note">使用 <code>:focus-visible</code>——仅键盘导航显示。颜色统一<strong>天青 celadon</strong>，2px 宽度，2px offset。</div>
+      <div class="focus-demo">
+        <button class="focus-box" tabindex="0">Tab 到此处</button>
+        <button class="focus-box" tabindex="0">再 Tab</button>
+        <button class="focus-box" tabindex="0">继续 Tab</button>
+      </div>
+      <div class="codeblock" style="margin-bottom:0;">
+:focus-visible {
+  outline: <span class="vl">2px solid var(--celadon)</span>;
+  outline-offset: <span class="vl">2px</span>;
+}
+input:focus-visible, textarea:focus-visible {
+  outline: <span class="vl">none</span>;
+  box-shadow: <span class="vl">0 0 0 2px var(--celadon)</span>;
+  border-color: <span class="vl">var(--celadon)</span>;
+}
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>交互状态</h3></div>
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>状态</th><th>视觉变化</th><th>Transition</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Default</strong></td><td>基础样式</td><td>—</td></tr>
+          <tr><td><strong>Hover</strong></td><td>背景色加深 / translateY(-2px)</td><td>dur-fast, ease-out</td></tr>
+          <tr><td><strong>Focus-visible</strong></td><td>天青 outline 2px, offset 2px</td><td>dur-instant</td></tr>
+          <tr><td><strong>Active</strong></td><td>scale(0.97) / 背景进一步加深</td><td>dur-instant, ease-spring</td></tr>
+          <tr><td><strong>Disabled</strong></td><td>opacity: 0.4 / cursor: not-allowed</td><td>—</td></tr>
+          <tr><td><strong>Loading</strong></td><td>opacity: 0.7 / spinner / cursor: wait</td><td>—</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>WCAG 2.1 AA 对比度</h3></div>
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>组合</th><th>对比度</th><th>结果</th></tr></thead>
+        <tbody>
+          <tr><td>Ink #2c3340 on White</td><td>12.5:1</td><td style="color:var(--pine);">✓ AAA</td></tr>
+          <tr><td>Light Ink #3d4a5c on White</td><td>8.2:1</td><td style="color:var(--pine);">✓ AAA</td></tr>
+          <tr><td>Smoke #787774 on White</td><td>4.6:1</td><td style="color:var(--pine);">✓ AA</td></tr>
+          <tr><td>Vermillion #c94040 on White</td><td>4.6:1</td><td style="color:var(--pine);">✓ AA</td></tr>
+          <tr><td>Celadon #6b8fa5 on White</td><td>3.6:1</td><td style="color:var(--amber);">⚠ ≥18px bold only</td></tr>
+          <tr><td>Deep Sky #4a6e82 on White</td><td>5.1:1</td><td style="color:var(--pine);">✓ AA — celadon 小字替代</td></tr>
+          <tr><td>White on Ink #2c3340</td><td>12.5:1</td><td style="color:var(--pine);">✓ AAA</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- S5 Z-INDEX -->
+<section class="section">
+  <div class="sh"><span class="sh-num">S5</span><div class="sh-group"><h2 class="sh-title">Z-index 层叠体系</h2><div class="sh-sub">Stacking Layers</div></div></div>
+
+  <div class="z-stack">
+    <div class="z-layer" style="top:170px;left:0;right:0;height:40px;background:var(--bg);border:1px solid var(--border);z-index:1;color:var(--smoke);"><i class="ph-thin ph-stack" style="font-size:14px;"></i> z-base: 0</div>
+    <div class="z-layer" style="top:130px;left:16px;width:180px;height:40px;background:var(--bg);border:1px solid var(--border);z-index:2;color:var(--smoke);"><i class="ph-thin ph-sidebar" style="font-size:14px;"></i> z-sticky: 100</div>
+    <div class="z-layer" style="top:90px;left:40px;width:200px;height:40px;background:var(--bg);border:1px solid var(--celadon);z-index:3;color:var(--celadon);"><i class="ph-thin ph-list" style="font-size:14px;"></i> z-dropdown: 200</div>
+    <div class="z-layer" style="top:50px;left:64px;width:240px;height:40px;background:rgba(44,51,64,0.6);z-index:4;color:rgba(255,255,255,0.9);"><i class="ph-thin ph-x-circle" style="font-size:14px;"></i> z-overlay: 300</div>
+    <div class="z-layer" style="top:10px;left:88px;width:260px;height:40px;background:var(--bg);border:1px solid var(--celadon);z-index:5;color:var(--ink);"><i class="ph-thin ph-browser" style="font-size:14px;"></i> z-modal: 400</div>
+    <div class="z-layer" style="top:10px;right:16px;width:180px;height:32px;background:var(--surface-inv);z-index:6;color:var(--gold);font-size:0.6rem;"><i class="ph-duotone ph-bell" style="font-size:14px;"></i> z-toast: 500</div>
+  </div>
+
+  <div class="card">
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>Token</th><th>Value</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><code>--z-base</code></td><td>0</td><td>常规页面内容</td></tr>
+          <tr><td><code>--z-sticky</code></td><td>100</td><td>Sticky 顶栏, 侧边栏, Tab Bar</td></tr>
+          <tr><td><code>--z-dropdown</code></td><td>200</td><td>Dropdown, Popover, Tooltip</td></tr>
+          <tr><td><code>--z-overlay</code></td><td>300</td><td>Modal/Sheet 背景蒙层</td></tr>
+          <tr><td><code>--z-modal</code></td><td>400</td><td>Modal/Dialog 内容</td></tr>
+          <tr><td><code>--z-toast</code></td><td>500</td><td>Toast, Snackbar (最顶层)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- S6 DARK MODE TOKENS -->
+<section class="section">
+  <div class="sh"><span class="sh-num">S6</span><div class="sh-group"><h2 class="sh-title">Dark Mode Token 映射</h2><div class="sh-sub">Light ↔ Dark Token System</div></div></div>
+  <p class="sh-desc">语义色（朱印/天青/琉璃金/松绿）dark mode 下保持不变，仅调整中性色。切换用 <code>dur-slow</code> 过渡。</p>
+
+  <div class="card">
+    <div class="card-hd"><h3>中性色映射</h3><span class="badge b-blue">Background / Text / Border</span></div>
+    <div class="card-bd">
+      <div class="token-pair"><div class="token-light"><div class="token-dot" style="background:#ffffff;"></div><div><div>--bg</div><div class="token-name">#ffffff</div></div></div><div class="token-dark"><div class="token-dot" style="background:#1e2128;border-color:rgba(255,255,255,0.1);"></div><div><div>--bg</div><div class="token-name">#1e2128</div></div></div></div>
+      <div class="token-pair"><div class="token-light"><div class="token-dot" style="background:#f7f7f5;"></div><div><div>--bg-alt</div><div class="token-name">#f7f7f5</div></div></div><div class="token-dark"><div class="token-dot" style="background:#15181e;border-color:rgba(255,255,255,0.1);"></div><div><div>--bg-alt</div><div class="token-name">#15181e</div></div></div></div>
+      <div class="token-pair"><div class="token-light"><div class="token-dot" style="background:#2c3340;"></div><div><div>--text-primary</div><div class="token-name">#2c3340</div></div></div><div class="token-dark"><div class="token-dot" style="background:#ededeb;border-color:rgba(255,255,255,0.1);"></div><div><div>--text-primary</div><div class="token-name">#ededeb</div></div></div></div>
+      <div class="token-pair"><div class="token-light"><div class="token-dot" style="background:#3d4a5c;"></div><div><div>--text-secondary</div><div class="token-name">#3d4a5c</div></div></div><div class="token-dark"><div class="token-dot" style="background:rgba(255,255,255,0.75);border-color:rgba(255,255,255,0.1);"></div><div><div>--text-secondary</div><div class="token-name">rgba(255,255,255,0.75)</div></div></div></div>
+      <div class="token-pair"><div class="token-light"><div class="token-dot" style="background:#787774;"></div><div><div>--text-muted</div><div class="token-name">#787774</div></div></div><div class="token-dark"><div class="token-dot" style="background:rgba(255,255,255,0.52);border-color:rgba(255,255,255,0.1);"></div><div><div>--text-muted</div><div class="token-name">rgba(255,255,255,0.52)</div></div></div></div>
+      <div class="token-pair"><div class="token-light"><div class="token-dot" style="background:#e3e2de;"></div><div><div>--border</div><div class="token-name">#e3e2de</div></div></div><div class="token-dark"><div class="token-dot" style="background:rgba(255,255,255,0.12);border-color:rgba(255,255,255,0.1);"></div><div><div>--border</div><div class="token-name">rgba(255,255,255,0.12)</div></div></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>语义色 + Shadow</h3><span class="badge b-red">不变色 · 仅调透明底</span></div>
+    <div class="card-bd">
+      <table>
+        <thead><tr><th>Token</th><th>Light</th><th>Dark</th></tr></thead>
+        <tbody>
+          <tr><td><code>--vermillion</code></td><td>#c94040</td><td>#c94040 (不变)</td></tr>
+          <tr><td><code>--celadon</code></td><td>#6b8fa5</td><td>#6b8fa5 (不变)</td></tr>
+          <tr><td><code>--vermillion-bg</code></td><td>rgba(201,64,64,0.06)</td><td>rgba(201,64,64,0.15)</td></tr>
+          <tr><td><code>--celadon-bg</code></td><td>rgba(107,143,165,0.08)</td><td>rgba(107,143,165,0.15)</td></tr>
+          <tr><td><code>--shadow-L1</code></td><td>0 2px 8px rgba(44,51,64,0.06)</td><td>0 2px 10px rgba(0,0,0,0.35)</td></tr>
+          <tr><td><code>--shadow-lg</code></td><td>0 8px 24px rgba(44,51,64,0.08)</td><td>0 8px 28px rgba(0,0,0,0.45)</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-hd"><h3>切换行为</h3></div>
+    <div class="card-bd">
+      <div class="codeblock" style="margin-bottom:var(--sp-4);">
+<span class="kw">html</span>[data-theme="dark"] { <span class="kw">--bg:</span><span class="vl">#1e2128</span>; <span class="kw">--bg-alt:</span><span class="vl">#15181e</span>; ... }
+
+<span class="cm">/* 跟随系统 */</span>
+<span class="kw">@media</span> (prefers-color-scheme: dark) {
+  <span class="kw">html</span>:not([data-theme="light"]) { <span class="cm">/* dark tokens */</span> }
+}
+      </div>
+      <div class="note" style="margin-bottom:0;"><strong>优先级：</strong>用户手动 > 系统偏好 > 默认 light。<code>data-theme</code> 存 localStorage，<code>&lt;head&gt;</code> 内联 script 提前设置避免 FOUC。</div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /tab-foundation -->
+
+<!-- ========================================================
+     TAB 5: CSS REFERENCE + GAP ANALYSIS
+     ======================================================== -->
+<div id="tab-ref" class="tab-panel">
+
+<section class="section">
+  <div class="sh"><span class="sh-num">06</span><div class="sh-group"><h2 class="sh-title">CSS 变量 · 完整参考</h2><div class="sh-sub">All Design Tokens</div></div></div>
+  <div class="codeblock">
+<span class="cm">/* Eastern Clarity v1 — Complete Token Set */</span>
+
+:root {
+  <span class="cm">/* ── Palette ── */</span>
+  <span class="kw">--ink:</span><span class="fn">#2c3340</span>; <span class="kw">--ink-light:</span><span class="fn">#3d4a5c</span>;
+  <span class="kw">--bg:</span><span class="fn">#ffffff</span>; <span class="kw">--bg-alt:</span><span class="fn">#f7f7f5</span>;
+  <span class="kw">--border:</span><span class="fn">#e3e2de</span>; <span class="kw">--border-light:</span><span class="fn">#f1f1ef</span>;
+  <span class="kw">--vermillion:</span><span class="fn">#c94040</span>; <span class="kw">--celadon:</span><span class="fn">#6b8fa5</span>; <span class="kw">--gold:</span><span class="fn">#c9a55a</span>;
+  <span class="kw">--pine:</span><span class="fn">#4a6b5a</span>; <span class="kw">--amber:</span><span class="fn">#d4a04b</span>; <span class="kw">--deep-sky:</span><span class="fn">#4a6e82</span>;
+  <span class="kw">--smoke:</span><span class="fn">#787774</span>; <span class="kw">--mist:</span><span class="fn">#c5bfb3</span>;
+
+  <span class="cm">/* ── Typography ── */</span>
+  <span class="kw">--font-display:</span><span class="st">'DM Sans','Noto Sans SC',sans-serif</span>;
+  <span class="kw">--font-body:</span><span class="st">'DM Sans','Noto Sans SC',sans-serif</span>;
+  <span class="kw">--font-code:</span><span class="st">'JetBrains Mono',monospace</span>;
+  <span class="kw">--font-brand:</span><span class="st">'Noto Serif SC',serif</span>;
+
+  <span class="cm">/* ── Spacing ── */</span>
+  <span class="kw">--sp-1:</span><span class="fn">4px</span>; <span class="kw">--sp-2:</span><span class="fn">8px</span>; <span class="kw">--sp-3:</span><span class="fn">12px</span>; <span class="kw">--sp-4:</span><span class="fn">16px</span>;
+  <span class="kw">--sp-6:</span><span class="fn">24px</span>; <span class="kw">--sp-8:</span><span class="fn">32px</span>; <span class="kw">--sp-12:</span><span class="fn">48px</span>; <span class="kw">--sp-16:</span><span class="fn">64px</span>; <span class="kw">--sp-24:</span><span class="fn">96px</span>;
+
+  <span class="cm">/* ── Shadows ── */</span>
+  <span class="kw">--shadow-sm:</span><span class="fn">0 1px 2px rgba(44,51,64,0.04)</span>;
+  <span class="kw">--shadow-md:</span><span class="fn">0 2px 8px rgba(44,51,64,0.06)</span>;
+  <span class="kw">--shadow-lg:</span><span class="fn">0 8px 24px rgba(44,51,64,0.08)</span>;
+  <span class="kw">--shadow-L1:</span><span class="fn">0 2px 8px rgba(44,51,64,0.06)</span>;
+  <span class="kw">--shadow-L2:</span><span class="fn">0 1px 3px rgba(44,51,64,0.04)</span>;
+
+  <span class="cm">/* ── Radii ── */</span>
+  <span class="kw">--radius-sm:</span><span class="fn">4px</span>; <span class="kw">--radius-md:</span><span class="fn">8px</span>; <span class="kw">--radius-lg:</span><span class="fn">12px</span>;
+
+  <span class="cm">/* ── Motion ── */</span>
+  <span class="kw">--ease-out:</span><span class="fn">cubic-bezier(0,0,0.2,1)</span>;
+  <span class="kw">--ease-in-out:</span><span class="fn">cubic-bezier(0.4,0,0.2,1)</span>;
+  <span class="kw">--ease-spring:</span><span class="fn">cubic-bezier(0.34,1.56,0.64,1)</span>;
+  <span class="kw">--dur-instant:</span><span class="fn">75ms</span>; <span class="kw">--dur-fast:</span><span class="fn">150ms</span>; <span class="kw">--dur-normal:</span><span class="fn">200ms</span>;
+  <span class="kw">--dur-slow:</span><span class="fn">300ms</span>; <span class="kw">--dur-page:</span><span class="fn">500ms</span>;
+
+  <span class="cm">/* ── Z-index ── */</span>
+  <span class="kw">--z-base:</span><span class="fn">0</span>; <span class="kw">--z-sticky:</span><span class="fn">100</span>; <span class="kw">--z-dropdown:</span><span class="fn">200</span>;
+  <span class="kw">--z-overlay:</span><span class="fn">300</span>; <span class="kw">--z-modal:</span><span class="fn">400</span>; <span class="kw">--z-toast:</span><span class="fn">500</span>;
+
+  <span class="cm">/* ── Inverted Surface (always dark) ── */</span>
+  <span class="kw">--surface-inv:</span><span class="fn">#2c3340</span>;       <span class="cm">/* code blocks, prompt headers, primary btn */</span>
+  <span class="kw">--surface-inv-text:</span><span class="fn">#d5d2ca</span>; <span class="cm">/* text on inverted surface */</span>
+
+  <span class="cm">/* ── Breakpoints ── */</span>
+  <span class="kw">--bp-sm:</span><span class="fn">0</span>; <span class="kw">--bp-md:</span><span class="fn">640px</span>; <span class="kw">--bp-lg:</span><span class="fn">768px</span>;
+  <span class="kw">--bp-xl:</span><span class="fn">1024px</span>; <span class="kw">--bp-2xl:</span><span class="fn">1280px</span>;
+  <span class="kw">--container-max:</span><span class="fn">1080px</span>;
+}
+  </div>
+</section>
+
+<section class="section">
+  <div class="sh"><span class="sh-num">07</span><div class="sh-group"><h2 class="sh-title">覆盖度评估</h2><div class="sh-sub">Gap Analysis</div></div></div>
+  <p class="sh-desc"><span style="color:var(--pine);">● 已覆盖</span> · <span style="color:var(--amber);">● 部分覆盖</span> · <span style="color:var(--vermillion);">● 未覆盖</span>。风格指南覆盖度评估。</p>
+
+  <div class="gap-card">
+    <div class="gap-hd"><h4><i class="ph-thin ph-globe" style="font-size:18px;margin-right:6px;"></i>产品主页 Homepage</h4><span class="badge b-green">~95% 覆盖</span></div>
+    <div class="gap-bd">
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>配色 + 字体 + 间距 + 动效</strong> — 完整覆盖 (含 S1 Motion)</div></div>
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>Hero 区 + 插画 + Logo + 背景纹理</strong> — Prompt + 生成资产已就绪</div></div>
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>Feature Section + CTA 按钮 + Code Block</strong></div></div>
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>Responsive 断点 + Focus/A11y</strong> — S2 + S4 补充完成</div></div>
+      <div class="gap-row"><i class="ph-duotone ph-warning gap-partial"></i><div><strong>Pricing / Testimonial / Footer 多栏</strong> — 属于业务组件，后续补充</div></div>
+      <div class="gap-row"><i class="ph-duotone ph-warning gap-partial"></i><div><strong>Navbar 固定顶栏</strong> — 属于业务组件，后续补充</div></div>
+    </div>
+  </div>
+
+  <div class="gap-card">
+    <div class="gap-hd"><h4><i class="ph-thin ph-chat-circle" style="font-size:18px;margin-right:6px;"></i>Chat App UI</h4><span class="badge b-gold">60% 覆盖</span></div>
+    <div class="gap-bd">
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>侧边栏 / Room 列表 / 通知卡片 / 代码渲染 / 嵌套层级 / Dark mode</strong></div></div>
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>Focus/A11y 状态 + Motion + Z-index</strong> — S1/S4/S5 补充完成</div></div>
+      <div class="gap-row"><i class="ph-duotone ph-x-circle gap-missing"></i><div><strong>消息气泡 / Composer / Avatar / DataType 卡片 / Kanban-Timeline-DAG / Emoji</strong> — 业务组件，后续补充</div></div>
+    </div>
+  </div>
+
+  <div class="gap-card">
+    <div class="gap-hd"><h4><i class="ph-thin ph-device-mobile" style="font-size:18px;margin-right:6px;"></i>Mobile 端</h4><span class="badge b-gold">~60% 覆盖</span></div>
+    <div class="gap-bd">
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>配色 + 字体 + 图标 + 间距</strong> — 直接复用</div></div>
+      <div class="gap-row"><i class="ph-duotone ph-check-circle gap-covered"></i><div><strong>断点体系 + Touch Target + 字号缩放 + Safe Area</strong> — S2 + S3 补充完成</div></div>
+      <div class="gap-row"><i class="ph-duotone ph-x-circle gap-missing"></i><div><strong>Bottom Tab Bar / Drawer / 手势交互 / 键盘适配</strong> — 业务组件，后续补充</div></div>
+    </div>
+  </div>
+</section>
+
+</div><!-- /tab-ref -->
+
+</div><!-- /page -->
+
+<footer class="footer">
+  <div class="footer-bg"></div>
+  <p>Eastern Clarity v1.0 — ezagent Design System — Complete Edition — 2026.02</p>
+  <p style="margin-top:var(--sp-1);">Phosphor Thin+Duotone · Ink accent system</p>
+</footer>
+
+<script>
+// Tab switching
+document.querySelectorAll('.tab-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+
+// Dark mode toggle
+const toggle = document.getElementById('themeToggle');
+const icon = document.getElementById('themeIcon');
+function setTheme(dark) {
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  icon.className = dark ? 'ph-thin ph-moon' : 'ph-thin ph-sun';
+  toggle.title = dark ? '切换到 Light' : '切换到 Dark';
+}
+toggle.addEventListener('click', () => {
+  const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  setTheme(!isDark);
+});
+// Default: light
+setTheme(false);
+</script>
+
+</body>
+</html>
