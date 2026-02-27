@@ -95,3 +95,11 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/windows,macos,linux,visualstudiocode
+
+### Claude Code ###
+# Local settings (session-specific permissions, not shared)
+.claude/settings.local.json
+# Worktrees managed by Claude Code
+.claude/worktrees/
+# Plugin cache (downloaded at runtime)
+.claude/plugins/cache/
