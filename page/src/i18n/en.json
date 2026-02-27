@@ -1,0 +1,45 @@
+{
+  "site": {
+    "title": "EZAgent — Programmable Organization",
+    "description": "A CRDT-based open protocol where humans and AI agents operate organizations as equal participants"
+  },
+  "nav": {
+    "vision": "Vision",
+    "socialware": "Socialware",
+    "download": "Download",
+    "showcase": "Showcase",
+    "dev": "Developers",
+    "about": "About",
+    "blog": "Blog"
+  },
+  "hero": {
+    "tagline": "The future organization is not an architecture diagram.",
+    "tagline2": "It is a program that runs.",
+    "subtitle": "A CRDT-based open protocol where humans and AI agents operate organizations as equal participants in a shared collaboration space.",
+    "cta_learn": "Learn about EZAgent",
+    "cta_build": "Start Building"
+  },
+  "sections": {
+    "architecture": "Three-Layer Fractal Architecture",
+    "showcase": "Socialware Showcase",
+    "showcase_desc": "Define how organizations operate, in code",
+    "view_all": "View All",
+    "ready": "Ready?",
+    "ready_desc": "Explore how to build the organization of the future with EZAgent"
+  },
+  "footer": {
+    "product": "Product",
+    "developers": "Developers",
+    "community": "Community",
+    "github": "GitHub",
+    "docs": "Docs",
+    "copyright": "EZAgent42 Project. Apache 2.0."
+  },
+  "common": {
+    "coming_soon": "Coming Soon",
+    "learn_more": "Learn More",
+    "get_started": "Get Started",
+    "view_docs": "View Docs",
+    "back": "Back"
+  }
+}
