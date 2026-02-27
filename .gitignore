@@ -103,3 +103,6 @@ $RECYCLE.BIN/
 .claude/worktrees/
 # Plugin cache (downloaded at runtime)
 .claude/plugins/cache/
+
+# Git worktrees
+.worktrees/
