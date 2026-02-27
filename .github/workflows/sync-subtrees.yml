@@ -28,16 +28,16 @@ jobs:
 
       - name: Sync specs
         if: contains(github.event.head_commit.modified, 'specs/')
-        run: git subtree push --prefix=specs specs main --squash
+        run: git subtree push --prefix=specs specs main
 
       - name: Sync ezagent
         if: contains(github.event.head_commit.modified, 'ezagent/')
-        run: git subtree push --prefix=ezagent ezagent main --squash
+        run: git subtree push --prefix=ezagent ezagent main
 
       - name: Sync relay
         if: contains(github.event.head_commit.modified, 'relay/')
-        run: git subtree push --prefix=relay relay main --squash
+        run: git subtree push --prefix=relay relay main
 
       - name: Sync page
         if: contains(github.event.head_commit.modified, 'page/')
-        run: git subtree push --prefix=page page main --squash
+        run: git subtree push --prefix=page page main

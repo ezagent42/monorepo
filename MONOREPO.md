@@ -94,19 +94,19 @@ git push origin main
 
 ```bash
 # 同步 specs
-git subtree push --prefix=specs specs main --squash
+git subtree push --prefix=specs specs main
 
 # 同步 ezagent
-git subtree push --prefix=ezagent ezagent main --squash
+git subtree push --prefix=ezagent ezagent main
 
 # 同步 relay
-git subtree push --prefix=relay relay main --squash
+git subtree push --prefix=relay relay main
 
 # 同步 page
-git subtree push --prefix=page page main --squash
+git subtree push --prefix=page page main
 ```
 
-> **注意**：`--squash` 是强制规范，初始化时用了 `--squash`，后续所有 push/pull 都必须带 `--squash`，不能混用。
+> **注意**：`--squash` 用于 `subtree add` 和 `subtree pull`，是强制规范，不能混用。`subtree push` 不支持也不需要 `--squash` 参数。
 
 ---
 
@@ -146,19 +146,19 @@ jobs:
 
       - name: Sync specs
         if: contains(github.event.head_commit.modified, 'specs/')
-        run: git subtree push --prefix=specs specs main --squash
+        run: git subtree push --prefix=specs specs main
 
       - name: Sync ezagent
         if: contains(github.event.head_commit.modified, 'ezagent/')
-        run: git subtree push --prefix=ezagent ezagent main --squash
+        run: git subtree push --prefix=ezagent ezagent main
 
       - name: Sync relay
         if: contains(github.event.head_commit.modified, 'relay/')
-        run: git subtree push --prefix=relay relay main --squash
+        run: git subtree push --prefix=relay relay main
 
       - name: Sync page
         if: contains(github.event.head_commit.modified, 'page/')
-        run: git subtree push --prefix=page page main --squash
+        run: git subtree push --prefix=page page main
 ```
 
 **配置步骤**：
@@ -190,7 +190,7 @@ feat/xxx → dev → main → [自动同步到子仓库]
 git remote -v
 
 # 同步单个子仓库（以 ezagent 为例）
-git subtree push --prefix=ezagent ezagent main --squash
+git subtree push --prefix=ezagent ezagent main
 
 # 从子仓库拉取更新到 monorepo（一般不需要，但紧急修复时使用）
 git subtree pull --prefix=ezagent ezagent main --squash
