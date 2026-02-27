@@ -3,13 +3,14 @@
 # ============================================
 # Claude Code launcher
 #
-# Both modes run inside tmux for:
+# All modes run inside tmux for:
 #   - SSH disconnect resilience (session keeps running)
 #   - Seamless reattach from any terminal (./claude.sh)
 #
 # Modes:
-#   [1] Interactive    — worktree + agent teams (auto split panes)
-#   [2] Remote Control — continue from phone/browser via claude.ai/code
+#   [1] Interactive          — standard claude session
+#   [2] Interactive+Worktree — isolated git branch for feature work
+#   [3] Remote Control       — continue from phone/browser
 # ============================================
 
 # Source shell configuration for proper PATH setup
@@ -104,7 +105,17 @@ if [ "${CLAUDE_TMUX_CLASSIC:-}" != "1" ]; then
 fi
 
 # ============================================
-# Outside tmux: mode selection + session management
+# Shared: mode selection menu
+# ============================================
+
+show_mode_menu() {
+    echo "  [1] Interactive (Recommended)"
+    echo "  [2] Interactive + Worktree — isolated git branch"
+    echo "  [3] Remote Control — continue from phone/browser"
+}
+
+# ============================================
+# Outside tmux: session management + mode selection
 # ============================================
 
 if [ -z "$TMUX" ]; then
@@ -135,7 +146,6 @@ if [ -z "$TMUX" ]; then
         SESSION_COUNT=$(echo "$EXISTING_SESSIONS" | wc -l | tr -d ' ')
 
         if [ "$SESSION_COUNT" -eq 1 ]; then
-            # Show session details
             INFO=$(tmux list-sessions -F '#{session_name}: #{session_windows} windows (created #{t:session_created})' 2>/dev/null | grep "^$EXISTING_SESSIONS:")
             CLIENTS=$(tmux list-clients -t "$EXISTING_SESSIONS" -F '#{client_name}' 2>/dev/null | wc -l | tr -d ' ')
 
@@ -187,35 +197,42 @@ if [ -z "$TMUX" ]; then
 
     # --- Mode selection ---
     echo "Create new session:"
-    echo "  [1] Interactive — worktree + agent teams (split panes in tmux)"
-    echo "  [2] Remote Control — continue from phone/browser via claude.ai/code"
+    show_mode_menu
     echo ""
     read -p "Mode [1]: " -r MODE
     MODE=${MODE:-1}
 
-    if [ "$MODE" != "1" ] && [ "$MODE" != "2" ]; then
+    if [ "$MODE" != "1" ] && [ "$MODE" != "2" ] && [ "$MODE" != "3" ]; then
         echo "❌ Invalid mode: $MODE"
         exit 1
     fi
 
     # --- Prompt for session name ---
     UUID_SHORT=$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
-    if [ "$MODE" = "1" ]; then
-        DEFAULT_NAME="${SESSION_PREFIX}-$(date +%m%d)-${UUID_SHORT}"
-        echo ""
-        echo "Enter a session name (also used as worktree branch name)."
-        echo "Examples: ${SESSION_PREFIX}-feat-auth, ${SESSION_PREFIX}-bugfix-login"
-    else
-        DEFAULT_NAME="${SESSION_PREFIX}-rc-$(date +%m%d)-${UUID_SHORT}"
-        echo ""
-        echo "Enter a session name for the remote control session."
-    fi
+    case "$MODE" in
+        1)
+            DEFAULT_NAME="${SESSION_PREFIX}-$(date +%m%d)-${UUID_SHORT}"
+            echo ""
+            echo "Enter a session name."
+            ;;
+        2)
+            DEFAULT_NAME="${SESSION_PREFIX}-$(date +%m%d)-${UUID_SHORT}"
+            echo ""
+            echo "Enter a session name (also used as worktree branch name)."
+            echo "Examples: ${SESSION_PREFIX}-feat-auth, ${SESSION_PREFIX}-bugfix-login"
+            ;;
+        3)
+            DEFAULT_NAME="${SESSION_PREFIX}-rc-$(date +%m%d)-${UUID_SHORT}"
+            echo ""
+            echo "Enter a session name for the remote control session."
+            ;;
+    esac
     echo ""
     read -p "Session name [$DEFAULT_NAME]: " -r SESSION_NAME
     SESSION_NAME=${SESSION_NAME:-$DEFAULT_NAME}
     echo ""
 
-    # --- Create tmux session (both modes go through tmux) ---
+    # --- Create tmux session (all modes go through tmux) ---
     echo "🚀 Creating tmux session: $SESSION_NAME"
     exec tmux $TMUX_CC new-session -s "$SESSION_NAME" "cd '$SCRIPT_DIR' && '$0' --_internal '$MODE' '$SESSION_NAME'"
 fi
@@ -241,33 +258,41 @@ fi
 
 # If no internal args, user ran ./claude.sh from a new tmux window — ask interactively
 if [ -z "$RUN_MODE" ]; then
-    echo "New session in existing tmux (Ctrl+b,c / Ctrl+b,% / Ctrl+b,\")"
-    echo ""
-    echo "  [1] Interactive — worktree + agent teams (split panes)"
-    echo "  [2] Remote Control — continue from phone/browser"
+    echo "New session in existing tmux:"
+    show_mode_menu
     echo ""
     read -p "Mode [1]: " -r RUN_MODE
     RUN_MODE=${RUN_MODE:-1}
 
-    if [ "$RUN_MODE" != "1" ] && [ "$RUN_MODE" != "2" ]; then
+    if [ "$RUN_MODE" != "1" ] && [ "$RUN_MODE" != "2" ] && [ "$RUN_MODE" != "3" ]; then
         echo "❌ Invalid mode: $RUN_MODE"
         exit 1
     fi
 
     UUID_SHORT=$(uuidgen | cut -d'-' -f1 | tr '[:upper:]' '[:lower:]')
-    if [ "$RUN_MODE" = "1" ]; then
-        DEFAULT_NAME="${SESSION_PREFIX}-$(date +%m%d)-${UUID_SHORT}"
-        echo ""
-        echo "Enter a worktree/branch name."
-        echo "Examples: feat-auth, bugfix-login, refactor-api"
-    else
-        DEFAULT_NAME="rc-$(date +%m%d)-${UUID_SHORT}"
-        echo ""
-        echo "Enter a session label."
-    fi
-    echo ""
-    read -p "Name [$DEFAULT_NAME]: " -r SESSION_NAME
-    SESSION_NAME=${SESSION_NAME:-$DEFAULT_NAME}
+    case "$RUN_MODE" in
+        1)
+            # No extra name needed for simple interactive
+            SESSION_NAME=""
+            ;;
+        2)
+            DEFAULT_NAME="${SESSION_PREFIX}-$(date +%m%d)-${UUID_SHORT}"
+            echo ""
+            echo "Enter a worktree/branch name."
+            echo "Examples: feat-auth, bugfix-login, refactor-api"
+            echo ""
+            read -p "Name [$DEFAULT_NAME]: " -r SESSION_NAME
+            SESSION_NAME=${SESSION_NAME:-$DEFAULT_NAME}
+            ;;
+        3)
+            DEFAULT_NAME="rc-$(date +%m%d)-${UUID_SHORT}"
+            echo ""
+            echo "Enter a session label."
+            echo ""
+            read -p "Name [$DEFAULT_NAME]: " -r SESSION_NAME
+            SESSION_NAME=${SESSION_NAME:-$DEFAULT_NAME}
+            ;;
+    esac
     echo ""
 fi
 
@@ -293,9 +318,15 @@ else
 fi
 echo ""
 
-# --- Mode 1: Interactive (worktree) ---
+# --- Mode 1: Interactive (standard) ---
 if [ "$RUN_MODE" = "1" ]; then
-    echo "🔧 Mode: Interactive (worktree + agent teams)"
+    echo "🔧 Mode: Interactive"
+    echo ""
+    claude $INTERACTIVE_FLAGS
+
+# --- Mode 2: Interactive + Worktree ---
+elif [ "$RUN_MODE" = "2" ]; then
+    echo "🔧 Mode: Interactive + Worktree"
     echo ""
     if [ -n "$SESSION_NAME" ]; then
         claude --worktree "$SESSION_NAME" $INTERACTIVE_FLAGS
@@ -303,8 +334,8 @@ if [ "$RUN_MODE" = "1" ]; then
         claude --worktree $INTERACTIVE_FLAGS
     fi
 
-# --- Mode 2: Remote Control ---
-elif [ "$RUN_MODE" = "2" ]; then
+# --- Mode 3: Remote Control ---
+elif [ "$RUN_MODE" = "3" ]; then
     echo "🌐 Mode: Remote Control"
     echo "   Connect from: claude.ai/code or Claude mobile app"
     echo "   Press spacebar to show QR code for mobile"
