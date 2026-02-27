@@ -5,8 +5,17 @@
   "permissions": {
     "defaultMode": "bypassPermissions"
   },
-  "teammateMode": "auto",
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/check-plugins.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -18,5 +27,10 @@
         ]
       }
     ]
+  },
+  "teammateMode": "auto",
+  "enabledPlugins": {
+    "ralph-loop@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true
   }
 }
