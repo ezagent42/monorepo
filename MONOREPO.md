@@ -147,24 +147,39 @@ jobs:
           git remote add app     https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/app
 
       - name: Sync docs
-        if: contains(github.event.head_commit.modified, 'docs/')
-        run: git subtree push --prefix=docs docs main
+        continue-on-error: true
+        run: |
+          git subtree split --prefix=docs -b _split-docs
+          git push docs _split-docs:main --force
+          git branch -D _split-docs
 
       - name: Sync ezagent
-        if: contains(github.event.head_commit.modified, 'ezagent/')
-        run: git subtree push --prefix=ezagent ezagent main
+        continue-on-error: true
+        run: |
+          git subtree split --prefix=ezagent -b _split-ezagent
+          git push ezagent _split-ezagent:main --force
+          git branch -D _split-ezagent
 
       - name: Sync relay
-        if: contains(github.event.head_commit.modified, 'relay/')
-        run: git subtree push --prefix=relay relay main
+        continue-on-error: true
+        run: |
+          git subtree split --prefix=relay -b _split-relay
+          git push relay _split-relay:main --force
+          git branch -D _split-relay
 
       - name: Sync page
-        if: contains(github.event.head_commit.modified, 'page/')
-        run: git subtree push --prefix=page page main
+        continue-on-error: true
+        run: |
+          git subtree split --prefix=page -b _split-page
+          git push page _split-page:main --force
+          git branch -D _split-page
 
       - name: Sync app
-        if: contains(github.event.head_commit.modified, 'app/')
-        run: git subtree push --prefix=app app main
+        continue-on-error: true
+        run: |
+          git subtree split --prefix=app -b _split-app
+          git push app _split-app:main --force
+          git branch -D _split-app
 ```
 
 **配置要求**：
