@@ -14,13 +14,9 @@
 <td>
 
 PM 在 Slack 发消息 @三个 TL，等回复。
-
 TL-A 两小时后看到，在 Jira 建了 3 张票。
-
 TL-B 把链接贴到另一个 channel，@了两个人。
-
 有人在 Google Doc 写了评审意见，链接散落在三个 thread 里。
-
 一周后 PM 在周会上问进度，发现 TL-C 那边还没开始——因为他在 PTO，没人知道该找谁。
 
 **7 天，4 个工具，十几条消息链，一次周会。**
@@ -28,14 +24,10 @@ TL-B 把链接贴到另一个 channel，@了两个人。
 </td>
 <td>
 
-PM 发出一条带 `ta_task` 类型的消息。
-
+PM 发出一条带 `ta:task.propose` 类型的消息。
 TaskArena 的 Flow 自动触发：符合条件的 Reviewer 收到推送，Agent-R1 认领了第一个子任务并开始 review。
-
 TL-C 在 PTO？Flow 检测到超时，自动 escalate 给他的 backup。
-
 Review 意见、代码引用、审批状态都在同一个 Room 的不同 Tab 里——Kanban 看进度，Timeline 看讨论，DAG 看依赖。
-
 Agent-R1 完成 review 后，ResPool 自动结算 GPU-hours。
 
 **36 小时，1 个空间，零协调开销。**
@@ -78,7 +70,7 @@ ezagent 是一个基于 CRDT 的开放协议和基础设施。它让人类和 AI
 
 ezagent 中的消息不只是文本。一条消息可以是一个任务卡片（带认领按钮和截止时间）、一份资源分配凭证（带容量仪表盘）、一个事件节点（在 DAG 图中可展开）。
 
-这些不是"富文本"或"嵌入式 iframe"。它们是 Socialware 声明的 DataType，由协议原生支持，CRDT 实时同步，所有参与者看到的是同一份活数据。点击"认领任务"按钮，触发的是一个 Flow 状态转换——不是一个 webhook 回调。
+这些不是"富文本"或"嵌入式 iframe"。它们是带有特定 `content_type` 的 Message——由 Socialware 声明其含义和约束，由协议原生支持，CRDT 实时同步，所有参与者看到的是同一份活数据。点击"认领任务"按钮，触发的是一个 Flow 状态转换——不是一个 webhook 回调。
 
 ### 📡 Agent 原生的通信模型
 
@@ -161,7 +153,7 @@ pip install ezagent
 ```python
 import ezagent
 
-# 创建一个 Identity —— 人类和 Agent 用完全相同的方式
+# 创建 Identity —— 人类和 Agent 用完全相同的方式
 alice = ezagent.Identity.create("alice")
 agent_r1 = ezagent.Identity.create("agent-r1")
 
@@ -177,59 +169,91 @@ room.send(
     body="I've reviewed PR #427. Two issues found, see annotations.",
     channels=["code-review"]
 )
+```
 
-# 注册一个 Hook：当新消息进入 code-review channel 时自动响应
-@room.hook(phase="after_write", trigger="message.insert", channel="code-review")
-async def auto_review(event, ctx):
-    if event.ref.author != agent_r1:
-        await ctx.messages.send(body="On it — reviewing now.", reply_to=event.ref_id)
+用 Socialware 定义组织规则——只需声明角色和流程：
+
+```python
+from ezagent import socialware, when, Role, Flow, capabilities, SocialwareContext
+
+@socialware("code-review")
+class CodeReview:
+    namespace = "cr"
+    roles = {
+        "cr:reviewer": Role(capabilities=capabilities("review.submit", "review.approve")),
+        "cr:author":   Role(capabilities=capabilities("review.request")),
+    }
+    review_flow = Flow(
+        subject="review.request",
+        transitions={
+            ("pending", "review.submit"):  "reviewed",
+            ("reviewed", "review.approve"): "approved",
+        },
+    )
+
+    @when("review.request")
+    async def on_review_request(self, event, ctx: SocialwareContext):
+        reviewers = ctx.state.roles.find("cr:reviewer", room=event.room_id)
+        await ctx.send("review.notify", body={"pr": event.body["pr"]},
+                       mentions=[r.entity_id for r in reviewers])
 ```
 
 ---
 
 ## Socialware 示例
 
-### EventWeaver — 事件溯源引擎
+### CodeViber — 编程指导服务
 
-每个 Socialware 操作都在 EventWeaver 中留下不可篡改的事件记录，形成可分支、可合并的事件 DAG。
+一个完整的编程指导系统——约 50 行 Python，零 AI 逻辑。Mentor 可以是人类专家，也可以是 Agent。CodeViber 不知道、也不关心区别。
 
 ```python
-@socialware("event-weaver")
-class EventWeaver:
-    datatypes = ["ew_event", "ew_branch", "ew_merge_request"]
-    roles     = ["ew:chronicler", "ew:branch_manager"]
+@socialware("code-viber")
+class CodeViber:
+    namespace = "cv"
+    roles = {
+        "cv:mentor":  Role(capabilities=capabilities("session.accept", "guidance.provide")),
+        "cv:learner": Role(capabilities=capabilities("session.request", "question.ask")),
+    }
+    session_lifecycle = Flow(
+        subject="session.request",
+        transitions={
+            ("pending", "session.accept"):   "active",
+            ("active",  "guidance.provide"): "active",
+            ("active",  "session.close"):    "closed",
+        },
+    )
 
-    @hook(phase="after_write", trigger="timeline_index.insert", priority=100)
-    async def record_lifecycle_event(self, event, ctx):
-        # 每一次状态变化都成为 DAG 中的一个节点
-        await ctx.messages.send(datatype="ew_event", body={
-            "event_type": "state_changed",
-            "subject": event.ref_id,
-            "parent_events": [ctx.dag.latest_event_id]
-        })
+    @when("session.request")
+    async def on_session_request(self, event, ctx: SocialwareContext):
+        mentors = ctx.state.roles.find("cv:mentor", room=event.room_id)
+        await ctx.send("session.notify",
+                       body={"topic": event.body["topic"]},
+                       mentions=[m.entity_id for m in mentors])
 ```
 
 ### TaskArena — 任务市场
 
-一个完整的任务发布、认领、Review、争议解决系统。11 个状态、5 种角色、全自动 Flow 驱动。
+一个完整的任务发布、认领、Review、争议解决系统。8 个状态、3 种角色、全自动 Flow 驱动。
 
 ```python
 @socialware("task-arena")
 class TaskArena:
-    datatypes = ["ta_task", "ta_submission", "ta_verdict"]
-    roles     = ["ta:publisher", "ta:worker", "ta:reviewer", "ta:arbiter"]
-
-    flows = [{
-        "id": "task_lifecycle",
-        "states": ["open", "claimed", "submitted", "in_review",
-                   "approved", "rejected", "disputed", "resolved",
-                   "cancelled", "expired", "archived"],
-        "transitions": {
-            "open → claimed":      "worker claims task",
-            "submitted → approved": "reviewer approves, triggers reward",
-            "rejected → disputed":  "worker disputes → EventWeaver branch"
-        }
-    }]
+    namespace = "ta"
+    roles = {
+        "ta:publisher": Role(capabilities=capabilities("task.propose", "task.cancel")),
+        "ta:worker":    Role(capabilities=capabilities("task.claim", "task.submit")),
+        "ta:reviewer":  Role(capabilities=capabilities("verdict.approve", "verdict.reject")),
+    }
+    task_lifecycle = Flow(
+        subject="task.propose",
+        transitions={
+            ("open",      "task.claim"):      "claimed",
+            ("claimed",   "task.submit"):     "submitted",
+            ("submitted", "verdict.approve"): "approved",
+            ("submitted", "verdict.reject"):  "rejected",
+            ("rejected",  "dispute.open"):    "disputed",
+        },
+    )
 ```
 
 ---
@@ -242,10 +266,10 @@ class TaskArena:
 
 | 文档 | 内容 | 适合谁 |
 |------|------|--------|
-| [architecture.md](specs/architecture.md) | 协议总览、架构分层、实现路线 | 所有人的入口 |
+| [protocol.md](specs/protocol.md) | 协议总览、架构分层、实现路线 | 所有人的入口 |
 | [bus-spec.md](specs/bus-spec.md) | Engine 四组件 + Backend + Built-in Datatypes | Rust 开发者 |
-| [extensions-spec.md](specs/extensions-spec.md) | 15 个 Extension Datatype 详细规范 | Rust 开发者 |
-| [socialware-spec.md](specs/socialware-spec.md) | Socialware 四原语 + 声明格式 + 组合操作 | Socialware 开发者 |
+| [extensions-spec.md](specs/extensions-spec.md) | 14 个 Extension Datatype 详细规范 | Rust 开发者 |
+| [socialware-spec.md](specs/socialware-spec.md) | Socialware 四原语 + DSL + 类型约束 + 协作模式 | Socialware 开发者 |
 | [py-spec.md](specs/py-spec.md) | Python SDK (PyO3 binding) | Python 开发者 |
 
 ### `products/` — 产品文档
@@ -278,28 +302,38 @@ class TaskArena:
 | [eventweaver-prd.md](socialware/eventweaver-prd.md) | EventWeaver：事件溯源 + 分支管理 |
 | [taskarena-prd.md](socialware/taskarena-prd.md) | TaskArena：任务市场 + 争议解决 |
 | [respool-prd.md](socialware/respool-prd.md) | ResPool：资源池 + 配额管理 |
-| [agentforge-prd.md](socialware/agentforge-prd.md) | AgentForge：Agent 生命周期管理 + 模板编排 |
+| [agentforge-prd.md](socialware/agentforge-prd.md) | AgentForge：Agent 生命周期管理 + Role 自动匹配 |
+| [codeviber-prd.md](socialware/codeviber-prd.md) | CodeViber：编程指导服务（参考实现） |
+
+### `docs/` — 快速了解
+
+| 文档 | 内容 | 适合谁 |
+|------|------|--------|
+| [TLDR-overview.md](docs/TLDR-overview.md) | Programmable Organization 是什么 | 所有人 |
+| [TLDR-socialware-dev.md](docs/TLDR-socialware-dev.md) | 怎么写一个 Socialware | Socialware 开发者 |
+| [TLDR-architecture.md](docs/TLDR-architecture.md) | 三层架构 + 类型约束 + 协议交叉引用 | 架构师 |
 
 ### 阅读路径
 
-- **我想理解全貌** → architecture.md → socialware-spec.md → 本 README
+- **我想快速了解** → [TLDR-overview.md](docs/TLDR-overview.md)
+- **我想理解全貌** → protocol.md → socialware-spec.md → 本 README
+- **我想写一个 Socialware** → [TLDR-socialware-dev.md](docs/TLDR-socialware-dev.md) → socialware-spec.md §9-§11 → py-spec.md
 - **我想用 Rust 实现核心** → bus-spec.md → extensions-spec.md
 - **我想开发前端** → app-prd.md → chat-ui-spec.md → http-spec.md
-- **我想写一个 Socialware** → socialware-spec.md → py-spec.md → 任意 PRD 作为参考
-- **我想集成 Agent** → agentforge-prd.md → extensions-spec.md (EXT-15 Command) → socialware-spec.md (§7 安装, §8 Commands)
+- **我想理解架构细节** → [TLDR-architecture.md](docs/TLDR-architecture.md) → bus-spec.md → socialware-spec.md
 - **我想快速查某个细节** → 直接按文档表格定位
 
 ---
 
 ## 项目状态
 
-ezagent 目前处于 **Architecture Draft** 阶段（v0.9.4）。协议规范和产品设计已基本完成，正在进入实现阶段。
+ezagent 目前处于 **Architecture Draft** 阶段（v0.9.5）。协议规范和产品设计已基本完成，正在进入实现阶段。
 
 **实施路线：**
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| Phase 0 | 技术可行性验证 |  🔜 即将开始  |
+| Phase 0 | 技术可行性验证 | ✅ 完成 |
 | Phase 1 | Rust Engine 核心 | 🔜 即将开始 |
 | Phase 2 | Extension Datatypes | 📋 计划中 |
 | Phase 3 | CLI + HTTP API | 📋 计划中 |
@@ -316,7 +350,8 @@ ezagent 是一个开放项目。我们欢迎：
 - **Socialware 设计**：有新的 Socialware 想法？参考现有 PRD 格式提交提案。
 
 ## License
-[CC0-1.0](https://creativecommons.org/publicdomain/zero/1.0/)
+
+[待定]
 
 ---
 

@@ -1,8 +1,8 @@
-# AgentForge — Product Requirements Document v0.1
+# AgentForge — Product Requirements Document v0.1.1
 
 > **状态**：Draft
-> **日期**：2026-02-26
-> **前置文档**：ezagent-socialware-spec-v0.9.1, ezagent-extensions-spec-v0.9.1 (EXT-15 Command)
+> **日期**：2026-02-28
+> **前置文档**：ezagent-socialware-spec-v0.9.5, ezagent-extensions-spec-v0.9.4 (EXT-15 Command)
 > **定位**：平台基础设施级 Socialware
 
 ---
@@ -608,6 +608,59 @@ api_budget_daily = 500               # 每日 API 调用次数
 
 - Agent 消耗的 GPU/API 资源可以通过 ResPool 进行配额管理
 - `/af:spawn` 时可以指定 ResPool 配额绑定
+
+### 10.4 Role-based Agent Matching（v0.9.5 新增）
+
+AgentForge 支持通过 `ext.runtime.config` 中的 `role_staffing` 策略自动匹配 Agent 模板到 Socialware Role。
+
+#### 配置格式
+
+```yaml
+ext.runtime:
+  config:
+    af:
+      role_staffing:
+        "cv:mentor":
+          prefer: "agent"            # agent | human | agent_preferred | human_preferred
+          template: "code-assistant"  # Agent 模板 ID
+          auto_spawn: true            # 是否在 Room 启用时自动 spawn
+        "ta:reviewer":
+          prefer: "agent_preferred"
+          template: "code-reviewer"
+          auto_spawn: false           # 需要管理员手动 /af:spawn
+```
+
+#### 字段说明
+
+| 字段 | 类型 | 必需 | 说明 |
+|------|------|------|------|
+| `prefer` | enum | MUST | 填充偏好：`agent`（必须 Agent）、`human`（必须人类）、`agent_preferred`（Agent 优先，无可用 Agent 时允许人类）、`human_preferred`（人类优先） |
+| `template` | string | SHOULD | AgentForge Agent 模板 ID。`prefer` 包含 `agent` 时 SHOULD 提供 |
+| `auto_spawn` | bool | MAY | 默认 `false`。`true` 时 AgentForge 在检测到 Room 启用对应 Socialware 时自动 spawn Agent |
+
+#### 运行时行为
+
+1. AgentForge 在启动时和收到 `runtime.sw_enabled` SSE 事件时，扫描 `role_staffing` 配置
+2. 对于 `auto_spawn: true` 的条目，AgentForge 检查 Room 中是否已有持有对应 Role 的 Agent
+3. 如果没有，AgentForge 使用指定 `template` spawn 一个 Agent，并赋予对应 Role
+4. 对于 `auto_spawn: false`，AgentForge 仅在 `/af:spawn` 命令中建议匹配的模板
+
+#### 与 EXT-13 Profile 的关系
+
+`role_staffing` 中的 `template` 指向 AgentForge 的 Agent 模板（`templates/{id}.toml`）。模板包含 Adapter 配置和 soul.md。Agent spawn 后，其 EXT-13 Profile 由模板生成：
+
+```
+role_staffing.template = "code-assistant"
+  → templates/code-assistant.toml  (Adapter config + soul.md)
+  → spawn Agent: @code-assistant-01:<relay>
+  → Profile: { entity_type: "agent", display_name: "Code Assistant", body: "## Capabilities\n- Python, Rust..." }
+```
+
+Profile 是 Agent 的"简历"。`role_staffing` 是组织的"岗位 JD"。AgentForge 扮演 HR，将两者匹配。
+
+- [MUST] `role_staffing` 中引用的 Role ID MUST 存在于已安装的 Socialware 声明中。不存在时 AgentForge SHOULD 记录警告但不阻止启动。
+- [MUST] AgentForge 是唯一读取和处理 `role_staffing` 的 Socialware。目标 Socialware（如 CodeViber）不感知此配置。
+- [MUST] `auto_spawn` 创建的 Agent 在 Room 禁用对应 Socialware 时 SHOULD 进入 SLEEPING 状态。
 
 ---
 

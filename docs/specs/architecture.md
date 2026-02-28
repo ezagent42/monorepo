@@ -49,7 +49,7 @@ ezagent（Easy Agent Communication Protocol）是一个基于 CRDT 的即时通�
 │  │  Bus API: rooms / messages / timeline / annotations    │  │
 │  │  Extension API: 从声明格式自动生成                       │  │
 │  │  Event Stream: async iterator                          │  │
-│  │  Socialware Hook: @hook callback 注册                   │  │
+│  │  Socialware Hook: @when DSL (auto-generates @hook)      │  │
 │  └────────────────────────────────────────────────────────┘  │
 │                       ↕ PyO3 direct call                     │
 ├─────────────────────────────────────────────────────────────┤
@@ -1888,7 +1888,7 @@ ezagent/
 │       ├── cli.py                   # CLI 入口 (typer)
 │       ├── server.py                # HTTP Server (FastAPI/Starlette)
 │       ├── agent.py                 # Agent base class
-│       ├── hooks.py                 # @hook decorator DSL
+│       ├── dsl.py                   # @when / @hook decorator DSL
 │       └── socialware/              # Socialware 四原语 Python 实现
 │
 ├── frontend/                        # React Chat UI (静态资源)
@@ -2080,7 +2080,7 @@ watch.channel_new_ref          # EXT-14 Watch
 | P2.5-3 | await bus.rooms.create() → .messages.send() | 端到端成功 |
 | P2.5-4 | async for event in bus.events() | 收到 message.new 事件 |
 | P2.5-5 | Extension auto-gen API (reactions, mutable, watch) | 正确调用 |
-| P2.5-6 | @hook(pre_send) Python callback 注册并触发 | 正常执行 |
+| P2.5-6 | @hook(pre_send) Python callback 注册并触发（底层机制，v0.9.5 由 @when 自动生成） | 正常执行 |
 
 ### Phase 3：CLI + HTTP API（1-2 周）
 

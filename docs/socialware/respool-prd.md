@@ -1,8 +1,8 @@
-# ResPool — Product Requirements Document v0.2.1
+# ResPool — Product Requirements Document v0.2.2
 
 > **状态**：Draft
-> **日期**：2026-02-26
-> **前置文档**：ezagent-socialware-spec-v0.9.1
+> **日期**：2026-02-28
+> **前置文档**：ezagent-socialware-spec-v0.9.5
 > **定位**：平台基础设施级 Socialware
 
 ---
@@ -902,14 +902,14 @@ ezagent/socialware/res-pool/
 [socialware]
 id = "res-pool"
 name = "ResPool"
-version = "0.9.1"
+version = "0.9.5"
 
 [declaration]
-datatypes = ["rp_pool", "rp_quota", "rp_allocation", "rp_settlement"]
-hooks = ["rp.allocate", "rp.release", "rp.settle", "rp.quota_check", "rp.expiry_monitor"]
+content_types = ["rp:pool.create", "rp:pool.update",
+                 "rp:quota.set", "rp:quota.update",
+                 "rp:allocation.request", "rp:allocation.approve", "rp:allocation.release",
+                 "rp:settlement.record"]
 roles = ["rp:pool_admin", "rp:allocator", "rp:consumer"]
-annotations = ["rp:pool_meta", "rp:quota_meta", "rp:allocation_meta"]
-indexes = ["pool_dashboard", "my_allocations", "settlement_history", "quota_usage"]
 
 [commands]
 allocate = { params = ["pool_id", "amount", "purpose?"], role = "rp:allocator" }
@@ -920,7 +920,7 @@ set-quota = { params = ["pool_id", "entity_id", "max_amount"], role = "rp:pool_a
 settle = { params = ["allocation_id", "actual_usage"], role = "rp:allocator" }
 
 [dependencies]
-extensions = ["EXT-06", "EXT-15"]
+extensions = ["EXT-06", "EXT-15", "EXT-17"]
 socialware = ["event-weaver"]
 ```
 
@@ -939,34 +939,39 @@ ResPool 注册以下命令（命名空间 `rp`）：
 | `/rp:set-quota` | `--pool-id`, `--entity-id`, `--max-amount` | `rp:pool_admin` | 设置配额上限 |
 | `/rp:settle` | `--allocation-id`, `--actual-usage` | `rp:allocator` | 结算实际资源消耗 |
 
-命令处理示例：
+命令处理示例（v0.9.5 推荐方式）：
 
 ```python
+from ezagent import socialware, when, Role, capabilities, SocialwareContext
+
 @socialware("res-pool")
 class ResPool:
-    @hook(phase="after_write", trigger="timeline_index.insert",
-          filter="ext.command.ns == 'rp'", priority=110)
-    async def on_command(self, event, ctx):
-        cmd = event.ref.ext.command
-        if cmd.action == "allocate":
-            pool = self.state.resources.get(cmd.params["pool_id"])
-            amount = float(cmd.params["amount"])
-            # 检查配额
-            quota = await self.check_entity_quota(
-                pool_id=cmd.params["pool_id"],
-                entity_id=event.ref.author
-            )
-            if quota.remaining < amount:
-                await ctx.command.result(cmd.invoke_id, status="error",
-                    error=f"Quota exceeded: remaining={quota.remaining}, requested={amount}")
-                return
-            # 执行分配
-            allocation = await self.do_allocate(
-                pool_id=cmd.params["pool_id"],
-                amount=amount,
-                consumer=event.ref.author,
-                purpose=cmd.params.get("purpose", "")
-            )
-            await ctx.command.result(cmd.invoke_id, status="success",
-                result={"allocation_id": allocation.id, "amount": amount})
+    namespace = "rp"
+    roles = {
+        "rp:pool_admin": Role(capabilities=capabilities("pool.create", "pool.update", "quota.set")),
+        "rp:allocator":  Role(capabilities=capabilities("allocation.request", "settlement.record")),
+        "rp:consumer":   Role(capabilities=capabilities("allocation.release")),
+    }
+
+    @when("allocate")
+    async def on_allocate(self, event, ctx: SocialwareContext):
+        pool = ctx.state.resources.get(event.params["pool_id"])
+        amount = float(event.params["amount"])
+        # 检查配额
+        quota = await self.check_entity_quota(
+            pool_id=event.params["pool_id"],
+            entity_id=event.author
+        )
+        if quota.remaining < amount:
+            await ctx.fail(f"Quota exceeded: remaining={quota.remaining}, requested={amount}")
+            return
+        # 执行分配
+        await ctx.send("allocation.request",
+                       body={"pool_id": event.params["pool_id"],
+                             "amount": amount,
+                             "consumer": event.author,
+                             "purpose": event.params.get("purpose", "")})
+        await ctx.succeed({"pool_id": event.params["pool_id"], "amount": amount})
 ```
+
+> **注**：Role check、content_type 拼接（`rp:allocation.request`）、Channel 路由（`_sw:rp`）由 Runtime 自动完成。底层 `@hook` + `EngineContext` 方式仍可通过 `@socialware("res-pool", unsafe=True)` 使用，参见 socialware-spec §10。

@@ -496,7 +496,7 @@ indexes:                       # [MAY] Index 列表
 
 Datatype 有两种加载方式：
 1. **编译时注册**（Rust trait impl）：Built-in + Extension Datatypes。协议层行为，所有 peer 一致。
-2. **运行时 Hook 注册**（PyO3 callback）：Socialware 层通过 Python @hook decorator 注册应用级 Hook（参见 §3.2.6）。不创建新 Datatype，不引入新的 CRDT 文档或命名空间，仅在已有 Datatype 上挂载 Hook。Socialware 的所有数据以普通 Message（特定 content_type，由 EXT-17 Runtime 管控）形式存在于 Timeline 中，运行时状态从 Message 序列纯派生（参见 ezagent-socialware-spec §2.5 State Cache）。
+2. **运行时 Hook 注册**（PyO3 callback）：Socialware 层通过 Python @hook decorator 注册应用级 Hook（参见 §3.2.6）。v0.9.5 起 Socialware 推荐使用 `@when` DSL 声明，Runtime 自动展开为 `@hook` 注册（参见 socialware-spec §9）。不创建新 Datatype，不引入新的 CRDT 文档或命名空间，仅在已有 Datatype 上挂载 Hook。Socialware 的所有数据以普通 Message（特定 content_type，由 EXT-17 Runtime 管控）形式存在于 Timeline 中，运行时状态从 Message 序列纯派生（参见 ezagent-socialware-spec §2.5 State Cache）。
 
 [MUST] 统一声明格式同时作为 Python API 自动生成的输入。详见 ezagent-py-spec §6。
 

@@ -1,8 +1,8 @@
-# EventWeaver — Product Requirements Document v0.2.1
+# EventWeaver — Product Requirements Document v0.2.2
 
 > **状态**：Draft
-> **日期**：2026-02-26
-> **前置文档**：ezagent-socialware-spec-v0.9.1
+> **日期**：2026-02-28
+> **前置文档**：ezagent-socialware-spec-v0.9.5
 > **定位**：平台基础设施级 Socialware
 
 ---
@@ -714,14 +714,13 @@ ezagent/socialware/event-weaver/
 [socialware]
 id = "event-weaver"
 name = "EventWeaver"
-version = "0.9.1"
+version = "0.9.5"
 
 [declaration]
-datatypes = ["ew_event", "ew_branch", "ew_merge_request"]
-hooks = ["ew.record_lifecycle", "ew.branch_create", "ew.merge_execute", "ew.conflict_detect"]
+content_types = ["ew:event.record", "ew:branch.create", "ew:branch.merge",
+                 "ew:merge_request.open", "ew:merge_request.close",
+                 "ew:replay.start", "ew:replay.result"]
 roles = ["ew:chronicler", "ew:branch_manager", "ew:merger", "ew:observer"]
-annotations = ["ew:event_meta", "ew:branch_meta", "ew:merge_meta"]
-indexes = ["event_dag", "branch_list", "merge_requests", "causal_chain"]
 
 [commands]
 branch = { params = ["name", "from?"], role = "ew:branch_manager" }
@@ -731,7 +730,7 @@ history = { params = ["entity_id?", "event_type?", "limit?"], role = "ew:observe
 dag = { params = ["root?", "depth?"], role = "ew:observer" }
 
 [dependencies]
-extensions = ["EXT-04", "EXT-06", "EXT-15"]
+extensions = ["EXT-04", "EXT-06", "EXT-15", "EXT-17"]
 socialware = []
 ```
 
@@ -749,29 +748,38 @@ EventWeaver 注册以下命令（命名空间 `ew`）：
 | `/ew:history` | `--entity-id?`, `--event-type?`, `--limit?` | `ew:observer` | 查询事件历史 |
 | `/ew:dag` | `--root?`, `--depth?` | `ew:observer` | 查看事件 DAG 结构 |
 
-命令处理示例：
+命令处理示例（v0.9.5 推荐方式）：
 
 ```python
+from ezagent import socialware, when, Role, capabilities, SocialwareContext
+
 @socialware("event-weaver")
 class EventWeaver:
-    @hook(phase="after_write", trigger="timeline_index.insert",
-          filter="ext.command.ns == 'ew'", priority=100)
-    async def on_command(self, event, ctx):
-        cmd = event.ref.ext.command
-        if cmd.action == "branch":
-            branch = await self.create_branch(
-                name=cmd.params["name"],
-                from_event=cmd.params.get("from"),
-                creator=event.ref.author
-            )
-            await ctx.command.result(cmd.invoke_id, status="success",
-                result={"branch_id": branch.id, "name": branch.name})
-        elif cmd.action == "history":
-            events = await self.query_events(
-                entity_id=cmd.params.get("entity_id"),
-                event_type=cmd.params.get("event_type"),
-                limit=int(cmd.params.get("limit", 20))
-            )
-            await ctx.command.result(cmd.invoke_id, status="success",
-                result={"events": events, "count": len(events)})
+    namespace = "ew"
+    roles = {
+        "ew:chronicler":      Role(capabilities=capabilities("event.record")),
+        "ew:branch_manager":  Role(capabilities=capabilities("branch.create", "branch.merge")),
+        "ew:merger":          Role(capabilities=capabilities("merge_request.open", "merge_request.close")),
+        "ew:observer":        Role(capabilities=capabilities("replay.start", "history.query", "dag.query")),
+    }
+
+    @when("branch")
+    async def on_branch(self, event, ctx: SocialwareContext):
+        branch = await self.create_branch(
+            name=event.params["name"],
+            from_event=event.params.get("from"),
+            creator=event.author
+        )
+        await ctx.succeed({"branch_id": branch.id, "name": branch.name})
+
+    @when("history")
+    async def on_history(self, event, ctx: SocialwareContext):
+        events = await self.query_events(
+            entity_id=event.params.get("entity_id"),
+            event_type=event.params.get("event_type"),
+            limit=int(event.params.get("limit", 20))
+        )
+        await ctx.succeed({"events": events, "count": len(events)})
 ```
+
+> **注**：Role check、Flow validation、State Cache 更新、content_type 拼接（`ew:branch.create`）和 Channel 路由（`_sw:ew`）由 Runtime 自动完成。开发者只写域逻辑。底层 `@hook` + `EngineContext` 方式仍可通过 `@socialware("event-weaver", unsafe=True)` 使用，参见 socialware-spec §10。

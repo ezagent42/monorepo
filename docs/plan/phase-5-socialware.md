@@ -1,10 +1,10 @@
 # Phase 5: Socialware
 
-> **版本**：0.9.3
-> **目标**：Agent 驱动的协作——Role-Driven Message 架构 + Socialware 四原语运行时 + 三个参考实现 + AgentForge
-> **预估周期**：3-4 周
+> **版本**：0.9.5
+> **目标**：Agent 驱动的协作——Role-Driven Message 架构 + Socialware 四原语运行时 + 四个参考实现 + AgentForge + Socialware DSL
+> **预估周期**：4-5 周
 > **前置依赖**：Phase 4 (Chat App) 完成
-> **Spec 依赖**：socialware-spec.md, extensions-spec.md (EXT-17), eventweaver-prd.md, taskarena-prd.md, respool-prd.md, agentforge-prd.md
+> **Spec 依赖**：socialware-spec.md (v0.9.5), extensions-spec.md (EXT-17), eventweaver-prd.md, taskarena-prd.md, respool-prd.md, agentforge-prd.md (v0.1.1), codeviber-prd.md (v0.1)
 
 ---
 
@@ -21,6 +21,13 @@
 - AgentForge: Agent 模板注册 → Spawn → @mention 触发 → 流式响应 → 休眠/唤醒
 - Role pre_send Hook 正确拒绝无权限的 Message 发送
 - Flow pre_send Hook 正确拒绝非法状态转换
+- **v0.9.5 新增**：
+- CodeViber: Session lifecycle → Mentor 通知 → 问答 → Escalation → 关闭 完整流程
+- `@when` decorator 自动生成 Role check / Flow validation / State Cache update Hook
+- `SocialwareContext` 类型约束：不可调用底层 `ctx.messages.send()` 等方法
+- `unsafe=True` 模式下 `EngineContext` 提供完整底层访问
+- Socialware 间协作：多 SW 共存 namespace 隔离 + @mention 驱动 AgentForge 唤醒
+- `role_staffing` 配置驱动 AgentForge 自动 spawn Agent 并赋予 Role
 
 ---
 
@@ -1145,6 +1152,372 @@ THEN   两个 Agent 独立响应
 
 ---
 
+## §16 CodeViber 功能验证
+
+> **Spec 引用**：codeviber-prd.md
+
+### TC-5-CV-001: Session 创建与 Mentor 通知
+
+```
+GIVEN  CodeViber 已启用 (ext.runtime.enabled: ["cv"])
+       E-alice 拥有 cv:learner Role
+       E-bob 和 @coding-bot 拥有 cv:mentor Role
+
+WHEN   E-alice 发送: /cv:request --topic "SQL optimization"
+
+THEN   1. EXT-17 namespace check: "cv" ∈ enabled ✓
+       2. Auto Role check: E-alice 持有 session.request capability ✓
+       3. Flow: session_lifecycle 创建，state = pending
+       4. CodeViber.on_session_request() 执行
+       5. cv:session.notify Message 发出，@mention E-bob 和 @coding-bot
+       6. command_result: { status: "success", session_id: ..., notified_mentors: 2 }
+```
+
+### TC-5-CV-002: Mentor 接受 Session
+
+```
+GIVEN  Session 已创建 (state = pending)
+       @coding-bot 拥有 cv:mentor Role
+
+WHEN   @coding-bot 发送 cv:session.accept (reply_to = session ref)
+
+THEN   1. Auto Role check: @coding-bot 持有 session.accept capability ✓
+       2. Auto Flow check: pending + session.accept → active ✓
+       3. Flow state: pending → active
+       4. State Cache 更新
+```
+
+### TC-5-CV-003: 问答完整流程
+
+```
+GIVEN  Session state = active
+       @coding-bot 是 active session 的 mentor
+
+WHEN   E-alice 发送 cv:question.ask body={"question": "How to optimize JOIN?"}
+
+THEN   1. Flow check: active + question.ask → active (self-loop) ✓
+       2. Commitment 记录: cv:mentor 须在 5m 内 guidance.provide
+       3. CodeViber @mention @coding-bot
+
+WHEN   @coding-bot 发送 cv:guidance.provide body={"answer": "...", "confidence": 0.9}
+
+THEN   1. Flow check: active + guidance.provide → active ✓
+       2. Commitment "response_sla" 标记为 fulfilled
+       3. confidence >= 0.5 → 不触发 escalation
+```
+
+### TC-5-CV-004: 低置信度 Escalation
+
+```
+GIVEN  Session state = active
+       @coding-bot 是 mentor，E-bob 也是 cv:mentor
+
+WHEN   @coding-bot 发送 cv:guidance.provide body={"answer": "...", "confidence": 0.3}
+
+THEN   1. Commitment fulfilled ✓
+       2. CodeViber.on_guidance() 检测 confidence < 0.5
+       3. cv:_system.escalation Message 发出
+       4. @mention E-bob（人类 mentor）
+       5. Flow state: active → escalated
+```
+
+### TC-5-CV-005: Session 关闭
+
+```
+GIVEN  Session state = active
+
+WHEN   E-alice 发送 /cv:close
+
+THEN   1. Role check: E-alice 持有 session.close capability ✓
+       2. Flow: active → closed
+       3. EventWeaver 记录 session 完整历史
+```
+
+### TC-5-CV-006: 无 Mentor 时拒绝创建 Session
+
+```
+GIVEN  Room 中没有任何 Entity 持有 cv:mentor Role
+
+WHEN   E-alice 发送 /cv:request --topic "Rust lifetimes"
+
+THEN   CodeViber.on_session_request() 检测无 mentor
+       ctx.fail("No mentor available in this room")
+       command_result: { status: "error", error: "CV_NO_MENTOR" }
+```
+
+### TC-5-CV-007: 无 AgentForge 时纯人类工作
+
+```
+GIVEN  CodeViber 已启用，AgentForge 未安装
+       E-bob 拥有 cv:mentor Role（人类）
+       E-alice 拥有 cv:learner Role（人类）
+
+WHEN   E-alice 发送 /cv:request --topic "Python debugging"
+
+THEN   CodeViber 正常工作
+       @mention E-bob（人类）
+       E-bob 手动回复 cv:guidance.provide
+       完整 session lifecycle 正常运行
+       不依赖 AgentForge
+```
+
+### TC-5-CV-008: 跨 Socialware 协作 — CodeViber + TaskArena
+
+```
+GIVEN  CodeViber 和 TaskArena 同时在 R-alpha 启用
+       @worker-bot 持有 ta:worker 和 cv:learner Role
+       @coding-bot 持有 cv:mentor Role
+
+WHEN   @worker-bot 正在执行 TaskArena 任务 (task state = in_progress)
+       @worker-bot 发送 /cv:request --topic "CRDT merge" --context "ta:task:42"
+
+THEN   CodeViber 正常处理 session.request
+       TaskArena 不受影响（namespace 隔离）
+       两个 Socialware 的 Hook 独立执行
+       EventWeaver 记录跨 Socialware 因果链
+```
+
+---
+
+## §17 Socialware DSL 与类型约束验证
+
+> **Spec 引用**：socialware-spec §9, §10
+
+### TC-5-DSL-001: @when 自动生成 Hook Pipeline
+
+```
+GIVEN  CodeViber 声明包含:
+       roles = { "cv:mentor": Role(capabilities=("guidance.provide",)) }
+       session_lifecycle = Flow(transitions={("pending","session.accept"): "active"})
+       @when("session.request") handler
+
+WHEN   Socialware Runtime 加载 CodeViber
+
+THEN   自动注册以下 Hook:
+       [pre_send, p100]  Role capability check (cv:*)
+       [pre_send, p101]  Flow transition validation (session_lifecycle)
+       [after_write, p100] State Cache update
+       [after_write, p105] Command dispatch
+       [after_write, p110] @when("session.request") handler
+       开发者未写任何 @hook 声明
+```
+
+### TC-5-DSL-002: SocialwareContext 类型约束 — 发送
+
+```
+GIVEN  CodeViber @when handler 中的 ctx: SocialwareContext
+
+WHEN   handler 调用 ctx.send("session.notify", body={...}, mentions=[...])
+
+THEN   Runtime 自动完成:
+       content_type = "cv:session.notify"
+       channels = ["_sw:cv"]
+       ext.mentions = [...]
+       Ref 签名
+       Message 写入 Timeline
+```
+
+### TC-5-DSL-003: SocialwareContext 类型约束 — 拒绝底层操作
+
+```
+GIVEN  CodeViber @when handler 中的 ctx: SocialwareContext
+
+WHEN   handler 尝试调用:
+       await ctx.messages.send(content_type="cv:session.notify", channels=["_sw:cv"])
+
+THEN   AttributeError: 'SocialwareContext' has no attribute 'messages'
+       （类型系统在 IDE 中也会报错）
+```
+
+### TC-5-DSL-004: SocialwareContext 类型约束 — 拒绝 Hook 注册
+
+```
+GIVEN  CodeViber @when handler 中的 ctx: SocialwareContext
+
+WHEN   handler 尝试调用:
+       await ctx.hook.register(phase="after_write", trigger=..., priority=200)
+
+THEN   AttributeError: 'SocialwareContext' has no attribute 'hook'
+```
+
+### TC-5-DSL-005: unsafe=True 模式允许底层操作
+
+```
+GIVEN  AgentForge 声明: @socialware("agent-forge", unsafe=True)
+       @hook handler 中的 ctx (EngineContext)
+
+WHEN   handler 调用:
+       await ctx.messages.send(room_id=..., content_type="immutable", body={...})
+
+THEN   成功发送（EngineContext 提供完整底层访问）
+```
+
+### TC-5-DSL-006: 非 unsafe 模式下 @hook 被拒绝
+
+```
+GIVEN  CodeViber 声明: @socialware("code-viber") （无 unsafe=True）
+
+WHEN   class 中包含:
+       @hook(phase="after_write", trigger="timeline_index.insert", priority=110)
+       async def raw_handler(self, event, ctx): ...
+
+THEN   加载时抛出 UnsafeRequiredError:
+       "@hook decorator requires @socialware(unsafe=True)"
+```
+
+### TC-5-DSL-007: Role check 自动拒绝无权限发送
+
+```
+GIVEN  CodeViber 已加载
+       E-charlie 不持有任何 cv:* Role
+
+WHEN   E-charlie 尝试发送 cv:session.request Message
+
+THEN   Auto Role check Hook (pre_send, p100) 拒绝:
+       Reject("Lacks capability 'session.request'")
+       Message 不写入 Timeline
+```
+
+### TC-5-DSL-008: Flow validation 自动拒绝非法转换
+
+```
+GIVEN  Session state = closed
+
+WHEN   有人尝试发送 cv:question.ask (reply_to = closed session)
+
+THEN   Auto Flow check Hook (pre_send, p101) 拒绝:
+       Reject("Invalid transition: closed + question.ask not defined")
+       Message 不写入 Timeline
+```
+
+### TC-5-DSL-009: ctx.succeed / ctx.fail 自动写入 command_result
+
+```
+GIVEN  CodeViber @when("session.request") handler
+       E-alice 通过 /cv:request 触发
+
+WHEN   handler 调用 await ctx.succeed({"session_id": "s-123"})
+
+THEN   command_result Annotation 写入:
+       { invoke_id: event.ext.command.invoke_id,
+         status: "success",
+         result: {"session_id": "s-123"} }
+       SSE command.result 事件发出
+```
+
+### TC-5-DSL-010: 声明式 Role/Flow/Commitment 解析
+
+```
+GIVEN  TaskArena 使用新 DSL 声明:
+       roles = { "ta:worker": Role(capabilities=capabilities("task.claim", "task.submit")) }
+       task_lifecycle = Flow(subject="task.propose", transitions={("open","task.claim"): "claimed"})
+       commitments = [Commitment(id="reward", between=("ta:publisher","ta:worker"), ...)]
+
+WHEN   Runtime 解析声明
+
+THEN   roles 展开为 Part B 标准格式
+       flow 展开为 Part B 标准格式
+       commitments 展开为 Part B 标准格式
+       与 v0.9.3 手写 Part B 等价
+```
+
+---
+
+## §18 Socialware 间协作验证
+
+> **Spec 引用**：socialware-spec §11
+
+### TC-5-COLLAB-001: Ad-hoc 协作 — 多 Socialware 共存
+
+```
+GIVEN  R-alpha 启用 CodeViber (cv) 和 TaskArena (ta)
+       @worker-bot 持有 ta:worker + cv:learner Role
+       @mentor-bot 持有 cv:mentor Role
+
+WHEN   @worker-bot 发送 /cv:request --topic "help with task"
+
+THEN   CodeViber 正常处理（cv namespace）
+       TaskArena 的 Hook 不被触发（ta namespace 隔离）
+       EXT-17 namespace check 独立执行
+```
+
+### TC-5-COLLAB-002: @mention 驱动的 AgentForge 唤醒
+
+```
+GIVEN  @coding-bot (SLEEPING) 持有 cv:mentor Role
+       AgentForge auto_wake_on_mention = true
+
+WHEN   CodeViber @mention @coding-bot
+
+THEN   AgentForge 的 @mention Hook 检测到 SLEEPING Agent 被 @mention
+       Agent status: SLEEPING → ACTIVE
+       Adapter 重建
+       @coding-bot 正常处理 CodeViber 的 session
+       CodeViber 不知道唤醒过程发生了什么
+```
+
+### TC-5-COLLAB-003: role_staffing 自动 Spawn
+
+```
+GIVEN  ext.runtime.config:
+         af.role_staffing:
+           "cv:mentor": { prefer: "agent", template: "code-assistant", auto_spawn: true }
+       CodeViber 刚在 R-alpha 启用
+       Room 中没有持有 cv:mentor 的 Agent
+
+WHEN   AgentForge 检测到 cv 启用事件
+
+THEN   AgentForge 读取 role_staffing 配置
+       使用 "code-assistant" 模板 spawn Agent
+       新 Agent 获得 cv:mentor Role
+       Agent 加入 R-alpha
+       CodeViber 不感知此过程（只看到多了一个 cv:mentor）
+```
+
+### TC-5-COLLAB-004: role_staffing 引用不存在的 Role
+
+```
+GIVEN  ext.runtime.config:
+         af.role_staffing:
+           "xx:nonexistent": { prefer: "agent", template: "generic", auto_spawn: true }
+       没有安装 namespace "xx" 的 Socialware
+
+WHEN   AgentForge 启动并扫描 role_staffing
+
+THEN   AgentForge 记录警告: "Role xx:nonexistent references unknown namespace 'xx'"
+       不阻止 AgentForge 启动
+       不 spawn Agent
+```
+
+### TC-5-COLLAB-005: Profile-based 能力发现
+
+```
+GIVEN  CodeViber 在 Platform Bus 注册 Profile:
+       { entity_type: "service", capabilities: ["coding-guidance", "code-review"] }
+
+WHEN   AgentForge 通过 Discovery Index 搜索 "coding-guidance"
+
+THEN   返回 CodeViber 的 Profile
+       AgentForge 可以据此决定 spawn 何种 Agent 模板
+```
+
+### TC-5-COLLAB-006: Compose 后跨 Socialware 规则
+
+```
+GIVEN  SmartTeam = Compose([CodeViber, TaskArena, AgentForge])
+       SmartTeam 新增规则: "cv:mentor 连续 3 次 confidence < 0.5 → 自动替换 Agent"
+
+WHEN   @coding-bot 第 3 次低置信度回答
+
+THEN   SmartTeam 的跨 SW 规则触发
+       AgentForge 接收 Agent 替换请求
+       旧 Agent 进入 SLEEPING
+       新 Agent（不同模板）spawn 并接管 cv:mentor Role
+       CodeViber 和 TaskArena 无感知
+```
+
+---
+
 ## 附录：Test Case 统计
 
 | 区域 | 编号范围 | 数量 |
@@ -1167,5 +1540,8 @@ THEN   两个 Agent 独立响应
 | Socialware 安装 | TC-5-INST-001~006 | 6 |
 | Socialware Commands | TC-5-CMD-001~005 | 5 |
 | AgentForge | TC-5-AF-001~011 | 11 |
-| **合计（含引用）** | | **106** |
-| **合计（新增 test case）** | | **72** |
+| **CodeViber** | **TC-5-CV-001~008** | **8** |
+| **Socialware DSL** | **TC-5-DSL-001~010** | **10** |
+| **Socialware 间协作** | **TC-5-COLLAB-001~006** | **6** |
+| **合计（含引用）** | | **130** |
+| **合计（新增 test case）** | | **96** |
