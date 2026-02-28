@@ -97,6 +97,7 @@ monorepo/
 | [docs/socialware/](docs/socialware/) | **Socialware PRD** — EventWeaver, TaskArena, ResPool, AgentForge, CodeViber |
 | [docs/products/](docs/products/) | **产品文档** — 桌面应用, Chat UI, HTTP API, CLI |
 | [docs/plan/](docs/plan/) | **实施计划** — Phase 0–5 |
+| [docs/eep/](docs/eep/) | **设计提案 (EEP)** — ezagent Enhancement Proposal |
 | [MONOREPO.md](MONOREPO.md) | **Monorepo 管理** — subtree 操作、CI 同步、分支策略 |
 
 ### 阅读路径
@@ -105,6 +106,7 @@ monorepo/
 - **理解全貌** → [docs/README.md](docs/README.md)
 - **写 Socialware** → [TLDR-socialware-dev.md](docs/tldr/TLDR-socialware-dev.md) → [socialware-spec.md](docs/specs/socialware-spec.md) → [py-spec.md](docs/specs/py-spec.md)
 - **理解架构** → [TLDR-architecture.md](docs/tldr/TLDR-architecture.md) → [architecture.md](docs/specs/architecture.md)
+- **提出设计提案** → [EEP-0000.md](docs/eep/EEP-0000.md)
 - **开始开发** → [MONOREPO.md](MONOREPO.md) → [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
