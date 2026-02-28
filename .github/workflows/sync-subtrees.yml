@@ -28,21 +28,16 @@ jobs:
           git remote add app     https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/app
 
       - name: Sync docs
-        if: contains(github.event.head_commit.modified, 'docs/')
         run: git subtree push --prefix=docs docs main
 
       - name: Sync ezagent
-        if: contains(github.event.head_commit.modified, 'ezagent/')
         run: git subtree push --prefix=ezagent ezagent main
 
       - name: Sync relay
-        if: contains(github.event.head_commit.modified, 'relay/')
         run: git subtree push --prefix=relay relay main
 
       - name: Sync page
-        if: contains(github.event.head_commit.modified, 'page/')
         run: git subtree push --prefix=page page main
 
       - name: Sync app
-        if: contains(github.event.head_commit.modified, 'app/')
         run: git subtree push --prefix=app app main
