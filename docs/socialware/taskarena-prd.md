@@ -1,8 +1,8 @@
-# TaskArena — Product Requirements Document v0.3.0
+# TaskArena — Product Requirements Document v0.3.1
 
 > **状态**：Draft
-> **日期**：2026-02-27
-> **前置文档**：ezagent-socialware-spec-v0.9.3
+> **日期**：2026-02-28
+> **前置文档**：ezagent-socialware-spec-v0.9.5
 > **定位**：应用级 Socialware
 > **依赖**：EventWeaver（事件追踪与争议管理）、ResPool（资源获取与奖励发放）
 > **架构**：方案 E — Role-Driven Message（Socialware 不创建 Datatype，状态从 Message 纯派生）
@@ -255,7 +255,7 @@ TaskArena 的核心理念是：**任务是一种结构化的承诺关系**。Pub
 ```yaml
 id: "task-arena"
 namespace: "ta"
-version: "0.9.3"
+version: "0.9.5"
 dependencies: ["channels", "reply-to", "command", "runtime"]
 ```
 
@@ -1231,14 +1231,13 @@ ezagent/socialware/task-arena/
 id = "task-arena"
 name = "TaskArena"
 namespace = "ta"
-version = "0.9.3"
+version = "0.9.5"
 
 [declaration]
 content_types = ["ta:task.propose", "ta:task.claim", "ta:task.submit", "ta:task.cancel",
                  "ta:verdict.approve", "ta:verdict.reject", "ta:verdict.request_revision",
                  "ta:dispute.open", "ta:dispute.resolve",
                  "ta:role.grant", "ta:role.revoke"]
-hooks = ["check_role", "check_flow", "check_business_rules", "advance_flow", "check_consensus", "check_commitments"]
 roles = ["ta:publisher", "ta:worker", "ta:reviewer", "ta:arbiter"]
 flows = ["task_lifecycle", "review_cycle", "reputation_evolution"]
 
@@ -1272,30 +1271,44 @@ TaskArena 注册以下命令（命名空间 `ta`）：
 | `/ta:arbitrate` | `--dispute-id`, `--ruling` | `ta:arbiter` | 仲裁争议 |
 | `/ta:cancel` | `--task-id` | `ta:publisher` | 取消任务 |
 
-命令处理示例：
+命令处理示例（v0.9.5 推荐方式）：
 
 ```python
+from ezagent import socialware, when, Role, Flow, capabilities, SocialwareContext
+
 @socialware("task-arena")
 class TaskArena:
-    @hook(phase="after_write", trigger="timeline_index.insert",
-          filter="ext.command.ns == 'ta'", priority=110)
-    async def on_command(self, event, ctx):
-        cmd = event.ref.ext.command
-        if cmd.action == "claim":
-            task_ref_id = cmd.params["task_id"]
-            task_state = self.state.flow_states.get(task_ref_id)
-            if task_state != "open":
-                await ctx.command.result(cmd.invoke_id, status="error",
-                    error=f"Task is {task_state}, cannot claim")
-                return
-            # 发送 claim Message（触发 Flow transition + State Cache 更新）
-            await ctx.messages.send(
-                room_id=event.room_id,
-                content_type="ta:task.claim",
-                body={"reason": cmd.params.get("reason", "")},
-                reply_to=task_ref_id,
-                channels=["_sw:ta"],
-            )
-            await ctx.command.result(cmd.invoke_id, status="success",
-                result={"task_id": task_ref_id, "new_state": "claimed"})
+    namespace = "ta"
+    roles = {
+        "ta:publisher": Role(capabilities=capabilities("task.propose", "task.cancel")),
+        "ta:worker":    Role(capabilities=capabilities("task.claim", "task.submit")),
+        "ta:reviewer":  Role(capabilities=capabilities("verdict.approve", "verdict.reject")),
+        "ta:arbiter":   Role(capabilities=capabilities("dispute.resolve")),
+    }
+    task_lifecycle = Flow(
+        subject="task.propose",
+        transitions={
+            ("open",      "task.claim"):      "claimed",
+            ("claimed",   "task.submit"):     "submitted",
+            ("submitted", "verdict.approve"): "approved",
+            ("submitted", "verdict.reject"):  "rejected",
+            ("rejected",  "dispute.open"):    "disputed",
+            ("disputed",  "dispute.resolve"): "resolved",
+        },
+    )
+
+    @when("claim")
+    async def on_claim(self, event, ctx: SocialwareContext):
+        task_ref_id = event.params["task_id"]
+        task_state = ctx.state.flow_states.get(task_ref_id)
+        if task_state != "open":
+            await ctx.fail(f"Task is {task_state}, cannot claim")
+            return
+        # Role check 和 Flow validation 由 Runtime 自动完成
+        await ctx.send("task.claim",
+                       body={"reason": event.params.get("reason", "")},
+                       target=task_ref_id)
+        await ctx.succeed({"task_id": task_ref_id, "new_state": "claimed"})
 ```
+
+> **注**：`content_type` 拼接（`ta:task.claim`）、`channels` 设置（`["_sw:ta"]`）、Role capability check、Flow transition validation、State Cache 更新均由 Runtime 自动完成。底层 `@hook` + `EngineContext` 方式仍可通过 `@socialware("task-arena", unsafe=True)` 使用，参见 socialware-spec §10。

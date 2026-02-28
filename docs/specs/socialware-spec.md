@@ -1,8 +1,8 @@
-# ezagent Socialware Specification v0.9.3
+# ezagent Socialware Specification v0.9.5
 
 > **状态**：Architecture Draft
-> **日期**：2026-02-27
-> **前置文档**：ezagent-protocol-v0.8, ezagent-bus-spec-v0.9.3, ezagent-extensions-spec-v0.9.3
+> **日期**：2026-02-28
+> **前置文档**：ezagent-architecture-v0.9.4, ezagent-bus-spec-v0.9.4, ezagent-extensions-spec-v0.9.4
 > **作者**：Allen & Claude collaborative design
 
 ---
@@ -13,7 +13,29 @@ Socialware 是在 ezagent 之上构建的、由 Agent 驱动的人机混合软�
 
 **核心洞察**：未来的软件不仅仅是代码，更是组织关系的体现。一个 Socialware 是代码与 Agent 的混合，Agent 在一般情况下由 LLM 驱动，在训练或必要时由人类介入。Socialware 可以动态地进行 Fork、Compose、Merge，就像现实世界的企业间进行分拆、合资与并购一样。
 
-**分形架构**：ezagent 协议具有三层结构，每层四个要素，层间有严格的构建关系。
+### §0.1 你是组织设计师，不是程序员
+
+当你创建一个 Socialware，你在做的事情是**设计一个组织**——定义岗位（Role）、划定部门边界（Arena）、制定 SLA 和合同条款（Commitment）、规划工作流程（Flow）。你不需要实现任何一个岗位的具体工作——那是被分配到该岗位的 Identity（人类或 Agent）自己的事。
+
+一个 Socialware 的 `@when` handler 只包含**组织管理逻辑**——路由、通知、协调、记录。不包含业务实现。以编程指导服务（CodeViber）为例：
+
+```python
+@when("session.request")
+async def on_session_request(self, event, ctx: SocialwareContext):
+    """找到可用 mentor 并通知。不实现任何 AI 逻辑。"""
+    mentors = ctx.state.roles.find("cv:mentor", room=event.room_id)
+    await ctx.send("session.notify",
+                   body={"learner": event.author, "topic": event.body["topic"]},
+                   mentions=[m.entity_id for m in mentors])
+```
+
+"如何回答编程问题"是 mentor（人类或 Agent）的职责。CodeViber 只确保正确的 mentor 收到问题、按时回答、质量不合格时升级。你的 Socialware 代码量会很少——因为大部分"工作"是由 Role 持有者通过发 Message 来完成的。
+
+Socialware 不区分参与者是人还是 Agent。正如公司章程不区分员工的雇佣形式——章程定义的是岗位和规则，谁来填充岗位是运营决策。AgentForge 管理的 Agent 通过 @mention 自然参与 Socialware 的协作，不需要任何特殊的 Socialware 间调用协议。
+
+### §0.2 分形架构
+
+ezagent 协议具有三层结构，每层四个要素，层间有严格的构建关系。
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -34,37 +56,29 @@ Socialware 是在 ezagent 之上构建的、由 Agent 驱动的人机混合软�
 - Bottom → Mid-layer：**组合关系**。Mid-layer 实体由底层原语组合构成。Identity、Room、Message、Timeline 都是 DataType 声明 + Hook 行为 + Annotation 元数据 + Index 查询能力 的组合。
 - Mid-layer → Socialware：**施加关系**。Socialware 原语作为正交维度施加于 Mid-layer 实体。每个原语可以施加于任何 Mid-layer 实体，每个实体可以被多个原语描述。
 
-**零浮空概念原则**：Socialware 不创造新的实体类型，也不创建新的 Datatype 或 CRDT 文档。所有领域概念（event、task、resource 等）都是具有特定 content_type 的 Message——Mid-layer 实体本身，而非引入新的抽象层。任何领域术语都必须能分解为"特定 content_type 的 Message + Socialware 四原语约束"。
+### §0.3 开发者的层级边界
 
-**Socialware 是行为约束者，不是数据管理者。** 四原语（Role, Arena, Commitment, Flow）全部是约束——约束谁能发什么 Message（Role）、在哪个 Room 中生效（Arena）、发了 Message 之后必须做什么（Commitment）、Message 的合法序列是什么（Flow）。Socialware 不需要自己的数据存储，所有状态隐含在 Timeline 的 Message 序列中，运行时状态由 State Cache 纯派生。
+Socialware 开发者默认只能操作 **Mid-layer 以上**的概念。底层概念（DataType、Hook Pipeline、Annotation Store、Index Builder）和 Extension 层概念（`ext.*` 命名空间、content_type 拼接、Channel 路由）由 Socialware Runtime 自动封装。
 
-**Python-First Socialware。** Socialware 的声明和运行时逻辑通过 Python 编写。ezagent-py 提供声明式 DSL：
+```
+开发者角色              可用 API 类型           可访问范围
+──────────────────────────────────────────────────────────
+普通 Socialware 开发者   SocialwareContext       Mid-layer + 四原语
+                        （受限类型）             不可越界
 
-```python
-@socialware("event-weaver")
-class EventWeaver:
-    namespace = "ew"
-
-    roles = {
-        "ew:chronicler": {"capabilities": {"branch.create", "branch.merge"}},
-    }
-
-    # Socialware Hook（应用层，priority >= 100）
-    @hook(phase="after_write", trigger="timeline_index.insert",
-          filter="content_type startswith 'ew:'", priority=100)
-    async def on_ew_message(self, event, ctx):
-        # State Cache 更新
-        self.state.apply(event.ref)
-
-    @hook(phase="pre_send", trigger="timeline_index.insert",
-          filter="content_type startswith 'ew:'", priority=100)
-    async def check_role(self, event, ctx):
-        action = event.ref.content_type.split(":")[1]  # e.g. "branch.create"
-        if not self.roles.has_capability(event.room_id, event.ref.author, action):
-            raise Reject(f"Lacks capability '{action}'")
+基础设施 Socialware      EngineContext           全部层级
+(@socialware(unsafe=True))（完整类型）           需显式声明
 ```
 
-底层通过 PyO3 将 Python Hook 注册到 Rust Engine Pipeline。Socialware 开发者无需接触 Rust。协议层功能（Extension API）通过 ctx 对象直接调用——这些 API 从 Extension 统一声明格式自动生成（详见 ezagent-py-spec §6）。
+这是**约束（constraint）而非约定（convention）**——`SocialwareContext` 上根本不存在底层操作方法。类似 Rust 的所有权模型：默认 safe，`unsafe` 需显式标注。详见 §10。
+
+### §0.4 核心原则
+
+**零浮空概念原则**：Socialware 不创造新的实体类型，也不创建新的 Datatype 或 CRDT 文档。所有领域概念（event、task、resource、session 等）都是具有特定 content_type 的 Message——Mid-layer 实体本身。任何领域术语都必须能分解为"特定 content_type 的 Message + Socialware 四原语约束"。
+
+**Socialware 是行为约束者，不是数据管理者。** 四原语（Role, Arena, Commitment, Flow）全部是约束——约束谁能发什么 Message（Role）、在哪个 Room 中生效（Arena）、发了 Message 之后必须做什么（Commitment）、Message 的合法序列是什么（Flow）。所有状态隐含在 Timeline 的 Message 序列中，运行时状态由 State Cache 纯派生。
+
+**Python-First Socialware。** Socialware 的声明和运行时逻辑通过 Python 编写。ezagent-py 提供声明式 DSL（详见 §9），底层通过 PyO3 注册到 Rust Engine Pipeline。开发者无需接触 Hook Pipeline、content_type 拼装、Channel 路由等底层细节。
 
 ---
 
@@ -753,12 +767,372 @@ class TaskArena:
                 result={"task_id": task_ref_id, "new_state": "claimed"})
 ```
 
-- [MUST] Socialware Hook 的 `filter` MUST 使用 `ext.command.ns` 确保只接收自己命名空间的命令。
-- [MUST] Socialware Hook MUST 在处理完成后写入 `command_result`（成功或失败均需写入）。
+- [MUST] Socialware Hook 的 `filter` MUST 使用 `ext.command.ns` 确保只接收自己命名空间的命令（`@hook` 模式），或由 Runtime 自动路由（`@when` 模式，§9）。
+- [MUST] Socialware Hook MUST 在处理完成后写入 `command_result`（`@when` 模式下通过 `ctx.succeed()` / `ctx.fail()` 自动完成）。
 - [SHOULD] Socialware Hook SHOULD 在 30s 内完成处理。超时由 EXT-15 的 timeout Hook 自动检测。
 - [MUST] 命令处理的最终结果是**发送一条 Socialware content_type 的 Message**，而非直接修改数据。
+- [SHOULD] 新开发的 Socialware SHOULD 使用 §9 DSL（`@when` + `SocialwareContext`）。`@hook` + `EngineContext` 保留给 `unsafe=True` 模式和向后兼容。
 
 ---
+
+---
+
+## §9 Socialware Developer DSL
+
+> **设计目标**：让 Socialware 开发者只写组织管理逻辑（路由、通知、协调），底层细节由 Runtime 自动生成。
+
+### §9.1 设计原则
+
+Socialware DSL 的核心原则是**声明驱动自动生成**：
+
+1. 开发者声明 Role / Flow / Commitment → Runtime 自动注册对应的 pre_send / after_write Hook
+2. 开发者写 `@when(action)` handler → Runtime 自动完成 content_type 路由、namespace 过滤
+3. 开发者通过 `ctx.send(action, body)` 发送 Message → Runtime 自动拼接 `content_type`、设置 `channels`、添加签名
+
+**开发者不需要触及的概念**（由 Runtime 自动完成）：
+
+| 底层概念 | 自动生成规则 |
+|---------|------------|
+| `content_type` 拼接 | `f"{self.namespace}:{action}"` |
+| `channels` 设置 | `[f"_sw:{self.namespace}"]` |
+| Hook `phase` / `trigger` / `filter` / `priority` | 从声明推导（§9.3） |
+| Role capability check | 从 `roles` 声明生成 pre_send Hook |
+| Flow transition validation | 从 `flows` 声明生成 pre_send Hook |
+| State Cache 更新 | 从 `flows` 声明生成 after_write Hook |
+| EXT-15 Command → action 路由 | 从 `commands` manifest 生成 after_write Hook |
+
+### §9.2 @when decorator
+
+```python
+from ezagent import socialware, when, SocialwareContext
+
+@socialware("code-viber")
+class CodeViber:
+    namespace = "cv"
+    roles = { ... }
+    session_lifecycle = Flow( ... )
+    commitments = [ ... ]
+
+    @when("session.request")
+    async def on_session_request(self, event, ctx: SocialwareContext):
+        """当 cv:session.request Message 被写入后执行。"""
+        ...
+
+    @when("guidance.provide")
+    async def on_guidance(self, event, ctx: SocialwareContext):
+        """当 cv:guidance.provide Message 被写入后执行。"""
+        ...
+```
+
+**`@when(action)` 语义**：
+
+| 属性 | 值 |
+|------|---|
+| 触发时机 | `after_write`（Message 已持久化后） |
+| 触发条件 | `content_type == f"{self.namespace}:{action}"` |
+| 自动前置检查 | Role check + Flow validation（Runtime 自动注册为 pre_send Hook，priority 100-109） |
+| handler priority | 110（在 Role/Flow check 之后） |
+| handler 收到的 ctx | `SocialwareContext`（受限类型，§10） |
+
+- [MUST] `@when` handler 的 `event` 参数包含已写入的 Ref 信息：`event.author`、`event.body`、`event.ref_id`、`event.room_id`。
+- [MUST] 通过 EXT-15 Command 触发时，`event.params` 包含命令参数。
+- [MUST] `@when` handler 的 `ctx` 类型为 `SocialwareContext`（§10）。
+- [MUST NOT] `@when` handler 中不可抛出 `Reject`——Message 已写入。业务拒绝通过 `ctx.fail()` 返回。
+- [SHOULD] `@when` handler 只包含组织管理逻辑（查找 Role 持有者、发通知、检查 Commitment），不应包含业务实现逻辑（如 LLM 调用）。
+
+### §9.3 Runtime 自动生成规则
+
+Socialware Runtime 从 Part B 声明自动生成以下 Hook：
+
+#### Role check Hook（auto-generated, pre_send, priority 100）
+
+```
+对于 roles 声明中的每个 capability：
+  IF incoming content_type 的 action 匹配该 capability
+  AND author 不持有包含该 capability 的 Role
+  THEN Reject("Lacks capability '{action}' for role '{role_id}'")
+```
+
+#### Flow validation Hook（auto-generated, pre_send, priority 101）
+
+```
+对于 flows 声明中的每个 transition：
+  IF incoming content_type 的 action 匹配 transition trigger
+  AND 当前 Flow state 不在 transition 的 source states 中
+  THEN Reject("Invalid transition: {current_state} + {action} not defined")
+```
+
+#### State Cache update Hook（auto-generated, after_write, priority 100）
+
+```
+对于每条写入的 Socialware Message：
+  1. 更新 flow_states（如果 action 是 Flow trigger）
+  2. 更新 role_assignments（如果 content_type 是 role.grant/revoke）
+  3. 检查 Commitment（如果 action 满足 triggered_by 条件）
+  4. 检查 Commitment 超时（如果 deadline 已过）
+```
+
+#### Command dispatch Hook（auto-generated, after_write, priority 105）
+
+```
+对于每条含 ext.command 且 ns == self.namespace 的 Message：
+  1. 提取 action 和 params
+  2. 查找匹配的 @when handler
+  3. 调用 handler，传入 SocialwareContext
+  4. 如果 handler 未调用 ctx.succeed/fail，自动写入 command_result
+```
+
+- [MUST] 自动生成的 Hook 遵循 Bus Spec §3.2.6 的 priority >= 100 约束。
+- [MUST] Role check 和 Flow validation 在 `@when` handler 之前执行。拒绝时 handler 不被调用。
+- [MUST] 自动生成的 Hook 对开发者不可见。
+
+### §9.4 声明式语法糖
+
+```python
+from ezagent import (
+    socialware, when, Role, Flow, Commitment, Arena,
+    capabilities, preferred_when, SocialwareContext,
+)
+
+@socialware("task-arena")
+class TaskArena:
+    namespace = "ta"
+
+    roles = {
+        "ta:publisher": Role(capabilities=capabilities("task.propose", "task.cancel")),
+        "ta:worker":    Role(capabilities=capabilities("task.claim", "task.submit")),
+        "ta:reviewer":  Role(capabilities=capabilities("verdict.approve", "verdict.reject")),
+    }
+
+    task_lifecycle = Flow(
+        subject="task.propose",
+        states=("open", "claimed", "submitted", "in_review",
+                "approved", "rejected", "disputed", "cancelled"),
+        transitions={
+            ("open",      "task.claim"):      "claimed",
+            ("claimed",   "task.submit"):     "submitted",
+            ("submitted", "verdict.approve"): "approved",
+            ("submitted", "verdict.reject"):  "rejected",
+        },
+        preferences={
+            "verdict.approve": preferred_when("reviewer_count >= 2"),
+        },
+    )
+
+    commitments = [
+        Commitment(
+            id="reward_guarantee",
+            between=("ta:publisher", "ta:worker"),
+            obligation="Publisher pays reward upon approval",
+            triggered_by="verdict.approve",
+        ),
+    ]
+
+    arenas = [
+        Arena(id="task_marketplace", boundary="external"),
+        Arena(id="review_chamber", boundary="internal"),
+    ]
+```
+
+- [MUST] 语法糖在 `@socialware` decorator 解析时展开为标准 Part B 声明格式（§2.2）。
+- [MUST] `Role(capabilities=...)` 中的 capability 名称 MUST 与 content_type 的 action 部分一致。
+- [MUST] `Flow(transitions=...)` 中的 action 名称 MUST 与 content_type 的 action 部分一致。
+
+---
+
+## §10 类型级层级约束
+
+> **设计目标**：通过 Python 类型系统强制开发者不可越过层级边界。一套 API，不是两套。
+
+### §10.1 SocialwareContext
+
+`SocialwareContext` 是 `@when` handler 中 `ctx` 参数的类型。只暴露 Mid-layer 以上的操作：
+
+```python
+class SocialwareContext:
+    """Socialware 开发者可用的操作集合。"""
+
+    # ── 发送 Socialware Message ──
+
+    async def send(self, action: str, body: dict, *,
+                   target: str | None = None,
+                   mentions: list[str] | None = None) -> str:
+        """发送一条 Socialware action Message。
+        Runtime 自动完成 content_type 拼接、channels 设置、签名。
+        Returns: ref_id。"""
+
+    async def reply(self, ref_id: str, action: str, body: dict, **kwargs) -> str:
+        """回复一条 Message。等同于 send(action, body, target=ref_id)。"""
+
+    # ── 命令结果 ──
+
+    async def succeed(self, result: dict | None = None):
+        """报告命令执行成功。"""
+
+    async def fail(self, error: str):
+        """报告命令执行失败。"""
+
+    # ── State Cache（只读）──
+
+    @property
+    def state(self) -> StateCache:
+        """当前 Socialware 的 State Cache。
+        Attributes:
+            flow_states: dict[str, str]
+            role_assignments: RoleMap
+            commitments: list[CommitmentState]
+        """
+
+    # ── Mid-layer 只读查询 ──
+
+    @property
+    def room(self) -> RoomAccessor:
+        """当前 Room 信息（只读）。"""
+
+    @property
+    def members(self) -> list[MemberInfo]:
+        """当前 Room 成员列表。"""
+
+    # ── Role 管理 ──
+
+    async def grant_role(self, entity_id: str, role: str):
+        """授予 Role。内部发送 {ns}:role.grant Message。"""
+
+    async def revoke_role(self, entity_id: str, role: str):
+        """撤回 Role。内部发送 {ns}:role.revoke Message。"""
+
+    # ── 以下方法在此类型上不存在（类型级排除）──
+    # ❌ ctx.messages.send(content_type=..., channels=[...])
+    # ❌ ctx.hook.register(phase=..., trigger=..., priority=...)
+    # ❌ ctx.annotations.write(key=..., value=...)
+    # ❌ ctx.runtime.list_sw_messages(...)
+```
+
+- [MUST] `SocialwareContext.send()` MUST 自动拼接 `content_type` 和 `channels`。
+- [MUST] `SocialwareContext` MUST NOT 暴露 `EngineContext` 的底层操作。
+- [MUST] Python type checker（mypy/pyright）可对 `SocialwareContext` 静态检查。
+- [SHOULD] Runtime 运行时也检查——反射绕过 SHOULD raise `LayerViolationError`。
+
+### §10.2 EngineContext
+
+`EngineContext` 是 `unsafe=True` 模式下的完整 ctx 类型：
+
+```python
+class EngineContext:
+    """完整的 Engine 操作集合。Bottom/Extension/Mid-layer/Socialware 全部操作。"""
+
+    # 包含 SocialwareContext 的全部方法 +
+    messages: MessageAPI          # ctx.messages.send(content_type=..., channels=[...])
+    rooms: RoomAPI                # ctx.rooms[id].config.update(...)
+    annotations: AnnotationAPI    # ctx.annotations.write(...)
+    runtime: RuntimeAPI           # ctx.runtime.list_sw_messages(...)
+    command: CommandAPI            # ctx.command.result(...)
+    hook: HookAPI                 # ctx.hook.register(...)
+```
+
+- [MUST] `EngineContext` 仅在 `@socialware(name, unsafe=True)` 中可用。
+- [MUST] `@hook` decorator 仅在 `unsafe=True` 模式下可使用。否则 MUST raise `UnsafeRequiredError`。
+
+### §10.3 unsafe=True 适用场景
+
+1. **基础设施级 Socialware**：如 AgentForge 的 @mention 检测 Hook
+2. **跨 Extension 集成**：如深度集成 EXT-14 Watch 的自动化系统
+3. **迁移期兼容**：从 v0.9.3 `@hook` 向 v0.9.5 `@when` 迁移
+
+- [SHOULD] 绝大多数 Socialware SHOULD 使用默认模式。
+- [MUST] `unsafe=True` MUST 在 manifest.toml 中标注 `unsafe = true`。
+
+---
+
+## §11 Socialware 间协作
+
+> **设计目标**：Socialware 间协作使用与人类协作相同的原语，不引入新的 Extension 或 Service Protocol。
+
+### §11.1 核心原则
+
+Socialware 之间的协作基于 **Room + Message + @mention + Role**，与人类协作完全相同。
+
+CodeViber 不知道 mentor 是人还是 Agent。它只 @mention 持有 `cv:mentor` Role 的 Identity。如果该 Identity 是 Agent，AgentForge 的 @mention Hook 自然唤醒它。如果是人类，IM 通知自然到达。不需要特殊的 Socialware 间调用协议——这是 §0.1 "Agent 即同事" 原则的直接体现。
+
+### §11.2 三种协作模式
+
+按"组织成熟度"分为三层，三者共存而非替代：
+
+#### 模式 1：Ad-hoc 协作（拉群模式）
+
+两个 Socialware 的 Role 持有者在同一 Room 中自然交互。
+
+**示例**：TaskArena 的 Worker 请求 CodeViber 帮助。
+
+```
+1. @worker-bot（ta:worker）在同一 Room 发送 /cv:request --topic "CRDT merge"
+2. CodeViber 正常处理，@mention cv:mentor
+3. 指导完成后 @worker-bot 继续 TaskArena 任务
+4. EventWeaver 自然追踪跨 Socialware 因果链
+```
+
+- [MUST] 同一 Room 中多个 Socialware 共存时，各自 namespace check 独立执行。
+
+**适用**：偶发的、非结构化的协作。
+
+#### 模式 2：能力发现（Profile + Discovery）
+
+通过 EXT-13 Profile 声明服务能力，通过 Discovery 查找。
+
+**示例**：AgentForge 查找能填充 cv:mentor Role 的 Agent。
+
+```
+1. CodeViber Profile: entity_type=service, capabilities=["coding-guidance"]
+2. AgentForge 通过 Discovery 搜索匹配的服务
+3. 读取 ext.runtime.config 中的 staffing 策略
+4. Spawn Agent 并赋予 cv:mentor Role
+```
+
+- [SHOULD] 提供外部服务的 Socialware SHOULD 声明 `entity_type: service` 的 Profile。
+
+**适用**：结构化的服务匹配和 Agent 分配。
+
+#### 模式 3：Compose（组织固化）
+
+协作模式稳定化后，通过 §4.2 Compose 固化为新 Socialware。
+
+**适用**：需要额外跨 Socialware 协调规则的成熟组合。
+
+### §11.3 ext.runtime.config 中的 staffing 策略
+
+```yaml
+ext.runtime:
+  config:
+    af:
+      role_staffing:
+        "cv:mentor":
+          prefer: "agent"            # agent | human | agent_preferred | human_preferred
+          template: "code-assistant"  # AgentForge Agent 模板 ID
+          auto_spawn: true
+        "ta:reviewer":
+          prefer: "agent_preferred"
+          template: "code-reviewer"
+          auto_spawn: false
+```
+
+- [MUST] `role_staffing` 是 `ext.runtime.config.af` 的子字段，由 AgentForge 处理。
+- [MUST] 目标 Socialware（如 CodeViber）不感知 `role_staffing` 的存在。
+- [MUST] 引用的 Role ID MUST 存在于对应 Socialware 的声明中。
+
+### §11.4 与 EXT-13 Profile 的关系
+
+| 概念 | 承载者 | 类比 |
+|------|--------|------|
+| 岗位权限 | Role.capabilities（Socialware 声明） | 公司章程中的职位权限 |
+| 岗位需求 | ext.runtime.config.role_staffing（运营配置） | HR 的岗位 JD |
+| 候选人简历 | EXT-13 Profile（Entity 自描述） | 个人简历 |
+| 匹配过程 | AgentForge / 人类管理员 | HR 招聘 |
+
+- [MUST NOT] Socialware 声明（Part B）MUST NOT 包含"需要什么样的人/Agent 来填充 Role"的信息。这是运营决策，不是组织章程。
+- [SHOULD] 需要特定技能的 Role 填充策略 SHOULD 放在 `ext.runtime.config` 中。
+
+---
+
 
 ## 附录 A: 与协议规范的兼容性
 
@@ -775,6 +1149,8 @@ class TaskArena:
 | Inner Bus Timeline | ezagent-bus-spec §5.3 (Timeline) |
 | Socialware 本地命名空间 | ezagent-bus-spec 附录 B (`ezagent/socialware/`) |
 | Command 声明与派发 | ezagent-extensions-spec §16 (EXT-15 Command) |
+| Socialware 间能力发现 | ezagent-extensions-spec §14 (EXT-13 Profile) |
+| Role staffing 配置 | ezagent-extensions-spec §18.3 (ext.runtime.config) |
 
 ## 附录 B: 术语表
 
@@ -798,3 +1174,7 @@ class TaskArena:
 | **Registry** | 节点本地的 Socialware 安装注册表（`registry.toml`） |
 | **Manifest** | Socialware 的本地声明清单（`manifest.toml`），包含 content_type 和命令注册 |
 | **Command** | 基于 EXT-15 的斜杠命令，Socialware 向用户暴露操作入口 |
+| **SocialwareContext** | Socialware `@when` handler 的受限 ctx 类型，只暴露 Mid-layer + 四原语操作 |
+| **EngineContext** | `unsafe=True` 模式下的完整 ctx 类型，暴露所有层级操作 |
+| **@when** | 声明式事件响应 decorator，替代 `@hook` 用于普通 Socialware 开发 |
+| **staffing** | ext.runtime.config 中的 Role 填充策略，指导 AgentForge 匹配 Agent 模板 |

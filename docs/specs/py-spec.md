@@ -239,28 +239,62 @@ class CommandTimeoutError(CommandError): pass
 
 ## §4 Socialware Hook Callback Protocol
 
-### §4.1 @hook decorator 注册
+### §4.1 双模式 Hook 注册
+
+v0.9.5 提供两种 Hook 注册方式，对应不同的开发模式：
+
+| 模式 | decorator | ctx 类型 | 适用场景 |
+|------|-----------|---------|---------|
+| 声明式（推荐） | `@when(action)` | `SocialwareContext` | 普通 Socialware 开发 |
+| 命令式（unsafe） | `@hook(phase, trigger, ...)` | `EngineContext` | 基础设施级 Socialware、迁移 |
+
+#### @when decorator（默认模式）
 
 ```python
-from ezagent import hook
+from ezagent import socialware, when, SocialwareContext
 
-@hook(phase="pre_send", trigger="timeline_index.insert", priority=100)
-async def validate_task(event, ctx):
-    """Socialware-level validation before message is written"""
-    if not event.data.get("task_id"):
-        raise ValidationError("task_id required")
+@socialware("code-viber")
+class CodeViber:
+    namespace = "cv"
+    roles = { ... }
 
-@hook(phase="after_write", trigger="timeline_index.insert", priority=100)
-async def on_message(event, ctx):
-    """React to new messages"""
-    await ctx.messages.send(room_id=event.room_id, body="Acknowledged")
+    @when("session.request")
+    async def on_session_request(self, event, ctx: SocialwareContext):
+        """cv:session.request Message 写入后触发。"""
+        mentors = ctx.state.roles.find("cv:mentor", room=event.room_id)
+        await ctx.send("session.notify",
+                       body={"learner": event.author},
+                       mentions=[m.entity_id for m in mentors])
+        await ctx.succeed({"notified": len(mentors)})
 ```
+
+`@when(action)` 的底层行为：
+1. Runtime 自动注册 `after_write` Hook，`trigger="timeline_index.insert"`，`filter=f"content_type == \'{self.namespace}:{action}\'""`，`priority=110`
+2. Runtime 自动注册 Role check Hook（pre_send, priority 100）和 Flow validation Hook（pre_send, priority 101）
+3. handler 接收 `SocialwareContext`（受限类型，详见 socialware-spec §10）
+
+#### @hook decorator（unsafe 模式）
+
+```python
+from ezagent import socialware, hook
+
+@socialware("agent-forge", unsafe=True)
+class AgentForge:
+    @hook(phase="after_write", trigger="timeline_index.insert",
+          filter="content_type == \'immutable\' AND body contains \'@\'", priority=110)
+    async def on_mention(self, event, ctx):
+        """检测 @mention 并唤醒 Agent。需要底层 Message 访问。"""
+        ...
+```
+
+- [MUST] `@hook` 仅在 `unsafe=True` 模式下可用。否则 raise `UnsafeRequiredError`。
 
 ### §4.2 priority >= 100 约束
 
-- [MUST] Socialware Hook 的 priority MUST >= 100。
+- [MUST] Socialware Hook（`@when` 和 `@hook`）的 priority MUST >= 100。
 - [MUST] 尝试注册 priority < 100 的 Hook MUST raise `PriorityError`。
 - 0-99 保留给 Built-in (0-9) 和 Extension (10-99) Hook。
+- [MUST] `@when` handler 固定 priority 110。自动生成的 Role/Flow Hook 使用 100-109。
 
 ### §4.3 执行模型 (GIL management)
 
@@ -283,6 +317,23 @@ after_read phase:
 ### §4.5 与 Extension Hook 的执行顺序
 
 同一阶段内，Hook 按 priority 排序执行。Socialware Hook (100+) 始终在所有 Extension Hook (10-99) 之后执行。
+
+自动生成 Hook 的执行链（以 `@when("task.claim")` 为例）：
+
+```
+pre_send:
+  [p45]  EXT-17 namespace_check          → 验证 "ta" ∈ enabled
+  [p46]  EXT-17 local_sw_check           → 验证 TaskArena 已安装
+  [p100] Auto: Role capability check     → 验证 author 持有 task.claim
+  [p101] Auto: Flow transition check     → 验证 current_state + task.claim 合法
+  → Message 写入 CRDT
+
+after_write:
+  [p50]  EXT-17 sw_message_index         → 更新 socialware_messages Index
+  [p100] Auto: State Cache update        → 更新 flow_states
+  [p105] Auto: Command dispatch          → 查找 @when handler
+  [p110] @when("task.claim") handler     → 开发者的域逻辑
+```
 
 ---
 
@@ -379,71 +430,134 @@ watch_info = await bus.rooms[id].messages[ref].watch.get()
 ### §7.1 @socialware decorator
 
 ```python
-from ezagent import socialware, hook
+from ezagent import socialware, when, Role, Flow, Commitment, Arena, capabilities
 
-@socialware("event-weaver")
-class EventWeaver:
-    """Socialware 声明"""
+@socialware("code-viber")
+class CodeViber:
+    """Socialware 声明。decorator 解析 roles/flows/commitments/arenas 并注册到 Runtime。"""
+    namespace = "cv"
 
-    @hook(phase="after_write", trigger="timeline_index.insert", priority=100)
-    async def on_new_message(self, event, ctx):
+    roles = {
+        "cv:mentor": Role(capabilities=capabilities("session.accept", "guidance.provide")),
+        "cv:learner": Role(capabilities=capabilities("session.request", "question.ask")),
+    }
+
+    session_lifecycle = Flow(
+        subject="session.request",
+        transitions={
+            ("pending", "session.accept"): "active",
+            ("active",  "guidance.provide"): "active",
+            ("active",  "session.close"): "closed",
+        },
+    )
+
+    @when("session.request")
+    async def on_session_request(self, event, ctx: SocialwareContext):
         ...
 ```
 
+- [MUST] `@socialware` decorator MUST 在模块加载时解析全部声明并注册到 Socialware Runtime。
+- [MUST] `unsafe=True` 参数启用 `@hook` decorator 和 `EngineContext` 访问。
+
 ### §7.2 四原语 Python 实现
 
-Role、Arena、Commitment、Flow 四原语通过 Python class 声明。Role 约束 content_type 发送能力，Flow 约束 content_type 的合法序列。运行时状态（State Cache）从 Timeline Message 纯派生，由 after_write Hook 增量维护。详见 ezagent-socialware-spec §2。
-
-### §7.3 ctx 对象
-
-Hook callback 接收 `ctx` 参数，提供对 Engine API + Extension API 的完整访问：
+Role、Arena、Commitment、Flow 通过声明式辅助类创建：
 
 ```python
-async def on_message(event, ctx):
-    # Engine API
-    await ctx.messages.send(
-        room_id=..., content_type="ta:task.claim",
-        body={...}, reply_to=ref_id, channels=["_sw:ta"])
-    await ctx.rooms[id].members()
+# Role
+Role(capabilities=capabilities("action1", "action2"), description="...")
 
-    # Extension API (auto-generated)
-    await ctx.rooms[id].messages[ref].reactions.add("👍")
-    await ctx.rooms[id].messages[ref].watch.set(on_reply=True)
+# Flow
+Flow(subject="action_that_creates_subject",
+     states=("s1", "s2", ...),
+     transitions={("s1", "action"): "s2", ...},
+     preferences={"action": preferred_when("condition")})
 
-    # EXT-17 Runtime API
-    refs = await ctx.runtime.list_sw_messages(room_id, ns="ta")
-    rooms = await ctx.runtime.list_enabled_rooms(ns="ta")
+# Commitment
+Commitment(id="unique_id", between=("role1", "role2"),
+           obligation="description", triggered_by="action",
+           deadline="5m", enforcement="escalate")
 
-    # EXT-15 Command API (Socialware Hook 中使用)
-    await ctx.command.result(
-        invoke_id="uuid:...",
-        status="success",
-        result={"task_id": "t-42"},
-    )
+# Arena
+Arena(id="unique_id", boundary="external|internal|federated", purpose="...")
 ```
 
-注：Socialware 通过 `self.state`（State Cache）访问派生状态，不再通过 `ctx.data` 直接读写 Datatype 文档。
+- [MUST] 这些辅助类在 `@socialware` 解析时展开为 socialware-spec §2.2 的标准 Part B 格式。
+- [MUST] capability 名称 MUST 与 content_type 的 action 部分一致（如 `"task.claim"` 对应 `ta:task.claim`）。
+
+### §7.3 ctx 对象——双类型模型
+
+`ctx` 参数的类型取决于 Socialware 的声明模式：
+
+#### SocialwareContext（默认模式）
+
+```python
+@when("session.request")
+async def handler(self, event, ctx: SocialwareContext):
+    # ── 可用操作 ──
+    await ctx.send("session.notify", body={...}, mentions=[...])  # 发送 action
+    await ctx.reply(ref_id, "guidance.provide", body={...})       # 回复
+    await ctx.succeed({"key": "value"})                           # 命令成功
+    await ctx.fail("error message")                               # 命令失败
+    await ctx.grant_role(entity_id, "cv:mentor")                  # 授予 Role
+    await ctx.revoke_role(entity_id, "cv:mentor")                 # 撤回 Role
+
+    # ── 只读查询 ──
+    state = ctx.state                    # State Cache
+    mentors = ctx.state.roles.find("cv:mentor", room=event.room_id)
+    flow_state = ctx.state.flow_states[ref_id]
+    room_info = ctx.room                 # Room 信息
+    members = ctx.members                # 成员列表
+
+    # ── 不可用（类型上不存在）──
+    # ctx.messages.send(...)       → AttributeError
+    # ctx.hook.register(...)       → AttributeError
+    # ctx.annotations.write(...)   → AttributeError
+```
+
+#### EngineContext（unsafe=True 模式）
+
+```python
+@hook(phase="after_write", trigger="timeline_index.insert", priority=110)
+async def handler(self, event, ctx):  # ctx: EngineContext
+    # 包含 SocialwareContext 的全部方法 + 底层操作
+    await ctx.messages.send(room_id=..., content_type="ta:task.claim",
+                            body={...}, channels=["_sw:ta"])
+    await ctx.rooms[id].members()
+    await ctx.rooms[id].messages[ref].reactions.add("👍")
+    await ctx.runtime.list_sw_messages(room_id, ns="ta")
+    await ctx.command.result(invoke_id, status="success", result={...})
+```
 
 ### §7.4 EXT-15 Command 便捷 API
 
-Socialware Hook 中通过 `ctx.command` 访问命令相关操作：
+在 `@when` 模式下，Command 处理通过 `event.params` + `ctx.succeed()`/`ctx.fail()` 简化：
 
 ```python
-# 写入命令执行结果（简写：自动从 event 推导 invoke_id 和 ref）
-await ctx.command.result(event.ref.ext.command.invoke_id,
-    status="success", result={"key": "value"})
+@when("claim")
+async def on_claim(self, event, ctx: SocialwareContext):
+    task_id = event.params["task_id"]       # 从 EXT-15 Command params 提取
+    task_state = ctx.state.flow_states.get(task_id)
 
-# 读取命令信息
-cmd = event.ref.ext.command
-print(cmd.ns, cmd.action, cmd.params, cmd.invoke_id)
+    if task_state != "open":
+        await ctx.fail(f"Task not open (current: {task_state})")
+        return
 
-# 查询所有可用命令
-commands = await ctx.command.list_available()
-# → [CommandManifest(ns="ta", commands=[...]), CommandManifest(ns="ew", commands=[...])]
+    # Role check 和 Flow validation 已由 Runtime 自动完成
+    await ctx.send("task.claim", body={"reason": event.params.get("reason", "")},
+                   target=task_id)
+    await ctx.succeed({"task_id": task_id, "new_state": "claimed"})
 ```
 
-- [MUST] `ctx.command.result()` 内部通过 Annotation API 写入 `command_result:{invoke_id}` Annotation。
-- [MUST] `ctx.command.list_available()` 内部查询 `command_manifest_registry` Index。
+在 `unsafe=True` 模式下，保留原有 `ctx.command` API：
+
+```python
+await ctx.command.result(invoke_id, status="success", result={...})
+commands = await ctx.command.list_available()
+```
+
+- [MUST] `ctx.succeed()` / `ctx.fail()` 内部通过 Annotation API 写入 `command_result:{invoke_id}`。
+- [MUST] `@when` 模式下 `invoke_id` 自动从 event 推导，开发者无需手动指定。
 
 ### §6.7 Renderer 声明的传递
 
