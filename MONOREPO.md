@@ -137,7 +137,7 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Add remotes
+      - name: Add remotes and fetch
         # CI 环境使用 HTTPS + Token 推送，本地开发使用 SSH（见初始化章节）
         run: |
           git remote add docs    https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/docs
@@ -145,6 +145,7 @@ jobs:
           git remote add relay   https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/relay
           git remote add page    https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/ezagent.cloud
           git remote add app     https://x-token:${{ secrets.GH_TOKEN }}@github.com/ezagent42/app
+          git fetch --all --no-tags
 
       - name: Sync docs
         continue-on-error: true
