@@ -305,22 +305,30 @@ class TaskArena:
 | [agentforge-prd.md](socialware/agentforge-prd.md) | AgentForge：Agent 生命周期管理 + Role 自动匹配 |
 | [codeviber-prd.md](socialware/codeviber-prd.md) | CodeViber：编程指导服务（参考实现） |
 
-### `docs/` — 快速了解
+### `tldr/` — 快速了解
 
 | 文档 | 内容 | 适合谁 |
 |------|------|--------|
-| [TLDR-overview.md](docs/TLDR-overview.md) | Programmable Organization 是什么 | 所有人 |
-| [TLDR-socialware-dev.md](docs/TLDR-socialware-dev.md) | 怎么写一个 Socialware | Socialware 开发者 |
-| [TLDR-architecture.md](docs/TLDR-architecture.md) | 三层架构 + 类型约束 + 协议交叉引用 | 架构师 |
+| [TLDR-overview.md](tldr/TLDR-overview.md) | Programmable Organization 是什么 | 所有人 |
+| [TLDR-socialware-dev.md](tldr/TLDR-socialware-dev.md) | 怎么写一个 Socialware | Socialware 开发者 |
+| [TLDR-architecture.md](tldr/TLDR-architecture.md) | 三层架构 + 类型约束 + 协议交叉引用 | 架构师 |
+
+### `eep/` — 设计提案 (EEP)
+
+| 文档 | 类型 | 状态 | 内容 |
+|------|------|------|------|
+| [EEP-0000.md](eep/EEP-0000.md) | Process | Active | EEP Purpose and Convention |
+| [EEP-0001.md](eep/EEP-0001.md) | Standards | Draft | Bridge Extension (EXT-18) |
 
 ### 阅读路径
 
-- **我想快速了解** → [TLDR-overview.md](docs/TLDR-overview.md)
+- **我想快速了解** → [TLDR-overview.md](tldr/TLDR-overview.md)
 - **我想理解全貌** → protocol.md → socialware-spec.md → 本 README
-- **我想写一个 Socialware** → [TLDR-socialware-dev.md](docs/TLDR-socialware-dev.md) → socialware-spec.md §9-§11 → py-spec.md
+- **我想写一个 Socialware** → [TLDR-socialware-dev.md](tldr/TLDR-socialware-dev.md) → socialware-spec.md §9-§11 → py-spec.md
 - **我想用 Rust 实现核心** → bus-spec.md → extensions-spec.md
 - **我想开发前端** → app-prd.md → chat-ui-spec.md → http-spec.md
-- **我想理解架构细节** → [TLDR-architecture.md](docs/TLDR-architecture.md) → bus-spec.md → socialware-spec.md
+- **我想理解架构细节** → [TLDR-architecture.md](tldr/TLDR-architecture.md) → bus-spec.md → socialware-spec.md
+- **我想提出设计提案** → [EEP-0000.md](eep/EEP-0000.md)（EEP 流程和格式规范）
 - **我想快速查某个细节** → 直接按文档表格定位
 
 ---

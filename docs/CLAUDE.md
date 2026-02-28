@@ -9,7 +9,9 @@ docs/
 ├── specs/       → 协议规范（architecture, bus, extensions, socialware, py-sdk, relay, repo）
 ├── products/    → 产品文档（app PRD, chat-ui, http-api, cli）
 ├── plan/        → 实施计划（Phase 0–5, fixtures, foundations）
-├── socialware/  → Socialware PRD（EventWeaver, TaskArena, ResPool, AgentForge）
+├── socialware/  → Socialware PRD（EventWeaver, TaskArena, ResPool, AgentForge, CodeViber）
+├── tldr/        → 快速了解（Overview, Architecture, Socialware Dev）
+├── eep/         → EEP 设计提案（ezagent Enhancement Proposal）
 └── style/       → 品牌素材（logo, 样式, 背景）
 ```
 
@@ -27,6 +29,7 @@ docs/
 - 规范文档：`{domain}-spec.md`（如 `bus-spec.md`）
 - 产品文档：`{product}-prd.md`（如 `app-prd.md`）
 - 计划文档：`phase-{n}-{name}.md`（如 `phase-1-bus.md`）
+- EEP 提案：`EEP-{NNNN}.md`（如 `EEP-0001.md`），详见 `eep/EEP-0000.md`
 
 ### 交叉引用
 
