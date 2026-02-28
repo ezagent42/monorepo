@@ -28,7 +28,7 @@ EZAgent 官方网站 — 品牌门户与开发者社区入口。License: Apache 
 
 | 路由 | 页面 | 内容来源 |
 |------|------|----------|
-| `/` | Landing / Hero | 原创（灵感来自 `docs/README.md` 对比场景） |
+| `/` | Landing（单页长滚动） | 9 个 section，详见下方"Landing 单页架构" |
 | `/vision/` | "未来组织"理念 | 改编自 `docs/README.md` 核心理念章节 |
 | `/socialware/` | Socialware 概念（通俗版） | 简化自 `docs/specs/socialware-spec.md` §0-§1 |
 | `/download/` | 下载与快速开始 | 来自 `docs/products/app-prd.md` §1.3 交付格式 |
@@ -46,12 +46,28 @@ EZAgent 官方网站 — 品牌门户与开发者社区入口。License: Apache 
 
 **公共页面：** `/about/`、`/blog/`（预留）、`/404`
 
+### Landing 单页架构
+
+Landing page 是单页长滚动设计，Nav 使用锚点导航（`#section-id`）：
+
+| Section id | 内容 | 权威源 |
+|------------|------|--------|
+| `hero` | 品牌标语 + CTA | 原创 |
+| `problem` | "同一件事，两种组织"对比 | `docs/README.md` 开头场景 |
+| `what` | "ezagent 是什么" + Programmable Organization | `docs/tldr/TLDR-overview.md` §1-§2 |
+| `core` | 4 个核心理念卡片 | `docs/README.md` 核心理念 |
+| `architecture` | 三层架构图 | ArchDiagram 组件 |
+| `comparison` | Slack vs ezagent 对比表 | `docs/README.md` 对比表格 |
+| `showcase` | Socialware 展示卡片 | showcase collection |
+| `quickstart` | v0.9.5 API 代码示例 | `docs/README.md` Quick Start |
+| `cta` | 最终 CTA | 原创 |
+
 ### 双受众导航分叉
 
-Landing page 提供两条清晰路径：
+Nav 在 Landing page 使用锚点滚动，在其他页面使用 `/{lang}/#section-id` 跳转回首页：
 
-1. **"了解 EZAgent"** → vision / socialware 概念 / download（一般用户）
-2. **"开始构建"** → architecture / socialware guide / showcase（开发者）
+1. **"了解 EZAgent"** → `#what` / `#core`（一般用户）
+2. **"开始构建"** → `/dev/`（开发者，保持页面跳转）
 
 ### i18n 策略
 
@@ -128,26 +144,42 @@ page/
 - **`showcase`** — Socialware 展示条目（title, description, lang, icon, tags）
 - **`dev`** — 开发者内容（title, description, lang, order, sidebar_label）
 
-### 内容来源映射
+### 内容源映射（Content Source Mapping）
 
-| 官网页面 | 来源文件 | 改编说明 |
-|----------|----------|----------|
-| Landing Hero | `docs/README.md` 对比场景表 | 精简为 3-4 句 + CTA 按钮 |
-| Vision | `docs/README.md` 核心理念 | 面向非技术用户重写，去掉代码 |
-| Socialware 概念 | `docs/specs/socialware-spec.md` §0-§1 | 用类比解释，不涉及 spec 细节 |
-| Download | `docs/products/app-prd.md` §1.3 | 卡片式：Desktop / CLI / Web |
-| Showcase: EventWeaver | `docs/socialware/eventweaver-prd.md` §1 | 1 段摘要 + 核心价值点 |
-| Showcase: TaskArena | `docs/socialware/taskarena-prd.md` §1 | 同上 |
-| Showcase: ResPool | `docs/socialware/respool-prd.md` §1 | 同上 |
-| Showcase: AgentForge | `docs/socialware/agentforge-prd.md` §1 | 同上 |
-| Dev: Architecture | `docs/specs/architecture.md` §0-§1 | 保留三层图，简洁解释每层 |
-| Dev: Socialware Guide | `docs/specs/socialware-spec.md` + `py-spec.md` | 展示 `@socialware` 装饰器，链接 ReadTheDocs |
-| Dev: Showcase | `docs/socialware/*.md` + 代码示例 | 含 Python 代码片段 |
-| Dev: Resources | 所有文档 + 外部链接 | 策展链接列表 |
+当 docs 有重大更新时，参照此表同步 page 内容：
+
+| 页面 Section / Content File | 权威源 | 关注的段落 |
+|---------------------------|--------|----------|
+| Landing: `#problem` | `docs/README.md` §"同一件事，两种组织" | 对比表格 |
+| Landing: `#what` | `docs/tldr/TLDR-overview.md` §1-§2 | 核心定位 |
+| Landing: `#core` | `docs/README.md` §"核心理念" | 4 个理念 |
+| Landing: `#comparison` | `docs/README.md` §"为什么不能在 Slack" | 8 行对比表 |
+| Landing: `#quickstart` | `docs/README.md` §"Quick Start" | 代码示例 |
+| Vision page | `docs/README.md` 核心理念 | 面向非技术用户改编 |
+| Socialware page | `docs/specs/socialware-spec.md` §0-§1 | 通俗解释 |
+| Download page | `docs/products/app-prd.md` §1.3 | 交付格式 |
+| `dev/index.md` | `docs/README.md` Quick Start | 新 API 代码示例 |
+| `dev/socialware-guide.md` | `docs/tldr/TLDR-socialware-dev.md` | @when DSL、SocialwareContext |
+| `dev/architecture.md` | `docs/tldr/TLDR-architecture.md` | 三层架构、类型约束 |
+| `dev/resources.md` | 所有 docs + TLDR 链接 | 策展链接列表 |
+| `showcase/*.md` | `docs/socialware/*-prd.md` §1 | 产品摘要 |
 
 ### 不在官网承载的内容（→ ReadTheDocs）
 
 > 完整的协议规范、Bus spec、Extensions spec、Python SDK API 参考、HTTP API 参考、CLI 参考。官网仅提供跳转链接。
+
+### 内容版本
+
+当前内容基于 **docs v0.9.5**。
+
+当 docs 有重大更新时（spec 版本号变更、新 Socialware 添加、API 变更），需同步更新 page 内容。参照上方"内容源映射"表确定影响范围。
+
+### 为何不用自动化导入
+
+已评估过直接引用 `docs/` 的方案：
+- Astro glob loader 可以引用 `../../docs/tldr/`，但 TLDR 文件没有 frontmatter、使用 docs 内部相对链接、格式不适合直接渲染为网页
+- 网站需要的是"改编后的面向用户的内容"，不是"原始技术文档"
+- **结论**：保持受控的手动适配，通过源映射表确保可追溯性
 
 ## 设计系统集成（Eastern Clarity v1）
 

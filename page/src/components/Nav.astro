@@ -11,18 +11,21 @@ const { lang } = Astro.props;
 const t = useTranslations(lang as Lang);
 const tp = useTranslatedPath(lang as Lang);
 
+const currentPath = Astro.url.pathname;
+const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+const isLanding = currentPath === `${base}/${lang}/` || currentPath === `${base}/${lang}`;
+const landingBase = isLanding ? '' : tp('/');
+
 const userLinks = [
-  { href: tp('/vision'), label: t('nav.vision') },
-  { href: tp('/socialware'), label: t('nav.socialware') },
-  { href: tp('/showcase'), label: t('nav.showcase') },
-  { href: tp('/download'), label: t('nav.download') },
+  { href: `${landingBase}#what`, label: t('nav.vision') },
+  { href: `${landingBase}#core`, label: t('nav.socialware') },
+  { href: `${landingBase}#showcase`, label: t('nav.showcase') },
+  { href: `${landingBase}#quickstart`, label: t('nav.download') },
 ];
 
 const devLinks = [
   { href: tp('/dev'), label: t('nav.dev') },
 ];
-
-const currentPath = Astro.url.pathname;
 ---
 
 <header class="nav-header">
@@ -34,7 +37,7 @@ const currentPath = Astro.url.pathname;
 
     <nav class="nav-links" id="nav-links">
       {userLinks.map(link => (
-        <a href={link.href} class:list={['nav-link', { active: currentPath.startsWith(link.href) }]}>
+        <a href={link.href} class="nav-link">
           {link.label}
         </a>
       ))}

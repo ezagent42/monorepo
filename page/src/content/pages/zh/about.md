@@ -30,7 +30,7 @@ EZAgent 是完全开源的：
 
 ## 项目状态
 
-EZAgent 目前处于 **Architecture Draft** 阶段（v0.9.1）。协议规范和产品设计已基本完成，正在进入实现阶段。
+EZAgent 目前处于 **Architecture Draft** 阶段（v0.9.5）。协议规范和产品设计已基本完成，正在进入实现阶段。
 
 ## 联系
 

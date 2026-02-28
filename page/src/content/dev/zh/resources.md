@@ -6,6 +6,16 @@ order: 3
 sidebar_label: "资源"
 ---
 
+## TLDR 速读
+
+快速理解 EZAgent 核心概念：
+
+| 文档 | 内容 | 阅读时间 |
+|------|------|---------|
+| [TLDR: 总览](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-overview.md) | Programmable Organization 完整叙事 | 10 分钟 |
+| [TLDR: Socialware 开发](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-socialware-dev.md) | @when DSL、SocialwareContext、Runtime 自动生成 | 15 分钟 |
+| [TLDR: 架构](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-architecture.md) | 三层分形架构、类型约束、协作模式 | 12 分钟 |
+
 ## 规范文档
 
 | 文档 | 内容 | 适合谁 |
@@ -43,3 +53,7 @@ sidebar_label: "资源"
 - [TaskArena PRD](https://github.com/ezagent42/docs/blob/main/socialware/taskarena-prd.md)
 - [ResPool PRD](https://github.com/ezagent42/docs/blob/main/socialware/respool-prd.md)
 - [AgentForge PRD](https://github.com/ezagent42/docs/blob/main/socialware/agentforge-prd.md)
+- [CodeViber PRD](https://github.com/ezagent42/docs/blob/main/socialware/codeviber-prd.md)
+
+---
+*当前内容基于 docs v0.9.5。*

@@ -39,6 +39,11 @@ html {
   color: var(--ink);
   background: var(--bg-alt);
   line-height: 1.8;
+  scroll-behavior: smooth;
+}
+
+section[id] {
+  scroll-margin-top: 72px;
 }
 
 body {

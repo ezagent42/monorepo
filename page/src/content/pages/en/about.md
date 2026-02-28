@@ -30,7 +30,7 @@ We welcome all forms of contribution:
 
 ## Project Status
 
-EZAgent is currently in the **Architecture Draft** stage (v0.9.1). Protocol specs and product design are largely complete, now entering the implementation phase.
+EZAgent is currently in the **Architecture Draft** stage (v0.9.5). Protocol specs and product design are largely complete, now entering the implementation phase.
 
 ## Contact
 

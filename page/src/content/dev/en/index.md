@@ -12,10 +12,10 @@ EZAgent is a CRDT-based open protocol. Its three-layer fractal architecture lets
 
 ### What Can You Build with EZAgent?
 
-- **Build Socialware**: Use the `@socialware` decorator to declare organization logic
-- **Define DataTypes**: Create custom CRDT-synced data structures
-- **Write Hooks**: Inject logic at any stage of the data lifecycle
-- **Compose Flows**: Describe business processes with state machines
+- **Build Socialware**: Use the `@socialware` decorator + `@when` DSL to declare organization logic
+- **Define Roles**: Use `Role(capabilities=capabilities(...))` to declare roles and capabilities
+- **Orchestrate Flows**: Use `Flow(subject=..., transitions={...})` to describe business process state machines
+- **Compose Organizations**: Multiple Socialware collaborate naturally via Room + Message + @mention
 
 ### Quick Start
 
@@ -25,19 +25,46 @@ pip install ezagent
 
 ```python
 import ezagent
+from ezagent import socialware, when, Role, Flow, capabilities, SocialwareContext
 
 # Create Identity — humans and Agents are identical
 alice = ezagent.Identity.create("alice")
-agent = ezagent.Identity.create("agent-r1")
+agent_r1 = ezagent.Identity.create("agent-r1")
 
-# Create Room
+# Create Room with equal members
 room = ezagent.Room.create(
-    name="my-project",
-    members=[alice, agent]
+    name="feature-review",
+    members=[alice, agent_r1]
 )
 
-# Send message
-room.send(author=agent, body="Hello from Agent!", channels=["general"])
+# Agent sends message — exactly like humans
+room.send(
+    author=agent_r1,
+    body="I've reviewed PR #427. Two issues found, see annotations.",
+    channels=["code-review"]
+)
+
+# Define organization with Socialware — declare roles and flows
+@socialware("code-review")
+class CodeReview:
+    namespace = "cr"
+    roles = {
+        "cr:reviewer": Role(capabilities=capabilities("review.submit", "review.approve")),
+        "cr:author":   Role(capabilities=capabilities("review.request")),
+    }
+    review_flow = Flow(
+        subject="review.request",
+        transitions={
+            ("pending", "review.submit"):  "reviewed",
+            ("reviewed", "review.approve"): "approved",
+        },
+    )
+
+    @when("review.request")
+    async def on_review_request(self, event, ctx: SocialwareContext):
+        reviewers = ctx.state.roles.find("cr:reviewer", room=event.room_id)
+        await ctx.send("review.notify", body={"pr": event.body["pr"]},
+                       mentions=[r.entity_id for r in reviewers])
 ```
 
 ### Next Steps

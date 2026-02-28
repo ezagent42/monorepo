@@ -63,3 +63,41 @@ EZAgent 协议的核心设计原则：
 ### 分形特性
 
 每一层都是 4 个原语。Socialware 本身拥有 Identity（它是一个 Entity），因此可以递归地被更上层的 Socialware 所组合。组织可以像代码一样嵌套、组合、分拆。
+
+## Socialware vs Skill / Subagent / MCP
+
+Socialware 不替代 Skill、Subagent、MCP——它是**上层建筑**：
+
+| 维度 | Skill | Subagent Framework | MCP | Socialware |
+|------|-------|-------------------|-----|-----------|
+| 核心抽象 | Agent 的单项能力 | Agent 间委托链 | Agent↔Tool 接口 | 组织规则（角色/流程/承诺） |
+| Agent 地位 | 执行者 | 层级节点 | 客户端 | 组织成员（与人类平等） |
+| 人类位置 | 系统外 | 系统外（顶层调用者） | 不涉及 | 系统内（相同 Identity 模型） |
+| 生命周期 | 单次调用 | 一个 Task | 一个 Session | 组织存续期 |
+| 状态管理 | 无状态 | 框架内存 | Tool 侧 | CRDT + Timeline 持久化 |
+| 协调方式 | 无 | 中心化 Orchestrator | Request/Response | 去中心化（Role + Flow） |
+
+```
+┌─────────────────────────────────────────────┐
+│ Socialware（组织规则）                        │
+│ Role · Arena · Commitment · Flow             │
+├─────────────────────────────────────────────┤
+│ Agent 内部基础设施（个体能力）                  │
+│ Skill · Subagent · MCP · LLM Adapter         │
+└─────────────────────────────────────────────┘
+```
+
+就像操作系统不关心 CPU 怎么执行指令，Socialware 不关心 Agent 内部用什么 LLM。只关心：在组织中什么角色、承诺了什么、流程是否合法。
+
+## 类型层约束
+
+v0.9.5 的核心决策：Python 类型系统强制开发者不能跨层操作。
+
+| | SocialwareContext（默认） | EngineContext（unsafe=True） |
+|---|---|---|
+| Socialware 层 | ✅ ctx.send / ctx.state / ctx.grant_role | ✅ |
+| Mid-layer | ✅ ctx.room / ctx.members（只读查询） | ✅ |
+| Extension 层 | ❌ 不可访问 | ✅ ctx.runtime.* |
+| Bottom 层 | ❌ 不可访问 | ✅ ctx.messages.* / ctx.hook.* |
+
+类似 Rust 的 safe/unsafe 模型：默认受限，`unsafe` 需要显式声明并标记在 `manifest.toml` 中。

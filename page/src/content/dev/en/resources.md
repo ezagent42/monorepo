@@ -6,6 +6,16 @@ order: 3
 sidebar_label: "Resources"
 ---
 
+## TLDR Quick Reads
+
+Quickly understand EZAgent core concepts:
+
+| Document | Content | Reading Time |
+|----------|---------|-------------|
+| [TLDR: Overview](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-overview.md) | The full Programmable Organization narrative | 10 min |
+| [TLDR: Socialware Dev](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-socialware-dev.md) | @when DSL, SocialwareContext, Runtime auto-generation | 15 min |
+| [TLDR: Architecture](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-architecture.md) | Three-layer fractal architecture, type constraints, collaboration modes | 12 min |
+
 ## Specification Documents
 
 | Document | Content | Audience |
@@ -43,3 +53,7 @@ Want to design a new Socialware? Reference existing PRD format:
 - [TaskArena PRD](https://github.com/ezagent42/docs/blob/main/socialware/taskarena-prd.md)
 - [ResPool PRD](https://github.com/ezagent42/docs/blob/main/socialware/respool-prd.md)
 - [AgentForge PRD](https://github.com/ezagent42/docs/blob/main/socialware/agentforge-prd.md)
+- [CodeViber PRD](https://github.com/ezagent42/docs/blob/main/socialware/codeviber-prd.md)
+
+---
+*Content based on docs v0.9.5.*

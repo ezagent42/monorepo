@@ -63,3 +63,41 @@ Four orthogonal dimensions applicable to any Mid-layer entity:
 ### Fractal Property
 
 Each layer has 4 primitives. A Socialware itself possesses an Identity (it's an Entity), so it can recursively be composed by higher-level Socialware. Organizations can be nested, composed, and split — just like code.
+
+## Socialware vs Skill / Subagent / MCP
+
+Socialware doesn't replace Skill, Subagent, or MCP — it's the **upper-layer infrastructure**:
+
+| Dimension | Skill | Subagent Framework | MCP | Socialware |
+|-----------|-------|-------------------|-----|-----------|
+| Core abstraction | Agent's single ability | Agent-to-Agent delegation | Agent↔Tool interface | Org rules (roles/flows/commitments) |
+| Agent status | Executor | Hierarchy node | Client | Org member (equal to Human) |
+| Human placement | Outside system | Outside (top caller) | Out of scope | Inside (same Identity model) |
+| Lifecycle | Single invocation | One Task | One session | Organization lifetime |
+| State management | Stateless | Framework memory | Tool-side | CRDT + Timeline persistence |
+| Coordination | None | Centralized Orchestrator | Request/Response | Decentralized (Role + Flow) |
+
+```
+┌─────────────────────────────────────────────┐
+│ Socialware (Organization rules)              │
+│ Role · Arena · Commitment · Flow             │
+├─────────────────────────────────────────────┤
+│ Agent internal infrastructure                │
+│ Skill · Subagent · MCP · LLM Adapter         │
+└─────────────────────────────────────────────┘
+```
+
+Like an OS doesn't care how the CPU executes instructions, Socialware doesn't care what LLM an Agent uses internally. It only cares: what role in the org, what was promised, is the flow legal.
+
+## Type-Level Hierarchy Constraints
+
+A core v0.9.5 decision: Python's type system enforces that developers cannot cross layer boundaries.
+
+| | SocialwareContext (default) | EngineContext (unsafe=True) |
+|---|---|---|
+| Socialware layer | ✅ ctx.send / ctx.state / ctx.grant_role | ✅ |
+| Mid-layer | ✅ ctx.room / ctx.members (read-only) | ✅ |
+| Extension layer | ❌ Inaccessible | ✅ ctx.runtime.* |
+| Bottom layer | ❌ Inaccessible | ✅ ctx.messages.* / ctx.hook.* |
+
+Like Rust's safe/unsafe model: restricted by default, `unsafe` requires explicit declaration marked in `manifest.toml`.

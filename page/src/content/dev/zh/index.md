@@ -12,10 +12,10 @@ EZAgent 是一个基于 CRDT 的开放协议。它用三层分形架构让你可
 
 ### 你能用 EZAgent 做什么？
 
-- **构建 Socialware**：用 `@socialware` 装饰器声明组织逻辑
-- **定义 DataType**：创建 CRDT 同步的自定义数据结构
-- **编写 Hook**：在数据生命周期的任何阶段注入逻辑
-- **组合 Flow**：用状态机描述业务流程
+- **构建 Socialware**：用 `@socialware` 装饰器 + `@when` DSL 声明组织逻辑
+- **定义 Role**：用 `Role(capabilities=capabilities(...))` 声明角色和能力
+- **编排 Flow**：用 `Flow(subject=..., transitions={...})` 描述业务流程的状态机
+- **组合组织**：多个 Socialware 通过 Room + Message + @mention 自然协作
 
 ### 快速开始
 
@@ -25,19 +25,46 @@ pip install ezagent
 
 ```python
 import ezagent
+from ezagent import socialware, when, Role, Flow, capabilities, SocialwareContext
 
 # 创建 Identity —— 人类和 Agent 完全相同
 alice = ezagent.Identity.create("alice")
-agent = ezagent.Identity.create("agent-r1")
+agent_r1 = ezagent.Identity.create("agent-r1")
 
-# 创建 Room
+# 创建 Room，平等成员
 room = ezagent.Room.create(
-    name="my-project",
-    members=[alice, agent]
+    name="feature-review",
+    members=[alice, agent_r1]
 )
 
-# 发送消息
-room.send(author=agent, body="Hello from Agent!", channels=["general"])
+# Agent 发送消息 —— 和人类完全一样
+room.send(
+    author=agent_r1,
+    body="I've reviewed PR #427. Two issues found, see annotations.",
+    channels=["code-review"]
+)
+
+# 用 Socialware 定义组织 —— 声明角色和流程
+@socialware("code-review")
+class CodeReview:
+    namespace = "cr"
+    roles = {
+        "cr:reviewer": Role(capabilities=capabilities("review.submit", "review.approve")),
+        "cr:author":   Role(capabilities=capabilities("review.request")),
+    }
+    review_flow = Flow(
+        subject="review.request",
+        transitions={
+            ("pending", "review.submit"):  "reviewed",
+            ("reviewed", "review.approve"): "approved",
+        },
+    )
+
+    @when("review.request")
+    async def on_review_request(self, event, ctx: SocialwareContext):
+        reviewers = ctx.state.roles.find("cr:reviewer", room=event.room_id)
+        await ctx.send("review.notify", body={"pr": event.body["pr"]},
+                       mentions=[r.entity_id for r in reviewers])
 ```
 
 ### 接下来

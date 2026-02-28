@@ -18,23 +18,142 @@ const t = useTranslations(lang as Lang);
 const tp = useTranslatedPath(lang as Lang);
 
 const showcaseEntries = (await getCollection('showcase'))
-  .filter(e => e.data.lang === lang)
-  .slice(0, 4);
+  .filter(e => e.data.lang === lang);
+
+const coreKeys = ['agent', 'org', 'interaction', 'sovereignty'];
+const compRows = [1, 2, 3, 4, 5, 6, 7, 8];
+const problemSteps = [1, 2, 3, 4, 5];
+
+const codeExample = `from ezagent import socialware, when, Role, Flow, capabilities, SocialwareContext
+
+@socialware("code-review")
+class CodeReview:
+    namespace = "cr"
+    roles = {
+        "cr:reviewer": Role(capabilities=capabilities("review.submit", "review.approve")),
+        "cr:author":   Role(capabilities=capabilities("review.request")),
+    }
+    review_flow = Flow(
+        subject="review.request",
+        transitions={
+            ("pending", "review.submit"):  "reviewed",
+            ("reviewed", "review.approve"): "approved",
+        },
+    )
+
+    @when("review.request")
+    async def on_review_request(self, event, ctx: SocialwareContext):
+        reviewers = ctx.state.roles.find("cr:reviewer", room=event.room_id)
+        await ctx.send("review.notify", body={"pr": event.body["pr"]},
+                       mentions=[r.entity_id for r in reviewers])`;
 ---
 
 <PageLayout title={t('site.title')} description={t('site.description')} lang={lang}>
+  <!-- 1. Hero -->
   <Hero lang={lang} />
 
-  <!-- Architecture Preview -->
-  <section class="section">
+  <!-- 2. Problem: Side-by-side comparison -->
+  <section id="problem" class="section section-alt">
+    <div class="section-inner">
+      <div class="section-header-center">
+        <h2 class="section-title">{t('sections.problem')}</h2>
+        <p class="section-desc">{t('sections.problem_desc')}</p>
+      </div>
+      <div class="comparison-grid">
+        <div class="comparison-col">
+          <h3 class="comparison-heading">{t('landing.problem_traditional')}</h3>
+          <ol class="comparison-list">
+            {problemSteps.map(i => (
+              <li>{t(`landing.problem_traditional_${i}`)}</li>
+            ))}
+          </ol>
+          <p class="comparison-result comparison-result--bad">{t('landing.problem_traditional_result')}</p>
+        </div>
+        <div class="comparison-col">
+          <h3 class="comparison-heading">{t('landing.problem_ezagent')}</h3>
+          <ol class="comparison-list">
+            {problemSteps.map(i => (
+              <li>{t(`landing.problem_ezagent_${i}`)}</li>
+            ))}
+          </ol>
+          <p class="comparison-result comparison-result--good">{t('landing.problem_ezagent_result')}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. What is ezagent -->
+  <section id="what" class="section">
+    <div class="section-inner">
+      <div class="section-header-center">
+        <h2 class="section-title">{t('sections.what')}</h2>
+        <p class="section-desc">{t('sections.what_desc')}</p>
+      </div>
+      <div class="prose">
+        <p>{t('landing.what_p1')}</p>
+        <p>{t('landing.what_p2')}</p>
+        <p>{t('landing.what_p3')}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Core Concepts: 2x2 grid -->
+  <section id="core" class="section section-alt">
+    <div class="section-inner">
+      <div class="section-header-center">
+        <h2 class="section-title">{t('sections.core')}</h2>
+      </div>
+      <div class="core-grid">
+        {coreKeys.map(key => (
+          <div class="core-card">
+            <h3 class="core-card-title">{t(`landing.core_${key}_title`)}</h3>
+            <p class="core-card-desc">{t(`landing.core_${key}_desc`)}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Architecture Diagram -->
+  <section id="architecture" class="section">
     <div class="section-inner">
       <h2 class="section-title">{t('sections.architecture')}</h2>
       <ArchDiagram lang={lang} compact />
     </div>
   </section>
 
-  <!-- Showcase Preview -->
-  <section class="section section-alt">
+  <!-- 6. Comparison Table -->
+  <section id="comparison" class="section section-alt">
+    <div class="section-inner">
+      <div class="section-header-center">
+        <h2 class="section-title">{t('sections.comparison')}</h2>
+      </div>
+      <div class="table-wrapper">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th>{t('landing.comp_dimension')}</th>
+              <th>{t('landing.comp_slack')}</th>
+              <th class="comp-highlight">{t('landing.comp_ez')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {compRows.map(i => (
+              <tr>
+                <td>{t(`landing.comp_r${i}_dim`)}</td>
+                <td>{t(`landing.comp_r${i}_slack`)}</td>
+                <td class="comp-highlight">{t(`landing.comp_r${i}_ez`)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p class="comp-analogy">{t('landing.comp_analogy')}</p>
+    </div>
+  </section>
+
+  <!-- 7. Showcase -->
+  <section id="showcase" class="section">
     <div class="section-inner">
       <div class="section-header">
         <div>
@@ -58,13 +177,26 @@ const showcaseEntries = (await getCollection('showcase'))
     </div>
   </section>
 
-  <!-- CTA -->
-  <section class="section">
+  <!-- 8. Quickstart -->
+  <section id="quickstart" class="section section-alt">
+    <div class="section-inner">
+      <div class="section-header-center">
+        <h2 class="section-title">{t('sections.quickstart')}</h2>
+        <p class="section-desc">{t('sections.quickstart_desc')}</p>
+      </div>
+      <div class="code-block-wrapper">
+        <pre class="code-block"><code>{codeExample}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. CTA -->
+  <section id="cta" class="section">
     <div class="section-inner cta-section">
       <h2 class="section-title">{t('sections.ready')}</h2>
       <p class="section-desc">{t('sections.ready_desc')}</p>
       <div class="cta-actions">
-        <a href={tp('/vision')} class="btn btn-ghost">{t('hero.cta_learn')}</a>
+        <a href="#what" class="btn btn-ghost">{t('hero.cta_learn')}</a>
         <a href={tp('/dev')} class="btn btn-primary">{t('hero.cta_build')}</a>
       </div>
     </div>
@@ -72,6 +204,7 @@ const showcaseEntries = (await getCollection('showcase'))
 </PageLayout>
 
 <style>
+  /* ── Section Layout ── */
   .section {
     padding: var(--sp-16) 0;
   }
@@ -90,6 +223,11 @@ const showcaseEntries = (await getCollection('showcase'))
     display: flex;
     justify-content: space-between;
     align-items: flex-end;
+    margin-bottom: var(--sp-8);
+  }
+
+  .section-header-center {
+    text-align: center;
     margin-bottom: var(--sp-8);
   }
 
@@ -115,14 +253,180 @@ const showcaseEntries = (await getCollection('showcase'))
     white-space: nowrap;
   }
 
-  .view-all:hover { color: var(--celadon); }
+  .view-all:hover {
+    color: var(--celadon);
+  }
 
+  /* ── Problem: Side-by-side Comparison ── */
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-6);
+  }
+
+  .comparison-col {
+    padding: var(--sp-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-alt);
+  }
+
+  .comparison-heading {
+    font-family: var(--font-display);
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--sp-4);
+  }
+
+  .comparison-list {
+    margin: 0 0 var(--sp-4);
+    padding-left: var(--sp-6);
+    font-size: 0.9375rem;
+    line-height: 1.9;
+    color: var(--ink-light);
+  }
+
+  .comparison-list li {
+    margin-bottom: var(--sp-2);
+  }
+
+  .comparison-result {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin: 0;
+    padding-top: var(--sp-3);
+    border-top: 1px solid var(--border);
+  }
+
+  .comparison-result--bad {
+    color: var(--smoke);
+  }
+
+  .comparison-result--good {
+    color: var(--vermillion);
+  }
+
+  /* ── What: Prose ── */
+  .prose {
+    max-width: 720px;
+    margin: 0 auto;
+    line-height: 2;
+    font-size: 0.9375rem;
+    color: var(--ink-light);
+  }
+
+  .prose p {
+    margin: 0 0 var(--sp-4);
+  }
+
+  .prose p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* ── Core: 2x2 Grid ── */
+  .core-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--sp-6);
+  }
+
+  .core-card {
+    padding: var(--sp-6);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-alt);
+  }
+
+  .core-card-title {
+    font-family: var(--font-display);
+    font-size: 1.0625rem;
+    font-weight: 700;
+    color: var(--ink);
+    margin: 0 0 var(--sp-2);
+  }
+
+  .core-card-desc {
+    font-size: 0.9375rem;
+    color: var(--ink-light);
+    margin: 0;
+    line-height: 1.8;
+  }
+
+  /* ── Comparison Table ── */
+  .table-wrapper {
+    overflow-x: auto;
+    margin-bottom: var(--sp-6);
+  }
+
+  .comp-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .comp-table th,
+  .comp-table td {
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .comp-table thead th {
+    font-family: var(--font-display);
+    font-weight: 700;
+    background: var(--bg-alt);
+    color: var(--ink);
+  }
+
+  .comp-table tbody td {
+    color: var(--ink-light);
+  }
+
+  .comp-highlight {
+    color: var(--pine) !important;
+    font-weight: 500;
+  }
+
+  .comp-analogy {
+    font-style: italic;
+    text-align: center;
+    color: var(--smoke);
+    font-size: 0.9375rem;
+    margin: 0;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+    line-height: 1.8;
+  }
+
+  /* ── Showcase Grid ── */
   .showcase-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: var(--sp-6);
   }
 
+  /* ── Quickstart: Code Block ── */
+  .code-block-wrapper {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  pre.code-block {
+    background: var(--surface-inv);
+    color: var(--surface-inv-text);
+    padding: var(--sp-6);
+    border-radius: var(--radius-md);
+    overflow-x: auto;
+    font-family: var(--font-code);
+    font-size: 0.8125rem;
+    line-height: 2;
+    margin: 0;
+  }
+
+  /* ── CTA Section ── */
   .cta-section {
     text-align: center;
     padding: var(--sp-8) 0;
@@ -143,6 +447,7 @@ const showcaseEntries = (await getCollection('showcase'))
     justify-content: center;
   }
 
+  /* ── Buttons (matching Hero.astro) ── */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -152,8 +457,14 @@ const showcaseEntries = (await getCollection('showcase'))
     font-family: var(--font-body);
     font-size: 0.875rem;
     font-weight: 500;
+    line-height: 1;
     text-decoration: none;
     transition: all var(--dur-fast) var(--ease-out);
+    cursor: pointer;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
   }
 
   .btn-ghost {
@@ -162,7 +473,10 @@ const showcaseEntries = (await getCollection('showcase'))
     border: 1px solid var(--border);
   }
 
-  .btn-ghost:hover { border-color: var(--ink-light); color: var(--ink); }
+  .btn-ghost:hover {
+    border-color: var(--ink-light);
+    color: var(--ink);
+  }
 
   .btn-primary {
     background: var(--surface-inv);
@@ -174,10 +488,34 @@ const showcaseEntries = (await getCollection('showcase'))
     background: var(--celadon);
   }
 
-  .btn-primary:hover { opacity: 0.9; color: #fff; }
+  .btn-primary:hover {
+    opacity: 0.9;
+    color: #fff;
+  }
 
+  /* ── Responsive ── */
   @media (max-width: 768px) {
-    .showcase-grid { grid-template-columns: 1fr; }
-    .section-header { flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
+    .comparison-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .core-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .showcase-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .section-header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--sp-2);
+    }
+
+    .cta-actions {
+      flex-direction: column;
+      align-items: center;
+    }
   }
 </style>
