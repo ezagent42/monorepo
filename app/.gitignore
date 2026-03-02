@@ -1,13 +1,14 @@
 # Created by https://www.toptal.com/developers/gitignore/api/node
-# Tailored for page: Astro + pnpm static site
-
-### Astro ###
-dist/
-.astro/
+# Tailored for app: TypeScript + React desktop client
 
 ### Node ###
 # Dependencies
 node_modules/
+
+# Build output
+dist/
+out/
+build/
 
 # Logs
 *.log
@@ -32,7 +33,6 @@ coverage/
 .eslintcache
 .stylelintcache
 .cache/
-.parcel-cache/
 
 # Environment variable files
 .env
