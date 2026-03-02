@@ -106,3 +106,13 @@ $RECYCLE.BIN/
 
 # Git worktrees
 .worktrees/
+
+### Rust ###
+**/target/
+
+### Python ###
+**/__pycache__/
+*.so
+*.pyd
+*.egg-info/
+uv.lock
