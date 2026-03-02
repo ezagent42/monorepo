@@ -668,6 +668,38 @@ indexes:
 
 ---
 
+## §11 URI 渲染（EEP-0001）
+
+消息内容中出现的 `ezagent://` URI 需要特殊渲染处理。
+
+### §11.1 自动识别
+
+- [MUST] Render Pipeline MUST 自动识别消息文本中的 `ezagent://` URI。
+- [MUST] 识别到的 URI MUST 渲染为可点击链接，而非纯文本。
+
+### §11.2 渲染样式
+
+| 资源类型 | 图标 | 链接文本 | 行为 |
+|---------|------|---------|------|
+| Room (`/r/`) | 🏠 | Room 名称（本地查找）或 room_id 缩写 | 客户端内导航 |
+| Message (`/r/.../m/`) | 💬 | "Message in {room_name}" 或 ref_id 缩写 | 跳转到消息并高亮 |
+| Identity (`/@`) | 👤 | 显示名或 entity_id | 打开 Profile |
+| Socialware 资源 (`/sw/`) | 🧩 | 资源类型 + 标识符 | 导航到 Socialware 视图 |
+| Share Link (`/s/`) | 🔗 | Share label 或 "Share Link" | 打开 Share 预览 |
+
+- [SHOULD] 客户端 SHOULD 在 URI 悬停时显示预览卡片（资源名称、类型、状态）。
+- [MUST] 点击 URI 链接 MUST 触发客户端内导航（不打开浏览器）。
+- [SHOULD] 如果 URI 指向的资源不在本地，客户端 SHOULD 显示加载指示器并异步获取。
+
+### §11.3 推荐 Override Level
+
+| 组件 | Level | 理由 |
+|------|-------|------|
+| URI 链接识别 | Level 0 | 基于 scheme 正则匹配，自动处理 |
+| URI 悬停预览 | Level 1 | 需声明预览卡片模板 |
+
+---
+
 ## 变更日志
 
 | 版本 | 日期 | 变更 |

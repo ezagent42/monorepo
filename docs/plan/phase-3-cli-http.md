@@ -893,6 +893,61 @@ THEN   200 OK  { "entity_id": "...", "status": "connected", "rooms": 2 }
 
 ---
 
+---
+
+## §12 URI 导航（EEP-0001）
+
+### TC-3-CLI-URI-001: ezagent open 解析 Room URI
+
+```
+GIVEN  本地存在 R-alpha 数据
+
+WHEN   ezagent open ezagent://relay.test/r/{R-alpha-id}
+
+THEN   输出 Room 信息（名称、成员列表、最新消息摘要）
+       退出码 0
+```
+
+### TC-3-CLI-URI-002: ezagent open 解析 Message URI
+
+```
+GIVEN  本地存在 R-alpha 中 M-001 数据
+
+WHEN   ezagent open ezagent://relay.test/r/{R-alpha-id}/m/{M-001-ref-id}
+
+THEN   输出该消息内容（author、body、timestamp）及上下文
+       退出码 0
+```
+
+### TC-3-CLI-URI-003: ezagent open 无效 URI
+
+```
+WHEN   ezagent open "not-a-uri"
+
+THEN   输出 INVALID_URI 错误
+       退出码 2
+```
+
+### TC-3-CLI-URI-004: ezagent open 资源不存在
+
+```
+WHEN   ezagent open ezagent://relay.test/r/nonexistent-room-id
+
+THEN   输出 RESOURCE_NOT_FOUND 错误
+       退出码 3
+```
+
+### TC-3-CLI-URI-005: ezagent open 规范化
+
+```
+WHEN   ezagent open "ezagent://Relay.Test/r/{R-alpha-id}/"
+
+THEN   authority 规范化为 relay.test（小写）
+       尾部斜杠去除
+       正常输出 Room 信息
+       退出码 0
+```
+
 ## 附录：Test Case 统计
 
 | 区域 | 编号范围 | 数量 |
@@ -902,10 +957,11 @@ THEN   200 OK  { "entity_id": "...", "status": "connected", "rooms": 2 }
 | CLI — Message | TC-3-CLI-020~024 | 5 |
 | CLI — Events/System | TC-3-CLI-030~043 | 7 |
 | CLI — Config/Exit | TC-3-CLI-050~054 | 5 |
+| CLI — URI Navigation | TC-3-CLI-URI-001~005 | 5 |
 | HTTP — Bus API | TC-3-HTTP-001~024 | 15 |
 | HTTP — Annotation | TC-3-HTTP-030~032 | 3 |
 | HTTP — Extension | TC-3-HTTP-040~055 | 16 |
 | HTTP — Render API | TC-3-HTTP-060~062 | 3 |
 | WebSocket | TC-3-WS-001~006 | 6 |
 | HTTP — Error/Status | TC-3-HTTP-070~074 | 5 |
-| **合计** | | **77** |
+| **合计** | | **82** |

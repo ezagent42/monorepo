@@ -190,6 +190,37 @@ ezagent ext remove <ext_name>                 # 卸载 Extension
 
 默认端口从 `8000` 改为 `8847`（避免与常见开发服务冲突）。App 启动时连接此端口，无需用户配置。
 
+### §2.11 URI 导航（EEP-0001）
+
+```bash
+# 打开 URI 指向的资源
+ezagent open ezagent://relay.example.com/r/{room_id}           # 显示 Room 信息
+ezagent open ezagent://relay.example.com/r/{room_id}/m/{ref_id}  # 显示 Message 内容
+ezagent open ezagent://relay.example.com/@alice                  # 显示 Identity 信息
+ezagent open ezagent://relay.example.com/r/{room_id}/sw/ta/task/{ref_id}  # 显示 Socialware 资源
+```
+
+| 命令 | 参数 | 说明 |
+|------|------|------|
+| `ezagent open {uri}` | ezagent URI | 解析 URI 并显示对应资源。先查本地缓存，未命中则联系 Relay 获取 |
+
+**解析流程**：
+
+1. 验证 URI 格式（scheme MUST 为 `ezagent`）
+2. 提取 authority 和 path
+3. 查本地 CRDT 数据，命中则直接展示
+4. 未命中：DNS 解析 authority → 联系 Relay → 获取资源位置 → P2P 直连或 Relay 中转
+5. 展示资源内容（格式遵循 §3 输出格式规则）
+
+**错误处理**：
+
+| 错误 | 退出码 | 说明 |
+|------|--------|------|
+| `INVALID_URI` | 2 | URI 格式不合法 |
+| `RESOURCE_NOT_FOUND` | 3 | 资源不存在 |
+| `RELAY_UNREACHABLE` | 4 | 无法联系 Relay |
+| `ACCESS_DENIED` | 5 | 无权限访问资源 |
+
 ---
 
 ## §3 输出格式

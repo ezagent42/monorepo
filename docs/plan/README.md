@@ -51,9 +51,9 @@ TC-{phase}-{area}-{number}
 Phase: 0 / 1 / 2 / 3 / 4 / 5
 Area:  SYNC / ENGINE / HOOK / ANNOT / INDEX / IDENT / ROOM / TL / MSG / API
        / EXT01 ... EXT14 / INTERACT
-       / CLI / HTTP / WS          (Phase 3)
-       / RENDER / DECOR / ACTION / TAB / OVERRIDE / WIDGET / UI / JOURNEY / PKG / SYNC  (Phase 4)
-       / SW / EW / TA / RP / CROSS  (Phase 5)
+       / CLI / HTTP / WS / URI     (Phase 3)
+       / RENDER / DECOR / ACTION / TAB / OVERRIDE / WIDGET / UI / JOURNEY / PKG / SYNC / URI  (Phase 4)
+       / SW / EW / TA / RP / CROSS / URI  (Phase 5)
 Number: 三位数字
 ```
 
@@ -63,8 +63,8 @@ Number: 三位数字
 |-------|------|-------------|
 | Phase 0 | phase-0-verification.md | 11 |
 | Phase 1 | phase-1-bus.md | ~120 |
-| Phase 2 | phase-2-extensions.md | ~100 |
-| Phase 3 | phase-3-cli-http.md | 77 |
-| Phase 4 | phase-4-chat-app.md | 69 |
-| Phase 5 | phase-5-socialware.md | 84 (50 新增 + 34 PRD 引用) |
-| **合计** | | **~461** |
+| Phase 2 | phase-2-extensions.md | ~103 |
+| Phase 3 | phase-3-cli-http.md | 82 |
+| Phase 4 | phase-4-chat-app.md | 72 |
+| Phase 5 | phase-5-socialware.md | 132 (98 新增 + 34 PRD 引用) |
+| **合计** | | **~520** |

@@ -411,6 +411,8 @@ Fork(S) → S':
 
 Fork 后的演化完全独立：S 修改声明不影响 S'，反之亦然。
 
+**URI 行为**：Fork 产生的 S' 获得新 Identity 和新 Room，因此自动获得独立的 URI 命名空间（`/r/{new_room_id}/sw/{namespace}`）。如果 S' 修改了 `namespace`，其 `[uri].resources` 中的 pattern 也 MUST 同步更新。
+
 ### §4.2 Compose（合资/联盟）
 
 多个独立 Socialware 组成一个上层 Socialware，成员保持独立运行。
@@ -633,11 +635,22 @@ review = { params = ["submission_id", "verdict"], role = "ta:reviewer" }
 [dependencies]
 extensions = ["EXT-04", "EXT-06", "EXT-15", "EXT-17"]
 socialware = ["event-weaver"]
+
+[uri]
+resources = [
+  { type = "task",       pattern = "/sw/ta/task/{ref_id}",       description = "Single task" },
+  { type = "submission", pattern = "/sw/ta/submit/{ref_id}",     description = "Task submission" },
+  { type = "verdict",    pattern = "/sw/ta/verdict/{ref_id}",    description = "Review verdict" }
+]
+# 完整 URI 路径 = /r/{room_id} + resource.pattern
+# 例：ezagent://relay.example.com/r/{room_id}/sw/ta/task/{ref_id}
 ```
 
 - [MUST] `manifest.toml` 在 Socialware 安装时创建，版本升级时更新。
 - [MUST] `[commands]` 中声明的命令 MUST 在启动时发布到 Profile 的 `command_manifest` Annotation（EXT-15）。
 - [MUST] `[dependencies]` 中列出的 Extension 和 Socialware MUST 在启动前验证可用性。
+- [MUST] `[uri].resources` 中的 `pattern` MUST 以 `/sw/{namespace}` 为前缀，且 `{namespace}` MUST 与 `[socialware].namespace` 字段一致（详见 architecture §1.5.2）。
+- [SHOULD] Socialware SHOULD 在 `[uri]` 中声明所有可寻址的资源类型，以支持 URI 解析和 Deep Link。
 
 ### §7.4 生命周期
 

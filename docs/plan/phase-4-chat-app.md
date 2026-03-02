@@ -926,6 +926,44 @@ THEN   两端 Sidebar 和 Room Header 实时更新 Room 名称
 
 ---
 
+---
+
+## §11 URI Deep Link 与渲染（EEP-0001）
+
+### TC-4-URI-001: ezagent:// Deep Link 处理
+
+```
+GIVEN  桌面应用已运行，本地存在 R-alpha 数据
+
+WHEN   系统触发 ezagent://relay.test/r/{R-alpha-id}（通过 URL scheme handler）
+
+THEN   应用导航到 R-alpha 的 Room 视图
+       Sidebar 中 R-alpha 高亮
+```
+
+### TC-4-URI-002: URI 在消息中的渲染
+
+```
+GIVEN  一条消息 body 包含文本 "请看 ezagent://relay.test/r/{R-alpha-id}/m/{ref_id}"
+
+WHEN   Render Pipeline 处理该消息
+
+THEN   URI 部分渲染为可点击链接
+       显示资源类型图标（💬）
+       点击后导航到对应消息并高亮
+```
+
+### TC-4-URI-003: Copy ezagent URI
+
+```
+GIVEN  用户在 R-alpha Room 中右键某条消息
+
+WHEN   选择 "Copy ezagent URI"
+
+THEN   剪贴板中包含 ezagent://relay.test/r/{R-alpha-id}/m/{ref_id}
+       URI 格式符合 architecture §1.5 规范化规则
+```
+
 ## 附录：Test Case 统计
 
 | 区域 | 编号范围 | 数量 |
@@ -940,4 +978,5 @@ THEN   两端 Sidebar 和 Room Header 实时更新 Room 名称
 | 用户旅程 | TC-4-JOURNEY-001~004 | 4 |
 | Desktop 打包 | TC-4-PKG-001~006 | 6 |
 | CRDT 实时同步 UI | TC-4-SYNC-001~005 | 5 |
-| **合计** | | **69** |
+| URI Deep Link & 渲染 | TC-4-URI-001~003 | 3 |
+| **合计** | | **72** |

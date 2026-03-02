@@ -313,12 +313,14 @@ class TaskArena:
 | [TLDR-socialware-dev.md](tldr/TLDR-socialware-dev.md) | 怎么写一个 Socialware | Socialware 开发者 |
 | [TLDR-architecture.md](tldr/TLDR-architecture.md) | 三层架构 + 类型约束 + 协议交叉引用 | 架构师 |
 
-### `eep/` — 设计提案 (EEP)
+### `eep/` — Enhancement Proposals
 
 | 文档 | 类型 | 状态 | 内容 |
 |------|------|------|------|
-| [EEP-0000.md](eep/EEP-0000.md) | Process | Active | EEP Purpose and Convention |
-| [EEP-0001.md](eep/EEP-0001.md) | Standards | Draft | Bridge Extension (EXT-18) |
+| [EEP-0000](eep/EEP-0000.md) | Process | Active | EEP Purpose and Convention |
+| [EEP-0001](eep/EEP-0001.md) | Standards | Implemented | ezagent URI Scheme |
+| [EEP-0002](eep/EEP-0002.md) | Standards | Draft | Bridge Extension (EXT-18) |
+| [EEP-0003](eep/EEP-0003.md) | Standards | Draft | Share Extension (EXT-19) |
 
 ### 阅读路径
 
@@ -328,14 +330,14 @@ class TaskArena:
 - **我想用 Rust 实现核心** → bus-spec.md → extensions-spec.md
 - **我想开发前端** → app-prd.md → chat-ui-spec.md → http-spec.md
 - **我想理解架构细节** → [TLDR-architecture.md](tldr/TLDR-architecture.md) → bus-spec.md → socialware-spec.md
-- **我想提出设计提案** → [EEP-0000.md](eep/EEP-0000.md)（EEP 流程和格式规范）
+- **我想了解 URI 寻址** → [EEP-0001](eep/EEP-0001.md) → architecture.md §1.5
 - **我想快速查某个细节** → 直接按文档表格定位
 
 ---
 
 ## 项目状态
 
-ezagent 目前处于 **Architecture Draft** 阶段（v0.9.5）。协议规范和产品设计已基本完成，正在进入实现阶段。
+ezagent 目前处于 **Architecture Draft** 阶段（v0.9.6）。协议规范和产品设计已基本完成，正在进入实现阶段。
 
 **实施路线：**
 

@@ -101,3 +101,29 @@ A core v0.9.5 decision: Python's type system enforces that developers cannot cro
 | Bottom layer | ❌ Inaccessible | ✅ ctx.messages.* / ctx.hook.* |
 
 Like Rust's safe/unsafe model: restricted by default, `unsafe` requires explicit declaration marked in `manifest.toml`.
+
+## Unified Addressing: ezagent URI
+
+> Source: EEP-0001 → architecture.md §1.5
+
+Every addressable resource in the three-layer architecture has a unique URI:
+
+```
+ezagent://{relay_domain}/{path}
+```
+
+| Layer | Example |
+|-------|---------|
+| Identity | `ezagent://relay.example.com/@alice` |
+| Room | `ezagent://relay.example.com/r/019a3b4c-...` |
+| Message | `ezagent://relay.example.com/r/.../m/01HXYZ...` |
+| Channel | `ezagent://relay.example.com/r/.../c/code-review` |
+| Socialware resource | `ezagent://relay.example.com/r/.../sw/ta/task/01HXYZ...` |
+
+Key design: the authority is an **identity namespace**, not a network address. The same resource keeps the same URI whether accessed via LAN or via Relay.
+
+No ezagent client? **Web Fallback** maps `ezagent://` to `https://{relay_domain}/e/...` for read-only preview.
+
+Extensions and Socialware register sub-paths through the `[uri]` section in manifest.toml.
+
+> Full URI specification → [ReadTheDocs: EEP-0001](#) | [architecture.md §1.5](#)

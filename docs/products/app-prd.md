@@ -226,6 +226,30 @@ Tray 状态指示:
 
 ---
 
+### §4.8 Deep Link 与 URI Scheme（EEP-0001）
+
+**Scheme 注册**：桌面应用安装时注册 `ezagent://` URL scheme handler。
+
+| 平台 | 注册方式 |
+|------|---------|
+| macOS | `Info.plist` CFBundleURLTypes |
+| Windows | Registry `HKCU\Software\Classes\ezagent` |
+| Linux | `.desktop` file `MimeType=x-scheme-handler/ezagent` |
+
+**Deep Link 处理流程**：
+
+```
+系统触发 ezagent://relay.example.com/r/{room_id}
+  │
+  ├─ App 已运行 → 传递 URI 到现有窗口 → 导航到对应 Room
+  │
+  └─ App 未运行 → 启动 App → 启动 daemon → 解析 URI → 导航
+```
+
+**右键菜单**：消息、Room、Identity 等资源支持 "Copy ezagent URI" 操作，复制 URI 到剪贴板。
+
+---
+
 ## §5 验收标准
 
 | # | 场景 | 预期 |
@@ -240,6 +264,8 @@ Tray 状态指示:
 | APP-8 | Level 1 renderer：有 renderer 声明的 Extension 渲染 | 按声明渲染 |
 | APP-9 | 关闭 App 窗口 → Tray 仍在 → Agent 仍在线 | daemon 不退出 |
 | APP-10 | Tray Quit → Agent 离线 | daemon 停止 |
+| APP-11 | 浏览器/其他应用触发 `ezagent://` URI → App 打开并导航到对应资源 | Deep Link 正常 |
+| APP-12 | 右键 Room/Message → "Copy ezagent URI" → 粘贴到其他应用 | URI 格式正确 |
 
 ---
 

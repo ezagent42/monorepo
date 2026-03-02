@@ -16,6 +16,15 @@ Quickly understand EZAgent core concepts:
 | [TLDR: Socialware Dev](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-socialware-dev.md) | @when DSL, SocialwareContext, Runtime auto-generation | 15 min |
 | [TLDR: Architecture](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-architecture.md) | Three-layer fractal architecture, type constraints, collaboration modes | 12 min |
 
+### EEP — Enhancement Proposals
+
+| Number | Status | Content |
+|--------|--------|---------|
+| [EEP-0000](#) | Active | EEP Purpose and Convention |
+| [EEP-0001](#) | Implemented | ezagent URI Scheme |
+| [EEP-0002](#) | Draft | Bridge Extension (EXT-18) |
+| [EEP-0003](#) | Draft | Share Extension (EXT-19) |
+
 ## Specification Documents
 
 | Document | Content | Audience |
@@ -56,4 +65,4 @@ Want to design a new Socialware? Reference existing PRD format:
 - [CodeViber PRD](https://github.com/ezagent42/docs/blob/main/socialware/codeviber-prd.md)
 
 ---
-*Content based on docs v0.9.5.*
+*Content based on docs v0.9.6.*

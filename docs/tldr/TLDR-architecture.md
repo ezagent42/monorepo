@@ -72,6 +72,30 @@ after_write:
 
 开发者只写 `[p110]`，其余全部自动生成。
 
+## 统一寻址：ezagent URI
+
+> 来源：[EEP-0001](../eep/EEP-0001.md) → architecture §1.5
+
+三层架构的每个可寻址资源都有唯一的 URI 标识：
+
+```
+ezagent://{relay_domain}/{path}
+```
+
+| 资源层 | 示例 |
+|--------|------|
+| Identity | `ezagent://relay.example.com/@alice` |
+| Room | `ezagent://relay.example.com/r/019a3b4c-...` |
+| Message | `ezagent://relay.example.com/r/.../m/01HXYZ...` |
+| Channel (EXT-06) | `ezagent://relay.example.com/r/.../c/code-review` |
+| Socialware 资源 | `ezagent://relay.example.com/r/.../sw/ta/task/01HXYZ...` |
+
+关键设计：authority 是**身份命名空间**，不是网络地址。同一资源在 LAN 直连和 Relay 中转时 URI 不变。
+
+没有 ezagent 客户端？Web Fallback 自动将 `ezagent://` 映射为 `https://{relay_domain}/e/...`，提供只读预览。
+
+Extension 和 Socialware 通过 manifest.toml 的 `[uri]` 部分注册自己的子路径，Engine 自动检测冲突。
+
 ## 与现有 Agent 基础设施的对比
 
 | 维度 | Skill | Subagent Framework | MCP | Socialware |

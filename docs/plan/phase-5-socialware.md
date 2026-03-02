@@ -1518,6 +1518,38 @@ THEN   SmartTeam 的跨 SW 规则触发
 
 ---
 
+### §18 Socialware URI 注册（EEP-0001）
+
+#### TC-5-URI-001: Socialware URI 路径注册
+
+```
+GIVEN  TaskArena manifest 声明:
+         [socialware] namespace = "ta"
+         [uri] resources = [{ type = "task", pattern = "/sw/ta/task/{ref_id}" }]
+
+WHEN   TaskArena 启动（start 生命周期阶段）
+
+THEN   URI 注册表中包含 /r/{room_id}/sw/ta/task/{ref_id} pattern
+       pattern 关联到 Socialware ID "task-arena"
+```
+
+#### TC-5-URI-002: Socialware URI namespace 一致性检查
+
+```
+GIVEN  manifest 声明:
+         [socialware] namespace = "ta"
+         [uri] resources = [{ type = "task", pattern = "/sw/xx/task/{ref_id}" }]
+         （namespace "xx" 与 [socialware].namespace "ta" 不一致）
+
+WHEN   Engine 加载此 Socialware
+
+THEN   加载失败
+       报 URI_NAMESPACE_MISMATCH 错误
+       错误信息包含 expected "ta" 和 actual "xx"
+```
+
+---
+
 ## 附录：Test Case 统计
 
 | 区域 | 编号范围 | 数量 |
@@ -1543,5 +1575,6 @@ THEN   SmartTeam 的跨 SW 规则触发
 | **CodeViber** | **TC-5-CV-001~008** | **8** |
 | **Socialware DSL** | **TC-5-DSL-001~010** | **10** |
 | **Socialware 间协作** | **TC-5-COLLAB-001~006** | **6** |
-| **合计（含引用）** | | **130** |
-| **合计（新增 test case）** | | **96** |
+| **URI 注册** | **TC-5-URI-001~002** | **2** |
+| **合计（含引用）** | | **132** |
+| **合计（新增 test case）** | | **98** |

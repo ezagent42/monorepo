@@ -811,6 +811,15 @@ Extension Loader 通过以下 Engine 内部 API 注册 Extension 提供的功能
 
 四个 Built-in Datatypes 使用 §3.5 定义的统一声明格式。它们始终加载，不受 `enabled_extensions` 控制。
 
+**URI Path 映射**（详见 architecture §1.5.2）：
+
+| Built-in | URI Path | 标识符 |
+|----------|----------|--------|
+| Identity | `/@{entity_id}` | Entity ID (`@local:relay_domain`) |
+| Room | `/r/{room_id}` | UUIDv7 |
+| Message | `/r/{room_id}/m/{ref_id}` | ULID |
+| Timeline | `/r/{room_id}/t` | — |
+
 ### §5.1 Identity
 
 #### §5.1.1 声明

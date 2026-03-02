@@ -238,6 +238,8 @@ Relay 本地层:
 - [SHOULD] Relay SHOULD 支持 Entity 吊销（revoke）：标记 Entity 为已吊销，后续公钥查询返回 revoked 状态。
 - [MAY] Relay MAY 支持 Entity 密钥轮换（key rotation）：更新 public_key 映射，旧公钥标记为 deprecated。
 
+注册成功的 Entity 自动获得 URI 表示：`ezagent://{relay_domain}/@{local_part}`（详见 architecture §1.5.2）。
+
 ---
 
 ## §7 Admin API
@@ -319,6 +321,48 @@ Response:
 GET    /admin/discovery/stats           # Discovery 索引统计
 POST   /admin/discovery/rebuild         # 重建索引
 ```
+
+### §7.7 Web Fallback（EEP-0001 URI Scheme）
+
+> **来源**：architecture §1.5.4、[EEP-0001](../eep/EEP-0001.md)
+
+当接收方没有安装 ezagent 客户端时，通过 HTTPS 访问 Relay 的 Web 端点获取可读视图。
+
+**路由规则**：
+
+```
+ezagent://{authority}/{path}  →  https://{authority}/e/{path}
+```
+
+```
+GET    /e/@{entity_id}                     # Identity 预览
+GET    /e/r/{room_id}                      # Room 预览
+GET    /e/r/{room_id}/m/{ref_id}           # Message 预览
+GET    /e/r/{room_id}/c/{channel_name}     # Channel 预览
+GET    /e/r/{room_id}/sw/{namespace}/...   # Socialware 资源预览
+GET    /e/s/{token}                        # Share Link 预览（EEP-0003）
+```
+
+- [MUST] Web Fallback path MUST 以 `/e/` 为前缀，与 Admin API (`/admin/`)、Health (`/health`) 路径区分。
+- [MUST] Relay MUST NOT 在未认证的 Web Fallback 请求中返回消息内容。
+- [SHOULD] Relay 收到 Web Fallback 请求时，SHOULD 返回 HTML 页面，包含：
+  - 资源的只读预览（未认证时仅显示 Room 名称和成员数等元信息）
+  - `ezagent://` deep link（"在 ezagent 中打开"）
+  - 客户端下载链接（如检测到用户未安装）
+- [MAY] Relay MAY 在已认证请求中返回完整内容预览。
+
+**响应头**：
+
+```
+Content-Type: text/html; charset=utf-8
+X-Ezagent-URI: ezagent://{authority}/{path}    # 原始 URI，供客户端拦截
+```
+
+**监控指标**：
+
+| 指标 | 类型 | 说明 |
+|------|------|------|
+| `relay_web_fallback_requests_total` | counter | Web Fallback 请求次数（按资源类型） |
 
 ---
 

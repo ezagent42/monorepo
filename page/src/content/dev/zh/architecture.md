@@ -101,3 +101,29 @@ v0.9.5 的核心决策：Python 类型系统强制开发者不能跨层操作。
 | Bottom 层 | ❌ 不可访问 | ✅ ctx.messages.* / ctx.hook.* |
 
 类似 Rust 的 safe/unsafe 模型：默认受限，`unsafe` 需要显式声明并标记在 `manifest.toml` 中。
+
+## 统一寻址：ezagent URI
+
+> 来源：EEP-0001 → architecture.md §1.5
+
+三层架构的每个可寻址资源都有唯一的 URI：
+
+```
+ezagent://{relay_domain}/{path}
+```
+
+| 资源层 | 示例 |
+|--------|------|
+| Identity | `ezagent://relay.example.com/@alice` |
+| Room | `ezagent://relay.example.com/r/019a3b4c-...` |
+| Message | `ezagent://relay.example.com/r/.../m/01HXYZ...` |
+| Channel | `ezagent://relay.example.com/r/.../c/code-review` |
+| Socialware 资源 | `ezagent://relay.example.com/r/.../sw/ta/task/01HXYZ...` |
+
+关键设计：authority 是**身份命名空间**，不是网络地址。同一资源在 LAN 直连和 Relay 中转时 URI 不变。
+
+没有 ezagent 客户端？**Web Fallback** 自动将 `ezagent://` 映射为 `https://{relay_domain}/e/...`，提供只读预览。
+
+Extension 和 Socialware 通过 manifest.toml 的 `[uri]` 部分注册子路径。
+
+> 完整 URI 规范 → [ReadTheDocs: EEP-0001](#) | [architecture.md §1.5](#)

@@ -37,6 +37,19 @@ http://localhost:8847/api/        # REST API
 ws://localhost:8847/ws            # WebSocket Event Stream
 ```
 
+### §1.3 HTTP Path 与 ezagent URI 的关系
+
+HTTP API 是**本地服务接口**，无 authority 部分。ezagent URI（architecture §1.5）是**全局寻址标识**，含 authority。两者的 path 映射关系如下：
+
+| ezagent URI Path | HTTP API Path | 说明 |
+|------------------|---------------|------|
+| `/@{entity_id}` | `/api/identity/{entity_id}` | Identity |
+| `/r/{room_id}` | `/api/rooms/{room_id}` | Room |
+| `/r/{room_id}/m/{ref_id}` | `/api/rooms/{room_id}/messages/{ref_id}` | Message |
+| `/r/{room_id}/t` | `/api/rooms/{room_id}/timeline` | Timeline |
+
+HTTP API path 保留 `/api/` 前缀以区分本地管理接口。URI path 设计更紧凑（`/r/`、`/m/`），因为它面向外部用户、需要可分享性。两者的标识符（room_id、ref_id）完全相同。
+
 ---
 
 ## §2 Bus API Endpoints

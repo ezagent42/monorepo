@@ -16,6 +16,15 @@ sidebar_label: "资源"
 | [TLDR: Socialware 开发](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-socialware-dev.md) | @when DSL、SocialwareContext、Runtime 自动生成 | 15 分钟 |
 | [TLDR: 架构](https://github.com/ezagent42/docs/blob/main/tldr/TLDR-architecture.md) | 三层分形架构、类型约束、协作模式 | 12 分钟 |
 
+### EEP 设计提案
+
+| 编号 | 状态 | 内容 |
+|------|------|------|
+| [EEP-0000](#) | Active | EEP Purpose and Convention |
+| [EEP-0001](#) | Implemented | ezagent URI Scheme |
+| [EEP-0002](#) | Draft | Bridge Extension (EXT-18) |
+| [EEP-0003](#) | Draft | Share Extension (EXT-19) |
+
 ## 规范文档
 
 | 文档 | 内容 | 适合谁 |
@@ -56,4 +65,4 @@ sidebar_label: "资源"
 - [CodeViber PRD](https://github.com/ezagent42/docs/blob/main/socialware/codeviber-prd.md)
 
 ---
-*当前内容基于 docs v0.9.5。*
+*当前内容基于 docs v0.9.6。*

@@ -881,6 +881,44 @@ THEN   P-core-only 保留所有 ext.* 字段
        E-alice 正常收到 P-core-only 的消息（没有 ext.* 也合法）
 ```
 
+### §5.18 URI Path 注册（EEP-0001）
+
+#### TC-2-URI-001: Extension URI 路径冲突检测
+
+```
+GIVEN  EXT-A manifest 声明 uri_paths = ["/r/{room_id}/c/{channel_name}"]
+       EXT-B manifest 声明 uri_paths = ["/r/{room_id}/c/{channel_name}"]
+
+WHEN   Engine 同时加载 EXT-A 和 EXT-B
+
+THEN   先加载者注册成功
+       后加载者被拒绝，Engine 报 URI_PATH_CONFLICT 错误
+       错误日志包含冲突的 pattern 和两个 Extension ID
+```
+
+#### TC-2-URI-002: Extension URI 路径注册
+
+```
+GIVEN  EXT-06 Channels manifest 声明 uri_paths = ["/r/{room_id}/c/{channel_name}"]
+       EXT-11 Threads manifest 声明 uri_paths = ["/r/{room_id}/m/{ref_id}/thread"]
+
+WHEN   Engine 加载 EXT-06 和 EXT-11
+
+THEN   URI 注册表包含两条 pattern
+       URI 注册表可根据输入 path 匹配到对应 Extension ID
+```
+
+#### TC-2-URI-003: Extension 无 [uri] 部分
+
+```
+GIVEN  EXT-04 Reply To manifest 不含 [uri] 部分
+
+WHEN   Engine 加载 EXT-04
+
+THEN   加载成功
+       URI 注册表中无 EXT-04 相关条目
+```
+
 ---
 
 
