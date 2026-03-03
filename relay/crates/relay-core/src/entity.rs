@@ -160,6 +160,21 @@ impl EntityManagerImpl {
 
         Ok(record)
     }
+
+    /// Revoke an entity by setting its status to `Revoked`.
+    ///
+    /// Returns the updated record. Revoked entities cannot participate
+    /// in further operations but their historical data is preserved.
+    pub fn revoke(&self, entity_id_str: &str) -> Result<EntityRecord> {
+        let mut record = self.get(entity_id_str)?;
+        record.status = EntityStatus::Revoked;
+
+        let serialized =
+            serde_json::to_vec(&record).map_err(|e| RelayError::Storage(e.to_string()))?;
+        self.store.put_entity(entity_id_str, &serialized)?;
+
+        Ok(record)
+    }
 }
 
 #[cfg(test)]
@@ -325,5 +340,34 @@ mod tests {
         // Stored key should now be the new one.
         let stored = mgr.get_pubkey(entity_id).unwrap();
         assert_eq!(stored, new_kp.public_key().as_bytes().to_vec());
+    }
+
+    /// TC-3-ADMIN-009: Entity revocation sets status to Revoked.
+    #[test]
+    fn tc_3_admin_009_entity_revocation() {
+        let mgr = setup("relay.example.com");
+        let kp = Keypair::generate();
+        let pk = kp.public_key();
+        let eid = "@spammer:relay.example.com";
+
+        mgr.register(eid, pk.as_bytes()).unwrap();
+        assert_eq!(mgr.get(eid).unwrap().status, EntityStatus::Active);
+
+        let revoked = mgr.revoke(eid).unwrap();
+        assert_eq!(revoked.status, EntityStatus::Revoked);
+
+        // Re-read from store to confirm persistence.
+        let stored = mgr.get(eid).unwrap();
+        assert_eq!(stored.status, EntityStatus::Revoked);
+        // Pubkey is still accessible (history preserved).
+        assert_eq!(stored.pubkey, pk.as_bytes().to_vec());
+    }
+
+    /// Revoking a non-existent entity returns EntityNotFound.
+    #[test]
+    fn revoke_nonexistent_entity() {
+        let mgr = setup("relay.example.com");
+        let err = mgr.revoke("@ghost:relay.example.com").unwrap_err();
+        assert!(matches!(err, RelayError::EntityNotFound(_)));
     }
 }
