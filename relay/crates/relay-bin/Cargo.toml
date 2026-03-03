@@ -17,3 +17,8 @@ serde_json = { workspace = true }
 relay-core = { workspace = true }
 relay-bridge = { workspace = true }
 relay-blob = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+ezagent-protocol = { workspace = true }
+yrs = { workspace = true }
