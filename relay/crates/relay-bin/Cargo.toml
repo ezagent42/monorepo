@@ -24,6 +24,9 @@ prometheus = { workspace = true }
 ezagent-protocol = { workspace = true }
 
 [dev-dependencies]
+base64 = { workspace = true }
+serde_json = { workspace = true }
+relay-core = { workspace = true }
 tempfile = { workspace = true }
 ezagent-protocol = { workspace = true }
 yrs = { workspace = true }
