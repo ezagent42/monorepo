@@ -135,7 +135,13 @@ async fn main() {
 
     let quota_manager = Arc::new(QuotaManager::new(quota_store, config.quota.clone()));
 
-    let relay_metrics = RelayMetrics::new();
+    let relay_metrics = match RelayMetrics::try_new() {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("Error: failed to create metrics: {e}");
+            std::process::exit(1);
+        }
+    };
 
     // Build shared application state.
     let ready_flag = Arc::new(AtomicBool::new(false));

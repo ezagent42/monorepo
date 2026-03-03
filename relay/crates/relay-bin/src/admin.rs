@@ -592,7 +592,7 @@ mod tests {
 
         let quota_manager = Arc::new(QuotaManager::new(quota_store, QuotaDefaults::default()));
 
-        let metrics = RelayMetrics::new();
+        let metrics = RelayMetrics::try_new().unwrap();
 
         let state = AdminState {
             entity_manager,

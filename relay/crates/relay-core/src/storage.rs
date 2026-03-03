@@ -35,7 +35,7 @@ pub struct RelayStore {
 impl RelayStore {
     /// Open (or create) a relay store at the given path.
     ///
-    /// Creates all four column families if they do not yet exist.
+    /// Creates all six column families if they do not yet exist.
     pub fn open(path: &Path) -> Result<Self> {
         let mut opts = Options::default();
         opts.create_if_missing(true);

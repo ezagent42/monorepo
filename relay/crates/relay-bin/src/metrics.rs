@@ -2,6 +2,8 @@
 //!
 //! Exposes counters, gauges, and an HTTP handler for the `/metrics` endpoint.
 
+use relay_core::error::{RelayError, Result};
+
 use prometheus::{Encoder, IntCounter, IntCounterVec, IntGauge, Opts, Registry, TextEncoder};
 
 /// All Prometheus metrics for the relay service.
@@ -28,60 +30,69 @@ pub struct RelayMetrics {
     pub requests_total: IntCounterVec,
 }
 
+/// Create and register a metric, returning a `RelayError` on failure.
+macro_rules! register_metric {
+    ($registry:expr, $metric:expr) => {{
+        let m = $metric;
+        $registry
+            .register(Box::new(m.clone()))
+            .map_err(|e| RelayError::Config(format!("register metric: {e}")))?;
+        m
+    }};
+}
+
 impl RelayMetrics {
     /// Create and register all metrics.
-    pub fn new() -> Self {
+    ///
+    /// Returns an error if any metric fails to create or register.
+    pub fn try_new() -> Result<Self> {
         let registry = Registry::new();
 
-        let peers_connected =
+        let peers_connected = register_metric!(
+            registry,
             IntGauge::new("relay_peers_connected", "Current connected peer count")
-                .expect("metric creation");
-        let rooms_total =
-            IntGauge::new("relay_rooms_total", "Total number of rooms").expect("metric creation");
-        let entities_total = IntGauge::new("relay_entities_total", "Total registered entities")
-            .expect("metric creation");
-        let blob_store_bytes = IntGauge::new("relay_blob_store_bytes", "Total blob storage bytes")
-            .expect("metric creation");
-        let blob_count =
-            IntGauge::new("relay_blob_count", "Total number of blobs").expect("metric creation");
-        let sync_operations_total =
+                .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
+        let rooms_total = register_metric!(
+            registry,
+            IntGauge::new("relay_rooms_total", "Total number of rooms")
+                .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
+        let entities_total = register_metric!(
+            registry,
+            IntGauge::new("relay_entities_total", "Total registered entities")
+                .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
+        let blob_store_bytes = register_metric!(
+            registry,
+            IntGauge::new("relay_blob_store_bytes", "Total blob storage bytes")
+                .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
+        let blob_count = register_metric!(
+            registry,
+            IntGauge::new("relay_blob_count", "Total number of blobs")
+                .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
+        let sync_operations_total = register_metric!(
+            registry,
             IntCounter::new("relay_sync_operations_total", "Total sync operations")
-                .expect("metric creation");
-        let quota_rejections_total =
+                .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
+        let quota_rejections_total = register_metric!(
+            registry,
             IntCounter::new("relay_quota_rejections_total", "Total quota rejections")
-                .expect("metric creation");
-        let requests_total = IntCounterVec::new(
-            Opts::new("relay_requests_total", "Total HTTP requests by method"),
-            &["method"],
-        )
-        .expect("metric creation");
+                .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
+        let requests_total = register_metric!(
+            registry,
+            IntCounterVec::new(
+                Opts::new("relay_requests_total", "Total HTTP requests by method"),
+                &["method"],
+            )
+            .map_err(|e| RelayError::Config(format!("create metric: {e}")))?
+        );
 
-        registry
-            .register(Box::new(peers_connected.clone()))
-            .expect("register");
-        registry
-            .register(Box::new(rooms_total.clone()))
-            .expect("register");
-        registry
-            .register(Box::new(entities_total.clone()))
-            .expect("register");
-        registry
-            .register(Box::new(blob_store_bytes.clone()))
-            .expect("register");
-        registry
-            .register(Box::new(blob_count.clone()))
-            .expect("register");
-        registry
-            .register(Box::new(sync_operations_total.clone()))
-            .expect("register");
-        registry
-            .register(Box::new(quota_rejections_total.clone()))
-            .expect("register");
-        registry
-            .register(Box::new(requests_total.clone()))
-            .expect("register");
-
-        Self {
+        Ok(Self {
             registry,
             peers_connected,
             rooms_total,
@@ -91,7 +102,7 @@ impl RelayMetrics {
             sync_operations_total,
             quota_rejections_total,
             requests_total,
-        }
+        })
     }
 
     /// Encode all metrics in Prometheus text exposition format.
@@ -99,10 +110,9 @@ impl RelayMetrics {
         let encoder = TextEncoder::new();
         let metric_families = self.registry.gather();
         let mut buffer = Vec::new();
-        encoder
-            .encode(&metric_families, &mut buffer)
-            .expect("encode metrics");
-        String::from_utf8(buffer).expect("utf8 metrics")
+        // TextEncoder.encode only fails if the writer fails; Vec<u8> never does.
+        let _ = encoder.encode(&metric_families, &mut buffer);
+        String::from_utf8(buffer).unwrap_or_default()
     }
 }
 
@@ -113,7 +123,7 @@ mod tests {
     /// TC-3-MON-001: Metrics endpoint returns Prometheus format.
     #[test]
     fn tc_3_mon_001_metrics_prometheus_format() {
-        let metrics = RelayMetrics::new();
+        let metrics = RelayMetrics::try_new().unwrap();
 
         // Set some values.
         metrics.peers_connected.set(5);
