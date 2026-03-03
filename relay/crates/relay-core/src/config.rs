@@ -95,7 +95,7 @@ fn default_gc_interval_hours() -> u32 {
 
 impl RelayConfig {
     /// Parse a `RelayConfig` from a TOML string.
-    pub fn from_str(s: &str) -> Result<Self> {
+    pub fn parse(s: &str) -> Result<Self> {
         let config: Self =
             toml::from_str(s).map_err(|e| RelayError::Config(e.to_string()))?;
         config.validate()?;
@@ -106,7 +106,7 @@ impl RelayConfig {
     pub fn from_file(path: &Path) -> Result<Self> {
         let contents = std::fs::read_to_string(path)
             .map_err(|e| RelayError::Config(format!("failed to read {}: {e}", path.display())))?;
-        Self::from_str(&contents)
+        Self::parse(&contents)
     }
 
     /// Validate required fields.
@@ -134,7 +134,7 @@ storage_path = "/tmp/relay"
 cert_path = "/etc/relay/cert.pem"
 key_path = "/etc/relay/key.pem"
 "#;
-        let err = RelayConfig::from_str(toml).unwrap_err();
+        let err = RelayConfig::parse(toml).unwrap_err();
         let msg = err.to_string().to_lowercase();
         assert!(
             msg.contains("domain"),
@@ -163,7 +163,7 @@ max_blob_size = 104857600
 orphan_retention_days = 14
 gc_interval_hours = 12
 "#;
-        let cfg = RelayConfig::from_str(toml).unwrap();
+        let cfg = RelayConfig::parse(toml).unwrap();
         assert_eq!(cfg.domain, "relay-a.example.com");
         assert_eq!(cfg.listen, "tls/0.0.0.0:7448");
         assert_eq!(cfg.storage_path, "/var/relay/data");
@@ -190,7 +190,7 @@ storage_path = "/tmp/relay"
 cert_path = "cert.pem"
 key_path = "key.pem"
 "#;
-        let cfg = RelayConfig::from_str(toml).unwrap();
+        let cfg = RelayConfig::parse(toml).unwrap();
         assert!(!cfg.require_auth);
         assert_eq!(cfg.healthz_port, 8080);
         assert!(cfg.peers.is_empty());
