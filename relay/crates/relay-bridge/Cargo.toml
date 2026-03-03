@@ -1,0 +1,22 @@
+[package]
+name = "relay-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+zenoh = { workspace = true }
+yrs = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+ezagent-protocol = { workspace = true }
+relay-core = { workspace = true }
+relay-blob = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+rand = { workspace = true }

@@ -1,0 +1,1 @@
+// Entity registration and management

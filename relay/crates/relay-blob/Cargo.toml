@@ -1,0 +1,17 @@
+[package]
+name = "relay-blob"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+log = { workspace = true }
+sha2 = { workspace = true }
+chrono = { workspace = true }
+relay-core = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
