@@ -70,6 +70,43 @@ pub enum RelayError {
     /// A network-layer error occurred.
     #[error("network error: {0}")]
     Network(String),
+
+    /// A quota limit was exceeded.
+    #[error("quota exceeded for {entity_id}: {dimension} used={used}, limit={limit}")]
+    QuotaExceeded {
+        entity_id: String,
+        dimension: String,
+        used: u64,
+        limit: u64,
+    },
+
+    /// The entity is not a member of the room.
+    #[error("not a member: {entity_id} is not in room {room_id}")]
+    NotAMember { entity_id: String, room_id: String },
+
+    /// The entity's power level is insufficient.
+    #[error("insufficient power level for {entity_id}: required={required}, actual={actual}")]
+    InsufficientPowerLevel {
+        entity_id: String,
+        required: u32,
+        actual: u32,
+    },
+
+    /// The entity is not the author of the resource.
+    #[error("not author: {entity_id} is not author {author}")]
+    NotAuthor { entity_id: String, author: String },
+
+    /// The request is not authenticated.
+    #[error("unauthorized: {0}")]
+    Unauthorized(String),
+
+    /// The authenticated entity lacks permission.
+    #[error("forbidden: {0}")]
+    Forbidden(String),
+
+    /// A replayed request was detected (timestamp too old).
+    #[error("replay detected: timestamp {timestamp_ms}ms is outside tolerance")]
+    ReplayDetected { timestamp_ms: i64 },
 }
 
 /// Convenience alias for relay results.
