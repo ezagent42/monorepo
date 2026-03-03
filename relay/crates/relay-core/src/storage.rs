@@ -1,7 +1,7 @@
 //! RocksDB storage abstraction for the relay service.
 //!
-//! Provides a thin wrapper over RocksDB with four column families:
-//! `entities`, `rooms`, `blobs_meta`, and `blob_refs`.
+//! Provides a thin wrapper over RocksDB with six column families:
+//! `entities`, `rooms`, `blobs_meta`, `blob_refs`, `quota_config`, and `quota_usage`.
 
 use std::path::Path;
 
@@ -9,14 +9,23 @@ use rocksdb::{ColumnFamilyDescriptor, Options, DB};
 
 use crate::error::{RelayError, Result};
 
-/// The four column family names used by the relay store.
+/// The six column family names used by the relay store.
 const CF_ENTITIES: &str = "entities";
 const CF_ROOMS: &str = "rooms";
 const CF_BLOBS_META: &str = "blobs_meta";
 const CF_BLOB_REFS: &str = "blob_refs";
+const CF_QUOTA_CONFIG: &str = "quota_config";
+const CF_QUOTA_USAGE: &str = "quota_usage";
 
 /// All column family names in declaration order.
-const ALL_CFS: &[&str] = &[CF_ENTITIES, CF_ROOMS, CF_BLOBS_META, CF_BLOB_REFS];
+const ALL_CFS: &[&str] = &[
+    CF_ENTITIES,
+    CF_ROOMS,
+    CF_BLOBS_META,
+    CF_BLOB_REFS,
+    CF_QUOTA_CONFIG,
+    CF_QUOTA_USAGE,
+];
 
 /// A RocksDB-backed key-value store for the relay service.
 pub struct RelayStore {
@@ -205,6 +214,93 @@ impl RelayStore {
             .delete_cf(&cf, key.as_bytes())
             .map_err(|e| RelayError::Storage(e.to_string()))
     }
+
+    // ---- quota_config CF ----
+
+    /// Store a quota config record.
+    pub fn put_quota_config(&self, key: &str, value: &[u8]) -> Result<()> {
+        let cf = self
+            .db
+            .cf_handle(CF_QUOTA_CONFIG)
+            .ok_or_else(|| RelayError::Storage("missing CF: quota_config".into()))?;
+        self.db
+            .put_cf(&cf, key.as_bytes(), value)
+            .map_err(|e| RelayError::Storage(e.to_string()))
+    }
+
+    /// Retrieve a quota config record by key.
+    pub fn get_quota_config(&self, key: &str) -> Result<Option<Vec<u8>>> {
+        let cf = self
+            .db
+            .cf_handle(CF_QUOTA_CONFIG)
+            .ok_or_else(|| RelayError::Storage("missing CF: quota_config".into()))?;
+        self.db
+            .get_cf(&cf, key.as_bytes())
+            .map_err(|e| RelayError::Storage(e.to_string()))
+    }
+
+    /// Delete a quota config record by key.
+    pub fn delete_quota_config(&self, key: &str) -> Result<()> {
+        let cf = self
+            .db
+            .cf_handle(CF_QUOTA_CONFIG)
+            .ok_or_else(|| RelayError::Storage("missing CF: quota_config".into()))?;
+        self.db
+            .delete_cf(&cf, key.as_bytes())
+            .map_err(|e| RelayError::Storage(e.to_string()))
+    }
+
+    /// List all keys in the quota_config CF.
+    pub fn list_quota_config_keys(&self) -> Result<Vec<String>> {
+        let cf = self
+            .db
+            .cf_handle(CF_QUOTA_CONFIG)
+            .ok_or_else(|| RelayError::Storage("missing CF: quota_config".into()))?;
+        let iter = self.db.iterator_cf(&cf, rocksdb::IteratorMode::Start);
+        let mut keys = Vec::new();
+        for item in iter {
+            let (key, _) = item.map_err(|e| RelayError::Storage(e.to_string()))?;
+            let key_str =
+                String::from_utf8(key.to_vec()).map_err(|e| RelayError::Storage(e.to_string()))?;
+            keys.push(key_str);
+        }
+        Ok(keys)
+    }
+
+    // ---- quota_usage CF ----
+
+    /// Store a quota usage record.
+    pub fn put_quota_usage(&self, key: &str, value: &[u8]) -> Result<()> {
+        let cf = self
+            .db
+            .cf_handle(CF_QUOTA_USAGE)
+            .ok_or_else(|| RelayError::Storage("missing CF: quota_usage".into()))?;
+        self.db
+            .put_cf(&cf, key.as_bytes(), value)
+            .map_err(|e| RelayError::Storage(e.to_string()))
+    }
+
+    /// Retrieve a quota usage record by key.
+    pub fn get_quota_usage(&self, key: &str) -> Result<Option<Vec<u8>>> {
+        let cf = self
+            .db
+            .cf_handle(CF_QUOTA_USAGE)
+            .ok_or_else(|| RelayError::Storage("missing CF: quota_usage".into()))?;
+        self.db
+            .get_cf(&cf, key.as_bytes())
+            .map_err(|e| RelayError::Storage(e.to_string()))
+    }
+
+    /// Delete a quota usage record by key.
+    pub fn delete_quota_usage(&self, key: &str) -> Result<()> {
+        let cf = self
+            .db
+            .cf_handle(CF_QUOTA_USAGE)
+            .ok_or_else(|| RelayError::Storage("missing CF: quota_usage".into()))?;
+        self.db
+            .delete_cf(&cf, key.as_bytes())
+            .map_err(|e| RelayError::Storage(e.to_string()))
+    }
 }
 
 #[cfg(test)]
@@ -318,5 +414,84 @@ mod tests {
             keys,
             vec!["@alice:relay.com", "@bob:relay.com", "@carol:relay.com",]
         );
+    }
+
+    /// CRUD operations on the quota_config CF.
+    #[test]
+    fn quota_config_cf_crud() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = RelayStore::open(dir.path()).unwrap();
+
+        assert!(store.get_quota_config("alice").unwrap().is_none());
+
+        store.put_quota_config("alice", b"config-a").unwrap();
+        assert_eq!(
+            store.get_quota_config("alice").unwrap().as_deref(),
+            Some(b"config-a".as_ref())
+        );
+
+        store.delete_quota_config("alice").unwrap();
+        assert!(store.get_quota_config("alice").unwrap().is_none());
+    }
+
+    /// CRUD operations on the quota_usage CF.
+    #[test]
+    fn quota_usage_cf_crud() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = RelayStore::open(dir.path()).unwrap();
+
+        assert!(store.get_quota_usage("alice").unwrap().is_none());
+
+        store.put_quota_usage("alice", b"usage-a").unwrap();
+        assert_eq!(
+            store.get_quota_usage("alice").unwrap().as_deref(),
+            Some(b"usage-a".as_ref())
+        );
+
+        store.delete_quota_usage("alice").unwrap();
+        assert!(store.get_quota_usage("alice").unwrap().is_none());
+    }
+
+    /// List quota config keys via prefix scan.
+    #[test]
+    fn list_quota_config_keys() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = RelayStore::open(dir.path()).unwrap();
+
+        store.put_quota_config("@a:relay.com", b"x").unwrap();
+        store.put_quota_config("@b:relay.com", b"y").unwrap();
+
+        let mut keys = store.list_quota_config_keys().unwrap();
+        keys.sort();
+        assert_eq!(keys, vec!["@a:relay.com", "@b:relay.com"]);
+    }
+
+    /// New CFs work alongside existing ones after reopen.
+    #[test]
+    fn quota_cfs_survive_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+
+        {
+            let store = RelayStore::open(dir.path()).unwrap();
+            store.put_quota_config("key1", b"cfg1").unwrap();
+            store.put_quota_usage("key1", b"usg1").unwrap();
+            store.put_entity("ent1", b"record1").unwrap();
+        }
+
+        {
+            let store = RelayStore::open(dir.path()).unwrap();
+            assert_eq!(
+                store.get_quota_config("key1").unwrap().as_deref(),
+                Some(b"cfg1".as_ref())
+            );
+            assert_eq!(
+                store.get_quota_usage("key1").unwrap().as_deref(),
+                Some(b"usg1".as_ref())
+            );
+            assert_eq!(
+                store.get_entity("ent1").unwrap().as_deref(),
+                Some(b"record1".as_ref())
+            );
+        }
     }
 }
