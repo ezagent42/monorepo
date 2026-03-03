@@ -1,0 +1,15 @@
+domain = "relay-a.example.com"
+listen = "tls/0.0.0.0:7448"
+storage_path = "/var/relay/data"
+require_auth = false
+healthz_port = 8080
+
+[tls]
+cert_path = "/etc/relay/cert.pem"
+key_path = "/etc/relay/key.pem"
+# ca_path = "/etc/relay/ca.pem"
+
+[blob]
+max_blob_size = 52428800
+orphan_retention_days = 7
+gc_interval_hours = 24

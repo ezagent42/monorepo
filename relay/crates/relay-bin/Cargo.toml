@@ -1,0 +1,24 @@
+[package]
+name = "relay-bin"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "relay"
+path = "src/main.rs"
+
+[dependencies]
+tokio = { workspace = true }
+log = { workspace = true }
+env_logger = { workspace = true }
+axum = { workspace = true }
+serde_json = { workspace = true }
+relay-core = { workspace = true }
+relay-bridge = { workspace = true }
+relay-blob = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+ezagent-protocol = { workspace = true }
+yrs = { workspace = true }
