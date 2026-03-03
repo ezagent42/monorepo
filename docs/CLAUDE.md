@@ -8,7 +8,7 @@
 docs/
 ├── specs/       → 协议规范（architecture, bus, extensions, socialware, py-sdk, relay, repo）
 ├── products/    → 产品文档（app PRD, chat-ui, http-api, cli）
-├── plan/        → 实施计划（Phase 0–5, fixtures, foundations）
+├── plan/        → 实施计划（Phase 0–6, fixtures, foundations）
 ├── socialware/  → Socialware PRD（EventWeaver, TaskArena, ResPool, AgentForge, CodeViber）
 ├── tldr/        → 快速了解（Overview, Architecture, Socialware Dev）
 ├── eep/         → EEP 设计提案（ezagent Enhancement Proposal）

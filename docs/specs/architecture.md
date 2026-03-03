@@ -2282,7 +2282,21 @@ watch.channel_new_ref          # EXT-14 Watch
 | P2.5-5 | Extension auto-gen API (reactions, mutable, watch) | 正确调用 |
 | P2.5-6 | @hook(pre_send) Python callback 注册并触发（底层机制，v0.9.5 由 @when 自动生成） | 正常执行 |
 
-### Phase 3：CLI + HTTP API（1-2 周）
+### Phase 3：Relay（3-4 周）
+
+**目标**：Relay 作为独立服务完整可运行（Level 1/2/3）。Phase 4 的前置条件。
+
+**交付物**：Relay 二进制 (relay-spec §4–§10)。
+
+| # | 场景 | 预期 |
+|---|------|------|
+| P3-1 | Relay 启动 + TLS 监听 | Zenoh Router 正常监听 |
+| P3-2 | 跨网段 Peer 通过 Relay 通信 | CRDT 同步正常 |
+| P3-3 | Entity 注册 + 公钥查询 | 身份服务可用 |
+| P3-4 | Blob 上传/下载 + GC | 全局 Blob Store 可用 |
+| P3-5 | Admin API + 健康检查 | 管理端点响应正常 |
+
+### Phase 4：CLI + HTTP API（1-2 周）
 
 **目标**：CLI 命令接口 + HTTP API endpoint。后端完整可用。
 
@@ -2290,11 +2304,11 @@ watch.channel_new_ref          # EXT-14 Watch
 
 | # | 场景 | 预期 |
 |---|------|------|
-| P3-1 | ezagent CLI (room create, send, rooms) | 正常输出 |
-| P3-2 | ezagent start → HTTP API 可用 | 端点正常响应 (localhost:8847) |
-| P3-3 | GET /api/renderers → 返回 renderer 声明 | JSON 正确 |
+| P4-1 | ezagent CLI (room create, send, rooms) | 正常输出 |
+| P4-2 | ezagent start → HTTP API 可用 | 端点正常响应 (localhost:8847) |
+| P4-3 | GET /api/renderers → 返回 renderer 声明 | JSON 正确 |
 
-### Phase 4：Chat App（3-4 周）
+### Phase 5：Chat App（3-4 周）
 
 **目标**：React Chat UI + Render Pipeline + Desktop App。终端用户可用。
 
@@ -2302,14 +2316,14 @@ watch.channel_new_ref          # EXT-14 Watch
 
 | # | 场景 | 预期 |
 |---|------|------|
-| P4-1 | ezagent start → HTTP server + Chat UI | 浏览器可访问 |
-| P4-2 | 两个 peer 通过 Chat UI 互发消息 | 实时同步 |
-| P4-3 | Level 0 自动渲染：无 renderer 的 DataType | 显示 key:value 卡片 |
-| P4-4 | Level 1 声明式渲染：有 renderer 的 Extension | 按声明渲染 |
-| P4-5 | Room Tab 切换 (Timeline ↔ Gallery) | 同一数据不同视图 |
-| P4-6 | brew install / DMG 安装 | 双击打开可用 |
+| P5-1 | ezagent start → HTTP server + Chat UI | 浏览器可访问 |
+| P5-2 | 两个 peer 通过 Chat UI 互发消息 | 实时同步 |
+| P5-3 | Level 0 自动渲染：无 renderer 的 DataType | 显示 key:value 卡片 |
+| P5-4 | Level 1 声明式渲染：有 renderer 的 Extension | 按声明渲染 |
+| P5-5 | Room Tab 切换 (Timeline ↔ Gallery) | 同一数据不同视图 |
+| P5-6 | brew install / DMG 安装 | 双击打开可用 |
 
-### Phase 5：Socialware（3-4 周）
+### Phase 6：Socialware（3-4 周）
 
 **目标**：Socialware 四原语 + 示例 Socialware。Role-Driven Message 架构。Agent 驱动的协作。
 
@@ -2317,11 +2331,11 @@ watch.channel_new_ref          # EXT-14 Watch
 
 | # | 场景 | 预期 |
 |---|------|------|
-| P5-1 | @socialware decorator + Role/Flow 声明 | Socialware 正常加载，Hook 注册到 Pipeline |
-| P5-2 | content_type="ta:task.propose" Message 发送 | EXT-17 namespace_check 通过，Role check 通过 |
-| P5-3 | Flow transition: ta:task.claim → State Cache 更新 | Flow 状态正确推进，pre_send 拒绝非法转换 |
-| P5-4 | State Cache 重建（节点重启后回放 Timeline） | 重建后状态与重启前一致 |
-| P5-5 | TaskArena Kanban Room Tab（从 State Cache 查询） | 看板视图可用 |
+| P6-1 | @socialware decorator + Role/Flow 声明 | Socialware 正常加载，Hook 注册到 Pipeline |
+| P6-2 | content_type="ta:task.propose" Message 发送 | EXT-17 namespace_check 通过，Role check 通过 |
+| P6-3 | Flow transition: ta:task.claim → State Cache 更新 | Flow 状态正确推进，pre_send 拒绝非法转换 |
+| P6-4 | State Cache 重建（节点重启后回放 Timeline） | 重建后状态与重启前一致 |
+| P6-5 | TaskArena Kanban Room Tab（从 State Cache 查询） | 看板视图可用 |
 
 ### Gate Review
 

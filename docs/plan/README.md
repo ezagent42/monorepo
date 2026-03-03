@@ -14,9 +14,10 @@
 | **Phase 1: Bus 实现** | Engine (4 组件) + Backend + Built-in (4 Datatypes) | 协议核心可运行 (Level 0) | 3-4 周 | [phase-1-bus.md](phase-1-bus.md) |
 | **Phase 2: Extension 实现** | EXT-01 到 EXT-14，全部 Rust | 协议功能完整 | 3-4 周 | [phase-2-extensions.md](phase-2-extensions.md) |
 | **Phase 2.5: Python Binding** | PyO3 + auto-gen API (py-spec §1-7) | `pip install ezagent` SDK 可用 | 2-3 周 | [phase-2-extensions.md](phase-2-extensions.md) |
-| **Phase 3: CLI + HTTP API** | CLI 命令 (cli-spec) + HTTP endpoint (http-spec) | 后端完整可用 | 1-2 周 | [phase-3-cli-http.md](phase-3-cli-http.md) |
-| **Phase 4: Chat App** | React Chat UI + Render Pipeline + Desktop 打包 | 终端用户可用 | 3-4 周 | [phase-4-chat-app.md](phase-4-chat-app.md) |
-| **Phase 5: Socialware** | Socialware 四原语 + EventWeaver/TaskArena/ResPool | Agent 驱动的协作 | 3-4 周 | [phase-5-socialware.md](phase-5-socialware.md) |
+| **Phase 3: Relay 实现** | Zenoh Router + CRDT 持久化 + 身份注册 + Blob + ACL + Admin | Relay 独立可运行 (Level 1/2/3) | 3-4 周 | [phase-3-relay.md](phase-3-relay.md) |
+| **Phase 4: CLI + HTTP API** | CLI 命令 (cli-spec) + HTTP endpoint (http-spec) | 后端完整可用 | 1-2 周 | [phase-4-cli-http.md](phase-4-cli-http.md) |
+| **Phase 5: Chat App** | React Chat UI + Render Pipeline + Desktop 打包 | 终端用户可用 | 3-4 周 | [phase-5-chat-app.md](phase-5-chat-app.md) |
+| **Phase 6: Socialware** | Socialware 四原语 + EventWeaver/TaskArena/ResPool | Agent 驱动的协作 | 3-4 周 | [phase-6-socialware.md](phase-6-socialware.md) |
 
 ## Gate 标准
 
@@ -48,12 +49,13 @@
 ```
 TC-{phase}-{area}-{number}
 
-Phase: 0 / 1 / 2 / 3 / 4 / 5
+Phase: 0 / 1 / 2 / 3 / 4 / 5 / 6
 Area:  SYNC / ENGINE / HOOK / ANNOT / INDEX / IDENT / ROOM / TL / MSG / API
        / EXT01 ... EXT14 / INTERACT
-       / CLI / HTTP / WS / URI     (Phase 3)
-       / RENDER / DECOR / ACTION / TAB / OVERRIDE / WIDGET / UI / JOURNEY / PKG / SYNC / URI  (Phase 4)
-       / SW / EW / TA / RP / CROSS / URI  (Phase 5)
+       / BRIDGE / STORE / IDENT / BLOB / ACL / QUOTA / ADMIN / MON / MULTI / DISC / WEB / DEPLOY  (Phase 3)
+       / CLI / HTTP / WS / URI     (Phase 4)
+       / RENDER / DECOR / ACTION / TAB / OVERRIDE / WIDGET / UI / JOURNEY / PKG / SYNC / URI  (Phase 5)
+       / SW / EW / TA / RP / CROSS / URI  (Phase 6)
 Number: 三位数字
 ```
 
@@ -64,7 +66,8 @@ Number: 三位数字
 | Phase 0 | phase-0-verification.md | 11 |
 | Phase 1 | phase-1-bus.md | ~120 |
 | Phase 2 | phase-2-extensions.md | ~103 |
-| Phase 3 | phase-3-cli-http.md | 82 |
-| Phase 4 | phase-4-chat-app.md | 72 |
-| Phase 5 | phase-5-socialware.md | 132 (98 新增 + 34 PRD 引用) |
-| **合计** | | **~520** |
+| Phase 3 | phase-3-relay.md | 93 |
+| Phase 4 | phase-4-cli-http.md | 82 |
+| Phase 5 | phase-5-chat-app.md | 72 |
+| Phase 6 | phase-6-socialware.md | 132 (98 新增 + 34 PRD 引用) |
+| **合计** | | **~613** |

@@ -12,7 +12,7 @@ EZAgent 桌面客户端应用，提供聊天 UI 和协作空间交互。License:
 
 - **TypeScript** — 主要开发语言
 - **React** — UI 框架
-- 桌面打包方案参考 Phase 4 计划
+- 桌面打包方案参考 Phase 5 计划
 
 ## 开发指南
 

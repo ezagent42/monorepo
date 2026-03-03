@@ -1,9 +1,9 @@
-# Phase 4: Chat App
+# Phase 5: Chat App
 
 > **版本**：0.9
 > **目标**：终端用户可用——React Chat UI + Render Pipeline + Desktop 打包
 > **预估周期**：3-4 周
-> **前置依赖**：Phase 3 (CLI + HTTP API) 完成
+> **前置依赖**：Phase 4 (CLI + HTTP API) 完成
 > **Spec 依赖**：chat-ui-spec.md, app-prd.md
 
 ---
@@ -21,7 +21,7 @@
 
 > **Spec 引用**：chat-ui-spec §3
 
-### TC-4-RENDER-001: text 类型默认渲染
+### TC-5-RENDER-001: text 类型默认渲染
 
 ```
 GIVEN  Message (datatype=message, format=text/plain, body="Hello world")
@@ -33,7 +33,7 @@ THEN   渲染为纯文本气泡
        无 field mapping（使用 Built-in 默认 text renderer）
 ```
 
-### TC-4-RENDER-002: text/markdown 渲染
+### TC-5-RENDER-002: text/markdown 渲染
 
 ```
 GIVEN  Message (format=text/markdown, body="# Title\n**bold** text")
@@ -44,7 +44,7 @@ THEN   渲染为 Markdown：标题、粗体正确显示
        代码块语法高亮
 ```
 
-### TC-4-RENDER-003: structured_card 渲染
+### TC-5-RENDER-003: structured_card 渲染
 
 ```
 GIVEN  Message (content_type=ta:task.propose) 有 renderer 声明：
@@ -64,7 +64,7 @@ THEN   渲染为卡片：
        - badge 显示 "Open"（蓝色，来自 Flow renderer.badge.open）
 ```
 
-### TC-4-RENDER-004: media_message 渲染
+### TC-5-RENDER-004: media_message 渲染
 
 ```
 GIVEN  Message (datatype=media_message, renderer.type=media_message)
@@ -77,7 +77,7 @@ THEN   渲染为图片内嵌预览（缩略图）
        显示文件名和大小
 ```
 
-### TC-4-RENDER-005: code_block 渲染
+### TC-5-RENDER-005: code_block 渲染
 
 ```
 GIVEN  Message (format=text/x-code, body 包含 Rust 代码)
@@ -89,7 +89,7 @@ THEN   渲染为代码块，Rust 语法高亮
        可复制按钮
 ```
 
-### TC-4-RENDER-006: document_link 渲染
+### TC-5-RENDER-006: document_link 渲染
 
 ```
 GIVEN  Message (datatype=mutable/collab content, renderer.type=document_link)
@@ -100,7 +100,7 @@ THEN   渲染为文档卡片：标题 + 摘要 + [Open] 按钮
        不内嵌编辑器（需点击打开）
 ```
 
-### TC-4-RENDER-007: composite 渲染
+### TC-5-RENDER-007: composite 渲染
 
 ```
 GIVEN  Message 的 renderer.type = composite
@@ -111,7 +111,7 @@ WHEN   Render Pipeline 处理
 THEN   垂直排列：先渲染文本，再渲染媒体预览
 ```
 
-### TC-4-RENDER-008: 未知 DataType 回退到 Level 0
+### TC-5-RENDER-008: 未知 DataType 回退到 Level 0
 
 ```
 GIVEN  Message (datatype=custom_unknown)
@@ -130,7 +130,7 @@ THEN   Level 0 自动渲染：
 
 > **Spec 引用**：chat-ui-spec §4
 
-### TC-4-DECOR-001: emoji_bar 渲染（EXT-03）
+### TC-5-DECOR-001: emoji_bar 渲染（EXT-03）
 
 ```
 GIVEN  M-001 的 ext.reactions = { "👍:@alice:...": 1700000000, "❤️:@bob:...": 1700000001 }
@@ -143,7 +143,7 @@ THEN   消息气泡下方（position: below）显示：
        长按显示 "Alice reacted 👍"
 ```
 
-### TC-4-DECOR-002: quote_preview 渲染（EXT-04）
+### TC-5-DECOR-002: quote_preview 渲染（EXT-04）
 
 ```
 GIVEN  M-002 的 ext.reply_to 指向 M-001
@@ -155,7 +155,7 @@ THEN   M-002 气泡上方（position: above）显示引用条：
        点击引用条跳转到 M-001
 ```
 
-### TC-4-DECOR-003: text_tag "(edited)" 渲染（EXT-01）
+### TC-5-DECOR-003: text_tag "(edited)" 渲染（EXT-01）
 
 ```
 GIVEN  M-001 被编辑过（ext.mutable.version > 1）
@@ -165,7 +165,7 @@ WHEN   after_read Hook 处理
 THEN   时间戳旁（position: inline）显示 "(edited)"
 ```
 
-### TC-4-DECOR-004: thread_indicator 渲染（EXT-11）
+### TC-5-DECOR-004: thread_indicator 渲染（EXT-11）
 
 ```
 GIVEN  M-007 有 3 个 thread reply，参与者为 E-alice, E-bob
@@ -177,7 +177,7 @@ THEN   气泡下方（position: below）显示：
        点击展开 thread panel
 ```
 
-### TC-4-DECOR-005: tag_list 渲染（EXT-06）
+### TC-5-DECOR-005: tag_list 渲染（EXT-06）
 
 ```
 GIVEN  M-001 的 ext.channels = ["code-review", "urgent"]
@@ -189,7 +189,7 @@ THEN   气泡下方显示标签：
        点击标签跳转到 Channel 聚合视图
 ```
 
-### TC-4-DECOR-006: redact_overlay 渲染（EXT-07）
+### TC-5-DECOR-006: redact_overlay 渲染（EXT-07）
 
 ```
 GIVEN  M-002 被 admin redact（moderation overlay 存在）
@@ -202,7 +202,7 @@ THEN   整个消息气泡被 overlay 遮罩（position: overlay）
        非 admin 无法查看
 ```
 
-### TC-4-DECOR-007: Decorator 渲染顺序
+### TC-5-DECOR-007: Decorator 渲染顺序
 
 ```
 GIVEN  M-001 同时有 reply_to (p30), "(edited)" (p35), reactions (p40),
@@ -219,7 +219,7 @@ THEN   从上到下依次为：
        #code-review              ← below, priority 50
 ```
 
-### TC-4-DECOR-008: presence_dot 和 typing_indicator（EXT-09）
+### TC-5-DECOR-008: presence_dot 和 typing_indicator（EXT-09）
 
 ```
 GIVEN  E-bob 在线，E-bob 正在输入
@@ -237,7 +237,7 @@ THEN   E-bob 头像旁显示绿色 presence dot
 
 > **Spec 引用**：chat-ui-spec §5
 
-### TC-4-ACTION-001: Action 按钮基本渲染
+### TC-5-ACTION-001: Action 按钮基本渲染
 
 ```
 GIVEN  ta:task.propose Message，Flow state = "open"
@@ -250,10 +250,10 @@ WHEN   渲染
 THEN   消息卡片底部显示 [Claim Task] 按钮（primary 样式）
 ```
 
-### TC-4-ACTION-002: Role 过滤可见性
+### TC-5-ACTION-002: Role 过滤可见性
 
 ```
-GIVEN  同 TC-4-ACTION-001
+GIVEN  同 TC-5-ACTION-001
        但当前 viewer 只有 ta:reviewer Role（无 ta:worker）
 
 WHEN   渲染
@@ -263,7 +263,7 @@ THEN   [Claim Task] 按钮不显示
        → [Approve] 按钮显示
 ```
 
-### TC-4-ACTION-003: Action 点击触发 Flow transition
+### TC-5-ACTION-003: Action 点击触发 Flow transition
 
 ```
 GIVEN  Task Flow state = "open"，viewer 有 ta:worker Role
@@ -277,7 +277,7 @@ THEN   写入 Annotation 推进 Flow: open → claimed
        - [Claim Task] 按钮消失
 ```
 
-### TC-4-ACTION-004: Action 确认弹窗
+### TC-5-ACTION-004: Action 确认弹窗
 
 ```
 GIVEN  Task Flow state = "under_review"
@@ -290,7 +290,7 @@ THEN   弹出确认对话框 "确认批准？"
        用户点击"取消" → 无变化
 ```
 
-### TC-4-ACTION-005: 多个 Action 并存
+### TC-5-ACTION-005: 多个 Action 并存
 
 ```
 GIVEN  Task Flow state = "under_review"
@@ -302,7 +302,7 @@ THEN   显示多个按钮：[Approve] (primary) [Reject] (danger)
        按 transition 声明顺序排列
 ```
 
-### TC-4-ACTION-006: State 变化后按钮实时更新
+### TC-5-ACTION-006: State 变化后按钮实时更新
 
 ```
 GIVEN  Peer-A 看到 Task Flow state = "open"，显示 [Claim Task]
@@ -322,7 +322,7 @@ THEN   Peer-A 的 UI 自动更新：
 
 > **Spec 引用**：chat-ui-spec §6
 
-### TC-4-TAB-001: 默认 Timeline Tab
+### TC-5-TAB-001: 默认 Timeline Tab
 
 ```
 GIVEN  R-alpha 有消息
@@ -334,7 +334,7 @@ THEN   默认显示 Timeline Tab（layout: message_list）
        Tab header 中 "Messages" 高亮
 ```
 
-### TC-4-TAB-002: Tab 列表汇聚
+### TC-5-TAB-002: Tab 列表汇聚
 
 ```
 GIVEN  R-alpha 启用了 EXT-10 Media (gallery tab) 和 EXT-11 Threads (thread panel)
@@ -345,7 +345,7 @@ THEN   Tab header 显示：[Messages] [Gallery] [Threads]
        来源：Built-in Timeline + Extension Index 中 as_room_tab=true 的声明
 ```
 
-### TC-4-TAB-003: Tab 切换保持数据
+### TC-5-TAB-003: Tab 切换保持数据
 
 ```
 GIVEN  用户在 Timeline Tab 中滚动到某位置
@@ -355,7 +355,7 @@ WHEN   切换到 Gallery Tab → 再切回 Timeline Tab
 THEN   Timeline 回到之前的滚动位置（不重载）
 ```
 
-### TC-4-TAB-004: kanban Layout
+### TC-5-TAB-004: kanban Layout
 
 ```
 GIVEN  R-taskarena 中有 ta:task.propose Message，启用了 TaskArena
@@ -368,7 +368,7 @@ THEN   看板显示：列 = Flow states (Open | Claimed | In Progress | ...)
        卡片使用 ta_task 的 Content Renderer
 ```
 
-### TC-4-TAB-005: kanban 拖拽触发 Flow transition
+### TC-5-TAB-005: kanban 拖拽触发 Flow transition
 
 ```
 GIVEN  Board Tab 中，一个 task 在 "Open" 列
@@ -382,10 +382,10 @@ THEN   触发 Flow transition: open → claimed
        所有 peer 看到 task 移动到 "Claimed" 列
 ```
 
-### TC-4-TAB-006: kanban 拖拽 Role 不足被拒
+### TC-5-TAB-006: kanban 拖拽 Role 不足被拒
 
 ```
-GIVEN  同 TC-4-TAB-005，但 viewer 无 ta:worker Role
+GIVEN  同 TC-5-TAB-005，但 viewer 无 ta:worker Role
 
 WHEN   用户尝试拖拽
 
@@ -393,7 +393,7 @@ THEN   拖拽操作被阻止或拖拽后回弹
        无 Flow transition 发生
 ```
 
-### TC-4-TAB-007: grid Layout（Gallery）
+### TC-5-TAB-007: grid Layout（Gallery）
 
 ```
 GIVEN  R-alpha 有 BL-001 (diagram.png) 和 BL-002 (report.pdf)
@@ -406,7 +406,7 @@ THEN   网格布局显示媒体缩略图
        点击可查看/下载
 ```
 
-### TC-4-TAB-008: table Layout
+### TC-5-TAB-008: table Layout
 
 ```
 GIVEN  rp_resource 消息在 Room 中
@@ -418,7 +418,7 @@ THEN   表格显示：列 = schema 字段
        可排序、可筛选
 ```
 
-### TC-4-TAB-009: Socialware UI Manifest views 汇入
+### TC-5-TAB-009: Socialware UI Manifest views 汇入
 
 ```
 GIVEN  TaskArena 的 Part C UI Manifest 声明了 "Board" view 和 "Review" view
@@ -435,7 +435,7 @@ THEN   Tab header 包含：[Messages] [Board] [Review]
 
 > **Spec 引用**：chat-ui-spec §7
 
-### TC-4-OVERRIDE-001: Level 0 Schema-derived 自动渲染
+### TC-5-OVERRIDE-001: Level 0 Schema-derived 自动渲染
 
 ```
 GIVEN  DataType "custom_report" 无 renderer 字段
@@ -453,7 +453,7 @@ THEN   自动生成 Content Renderer：
        └──────────────────────┘
 ```
 
-### TC-4-OVERRIDE-002: Level 0 自动生成 Room Tab
+### TC-5-OVERRIDE-002: Level 0 自动生成 Room Tab
 
 ```
 GIVEN  DataType "custom_report" 有 Index 但无 renderer
@@ -465,7 +465,7 @@ THEN   自动生成 table 类型的 Room Tab
        可排序
 ```
 
-### TC-4-OVERRIDE-003: Level 1 覆盖 Level 0
+### TC-5-OVERRIDE-003: Level 1 覆盖 Level 0
 
 ```
 GIVEN  DataType "ta_task" 有 renderer 声明:
@@ -477,7 +477,7 @@ THEN   使用 Level 1 声明式渲染（structured_card）
        不使用 Level 0 的 key:value 自动渲染
 ```
 
-### TC-4-OVERRIDE-004: Level 2 覆盖 Level 1
+### TC-5-OVERRIDE-004: Level 2 覆盖 Level 1
 
 ```
 GIVEN  DataType "ew_event" 有 renderer 声明（Level 1）
@@ -489,7 +489,7 @@ THEN   使用 Level 2 自定义 React 组件
        Level 1 声明被忽略
 ```
 
-### TC-4-OVERRIDE-005: Fallback chain 逐级回退
+### TC-5-OVERRIDE-005: Fallback chain 逐级回退
 
 ```
 GIVEN  Room 中有三种 DataType：
@@ -504,7 +504,7 @@ THEN   type_a → Level 2 自定义组件
        type_c → Level 0 schema-derived
 ```
 
-### TC-4-OVERRIDE-006: 同一 Extension 不同 Level
+### TC-5-OVERRIDE-006: 同一 Extension 不同 Level
 
 ```
 GIVEN  EXT-11 Threads:
@@ -524,7 +524,7 @@ THEN   thread indicator 使用 Level 0 自动生成
 
 > **Spec 引用**：chat-ui-spec §8
 
-### TC-4-WIDGET-001: registerRenderer 注册
+### TC-5-WIDGET-001: registerRenderer 注册
 
 ```
 GIVEN  开发者编写自定义 DAG 可视化组件
@@ -540,7 +540,7 @@ THEN   组件注册成功
        Room views 中出现 DAG view Tab
 ```
 
-### TC-4-WIDGET-002: WidgetProps.data 自动填充
+### TC-5-WIDGET-002: WidgetProps.data 自动填充
 
 ```
 GIVEN  DagViewComponent 注册了 subscriptions.datatypes = ['ew_event']
@@ -551,7 +551,7 @@ THEN   组件 props.data.query_results 包含 3 个事件
        当新 ew_event 写入时，props 自动更新（CRDT-reactive）
 ```
 
-### TC-4-WIDGET-003: WidgetProps.context 上下文
+### TC-5-WIDGET-003: WidgetProps.context 上下文
 
 ```
 GIVEN  viewer = E-alice，拥有 ew:chronicler Role
@@ -564,7 +564,7 @@ THEN   props.context.viewer = { entityId: "@alice:...", displayName: "Alice" }
        props.context.room_config 包含 Room 配置
 ```
 
-### TC-4-WIDGET-004: actions API — sendMessage
+### TC-5-WIDGET-004: actions API — sendMessage
 
 ```
 GIVEN  自定义组件通过 props.actions.sendMessage
@@ -575,7 +575,7 @@ THEN   消息发送成功，经过完整 Hook Pipeline
        CRDT 同步
 ```
 
-### TC-4-WIDGET-005: actions API — advanceFlow
+### TC-5-WIDGET-005: actions API — advanceFlow
 
 ```
 GIVEN  自定义组件显示 "Approve" 按钮
@@ -590,7 +590,7 @@ THEN   Flow transition 执行（如果 viewer 有对应 Role）
        如果 viewer 无 Role → Promise reject，UI 显示错误
 ```
 
-### TC-4-WIDGET-006: 安全沙箱 — 禁止访问其他 Room
+### TC-5-WIDGET-006: 安全沙箱 — 禁止访问其他 Room
 
 ```
 GIVEN  自定义组件尝试读取未声明的 Room 数据
@@ -601,7 +601,7 @@ THEN   数据为 undefined
        无法读取其他 Room 的数据
 ```
 
-### TC-4-WIDGET-007: 安全沙箱 — 禁止外部网络请求
+### TC-5-WIDGET-007: 安全沙箱 — 禁止外部网络请求
 
 ```
 GIVEN  自定义组件尝试 fetch("https://external-api.com/data")
@@ -612,7 +612,7 @@ THEN   网络请求被阻止
        组件应通过 actions API 间接完成需要的操作
 ```
 
-### TC-4-WIDGET-008: inline_widget 类型
+### TC-5-WIDGET-008: inline_widget 类型
 
 ```
 GIVEN  registerRenderer({ type: 'inline_widget', ... })
@@ -629,7 +629,7 @@ THEN   自定义组件嵌入消息气泡内（替代 Content Renderer 区域）
 
 > **Spec 引用**：app-prd §3
 
-### TC-4-UI-001: Sidebar Room 列表
+### TC-5-UI-001: Sidebar Room 列表
 
 ```
 GIVEN  E-alice 加入了 R-alpha (有 3 条未读) 和 R-beta (全部已读)
@@ -642,7 +642,7 @@ THEN   Sidebar 显示：
        未读 Room 排在上面
 ```
 
-### TC-4-UI-002: Sidebar Channel 列表（EXT-06）
+### TC-5-UI-002: Sidebar Channel 列表（EXT-06）
 
 ```
 GIVEN  #code-review channel 跨 R-alpha 和 R-gamma
@@ -654,7 +654,7 @@ THEN   显示 Channel 列表：
        点击跳转到 Channel 聚合视图
 ```
 
-### TC-4-UI-003: Main Area Timeline 基本操作
+### TC-5-UI-003: Main Area Timeline 基本操作
 
 ```
 GIVEN  R-alpha 有消息
@@ -666,7 +666,7 @@ THEN   Main Area 显示 Timeline View
        底部有 Compose 输入框
 ```
 
-### TC-4-UI-004: Compose Area 发送消息
+### TC-5-UI-004: Compose Area 发送消息
 
 ```
 GIVEN  用户在 R-alpha 的 Compose 输入框
@@ -679,7 +679,7 @@ THEN   消息发送成功
        其他 peer 实时收到
 ```
 
-### TC-4-UI-005: Compose Area 附件和 emoji
+### TC-5-UI-005: Compose Area 附件和 emoji
 
 ```
 GIVEN  Compose Area
@@ -691,7 +691,7 @@ THEN   文件上传为 blob（EXT-10），附加到消息
        emoji 插入到输入文本
 ```
 
-### TC-4-UI-006: Info Panel 成员列表
+### TC-5-UI-006: Info Panel 成员列表
 
 ```
 GIVEN  R-alpha 有 4 个成员，E-alice 和 E-bob 在线
@@ -705,7 +705,7 @@ THEN   Members 区域显示：
        ○ Translator (offline)
 ```
 
-### TC-4-UI-007: Info Panel Pinned 消息
+### TC-5-UI-007: Info Panel Pinned 消息
 
 ```
 GIVEN  M-001 被 pin（EXT-07 moderation action=pin）
@@ -716,7 +716,7 @@ THEN   显示 M-001 的预览
        点击跳转到 Timeline 中的 M-001
 ```
 
-### TC-4-UI-008: Info Panel Media Gallery
+### TC-5-UI-008: Info Panel Media Gallery
 
 ```
 GIVEN  R-alpha 有 BL-001, BL-002
@@ -727,7 +727,7 @@ THEN   显示媒体文件缩略图列表
        点击可查看/下载
 ```
 
-### TC-4-UI-009: Thread Panel 展开
+### TC-5-UI-009: Thread Panel 展开
 
 ```
 GIVEN  M-007 有 thread reply
@@ -745,7 +745,7 @@ THEN   Info Panel 区域切换为 Thread Panel
 
 > **Spec 引用**：app-prd §2
 
-### TC-4-JOURNEY-001: 首次使用完整流程
+### TC-5-JOURNEY-001: 首次使用完整流程
 
 ```
 GIVEN  全新安装
@@ -759,7 +759,7 @@ THEN   自动执行 ezagent init
        提示 "Create a room" 或 "Enter invite code"
 ```
 
-### TC-4-JOURNEY-002: 首次创建 Room
+### TC-5-JOURNEY-002: 首次创建 Room
 
 ```
 GIVEN  首次使用，主界面空状态
@@ -771,7 +771,7 @@ THEN   Room 创建成功
        Sidebar 显示 "My Team"
 ```
 
-### TC-4-JOURNEY-003: Agent 交互旅程
+### TC-5-JOURNEY-003: Agent 交互旅程
 
 ```
 GIVEN  Room 中有 TaskArena Agent
@@ -784,7 +784,7 @@ THEN   Flow transition: open → claimed
        Agent 响应：发送新消息 "Task claimed. Please submit by..."
 ```
 
-### TC-4-JOURNEY-004: 两个 Peer 实时聊天
+### TC-5-JOURNEY-004: 两个 Peer 实时聊天
 
 ```
 GIVEN  Peer-A (E-alice) 和 Peer-B (E-bob) 都在 R-alpha
@@ -802,7 +802,7 @@ THEN   两端实时看到对方消息（延迟 < 2s LAN / < 5s 跨网络）
 
 > **Spec 引用**：app-prd §4
 
-### TC-4-PKG-001: PyPI wheel 安装
+### TC-5-PKG-001: PyPI wheel 安装
 
 ```
 WHEN   pip install ezagent
@@ -812,7 +812,7 @@ THEN   安装成功
        python -c "import ezagent" 不报错
 ```
 
-### TC-4-PKG-002: ezagent start 启动 Web 访问
+### TC-5-PKG-002: ezagent start 启动 Web 访问
 
 ```
 GIVEN  pip install ezagent 完成
@@ -823,7 +823,7 @@ THEN   HTTP Server 启动
        浏览器访问 localhost:8000 显示 Chat UI
 ```
 
-### TC-4-PKG-003: macOS DMG 安装
+### TC-5-PKG-003: macOS DMG 安装
 
 ```
 WHEN   双击 ezagent.dmg → 拖入 Applications
@@ -834,7 +834,7 @@ THEN   ezagent.app 出现在 Applications
        .app 大小 ≤ 60MB
 ```
 
-### TC-4-PKG-004: Windows MSI 安装
+### TC-5-PKG-004: Windows MSI 安装
 
 ```
 WHEN   运行 ezagent.msi
@@ -845,7 +845,7 @@ THEN   安装完成
        无需系统 Python
 ```
 
-### TC-4-PKG-005: Linux AppImage
+### TC-5-PKG-005: Linux AppImage
 
 ```
 WHEN   chmod +x ezagent.AppImage && ./ezagent.AppImage
@@ -854,7 +854,7 @@ THEN   Chat UI 显示
        无需系统依赖
 ```
 
-### TC-4-PKG-006: Desktop 启动流程
+### TC-5-PKG-006: Desktop 启动流程
 
 ```
 WHEN   双击 ezagent.app
@@ -872,7 +872,7 @@ THEN   启动序列：
 
 > **Spec 引用**：chat-ui-spec §1.2 (CRDT-reactive)
 
-### TC-4-SYNC-001: 消息实时同步
+### TC-5-SYNC-001: 消息实时同步
 
 ```
 GIVEN  Peer-A 和 Peer-B 在同一 Room
@@ -883,7 +883,7 @@ THEN   Peer-B 的 Timeline 自动新增消息
        无需刷新页面
 ```
 
-### TC-4-SYNC-002: Reaction 实时同步
+### TC-5-SYNC-002: Reaction 实时同步
 
 ```
 GIVEN  Peer-A 和 Peer-B 看同一条消息
@@ -893,7 +893,7 @@ WHEN   Peer-A 添加 👍 reaction
 THEN   Peer-B 的 emoji_bar 实时更新：显示 👍 1
 ```
 
-### TC-4-SYNC-003: Flow state 实时同步
+### TC-5-SYNC-003: Flow state 实时同步
 
 ```
 GIVEN  Peer-A 和 Peer-B 看同一个 ta_task
@@ -904,7 +904,7 @@ THEN   Peer-B 的 badge 实时从 "Open" 变为 "Claimed"
        Peer-B 的 [Claim Task] 按钮实时消失
 ```
 
-### TC-4-SYNC-004: Kanban 拖拽实时同步
+### TC-5-SYNC-004: Kanban 拖拽实时同步
 
 ```
 GIVEN  Peer-A 和 Peer-B 都在 Board Tab
@@ -914,7 +914,7 @@ WHEN   Peer-A 拖拽 task 从 Open 到 Claimed
 THEN   Peer-B 看到 task 卡片从 Open 列移到 Claimed 列
 ```
 
-### TC-4-SYNC-005: Room config 变更实时反映
+### TC-5-SYNC-005: Room config 变更实时反映
 
 ```
 GIVEN  Peer-A 和 Peer-B 在同一 Room
@@ -930,7 +930,7 @@ THEN   两端 Sidebar 和 Room Header 实时更新 Room 名称
 
 ## §11 URI Deep Link 与渲染（EEP-0001）
 
-### TC-4-URI-001: ezagent:// Deep Link 处理
+### TC-5-URI-001: ezagent:// Deep Link 处理
 
 ```
 GIVEN  桌面应用已运行，本地存在 R-alpha 数据
@@ -941,7 +941,7 @@ THEN   应用导航到 R-alpha 的 Room 视图
        Sidebar 中 R-alpha 高亮
 ```
 
-### TC-4-URI-002: URI 在消息中的渲染
+### TC-5-URI-002: URI 在消息中的渲染
 
 ```
 GIVEN  一条消息 body 包含文本 "请看 ezagent://relay.test/r/{R-alpha-id}/m/{ref_id}"
@@ -953,7 +953,7 @@ THEN   URI 部分渲染为可点击链接
        点击后导航到对应消息并高亮
 ```
 
-### TC-4-URI-003: Copy ezagent URI
+### TC-5-URI-003: Copy ezagent URI
 
 ```
 GIVEN  用户在 R-alpha Room 中右键某条消息
@@ -968,15 +968,15 @@ THEN   剪贴板中包含 ezagent://relay.test/r/{R-alpha-id}/m/{ref_id}
 
 | 区域 | 编号范围 | 数量 |
 |------|---------|------|
-| Layer 1 Content Renderer | TC-4-RENDER-001~008 | 8 |
-| Layer 2 Decorator | TC-4-DECOR-001~008 | 8 |
-| Layer 3 Actions | TC-4-ACTION-001~006 | 6 |
-| Layer 4 Room Tab | TC-4-TAB-001~009 | 9 |
-| Progressive Override | TC-4-OVERRIDE-001~006 | 6 |
-| Widget SDK | TC-4-WIDGET-001~008 | 8 |
-| 信息架构 | TC-4-UI-001~009 | 9 |
-| 用户旅程 | TC-4-JOURNEY-001~004 | 4 |
-| Desktop 打包 | TC-4-PKG-001~006 | 6 |
-| CRDT 实时同步 UI | TC-4-SYNC-001~005 | 5 |
-| URI Deep Link & 渲染 | TC-4-URI-001~003 | 3 |
+| Layer 1 Content Renderer | TC-5-RENDER-001~008 | 8 |
+| Layer 2 Decorator | TC-5-DECOR-001~008 | 8 |
+| Layer 3 Actions | TC-5-ACTION-001~006 | 6 |
+| Layer 4 Room Tab | TC-5-TAB-001~009 | 9 |
+| Progressive Override | TC-5-OVERRIDE-001~006 | 6 |
+| Widget SDK | TC-5-WIDGET-001~008 | 8 |
+| 信息架构 | TC-5-UI-001~009 | 9 |
+| 用户旅程 | TC-5-JOURNEY-001~004 | 4 |
+| Desktop 打包 | TC-5-PKG-001~006 | 6 |
+| CRDT 实时同步 UI | TC-5-SYNC-001~005 | 5 |
+| URI Deep Link & 渲染 | TC-5-URI-001~003 | 3 |
 | **合计** | | **72** |

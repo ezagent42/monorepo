@@ -291,9 +291,10 @@ class TaskArena:
 | [phase-0-verification.md](plan/phase-0-verification.md) | 技术可行性验证 (yrs + Zenoh + PyO3) |
 | [phase-1-bus.md](plan/phase-1-bus.md) | Engine + Backend + Built-in Datatypes |
 | [phase-2-extensions.md](plan/phase-2-extensions.md) | 14 个 Extension Datatypes |
-| [phase-3-cli-http.md](plan/phase-3-cli-http.md) | CLI + HTTP API *(骨架)* |
-| [phase-4-chat-app.md](plan/phase-4-chat-app.md) | Chat UI + Desktop 打包 *(骨架)* |
-| [phase-5-socialware.md](plan/phase-5-socialware.md) | Socialware 运行时 *(骨架)* |
+| [phase-3-relay.md](plan/phase-3-relay.md) | Relay 实现 (Level 1/2/3) |
+| [phase-4-cli-http.md](plan/phase-4-cli-http.md) | CLI + HTTP API |
+| [phase-5-chat-app.md](plan/phase-5-chat-app.md) | Chat UI + Desktop 打包 |
+| [phase-6-socialware.md](plan/phase-6-socialware.md) | Socialware 运行时 |
 
 ### `socialware/` — Socialware PRD
 
@@ -346,9 +347,10 @@ ezagent 目前处于 **Architecture Draft** 阶段（v0.9.6）。协议规范和
 | Phase 0 | 技术可行性验证 | ✅ 完成 |
 | Phase 1 | Rust Engine 核心 | 🔜 即将开始 |
 | Phase 2 | Extension Datatypes | 📋 计划中 |
-| Phase 3 | CLI + HTTP API | 📋 计划中 |
-| Phase 4 | 桌面聊天应用 | 📋 计划中 |
-| Phase 5 | Socialware 运行时 | 📋 计划中 |
+| Phase 3 | Relay 实现 | 📋 计划中 |
+| Phase 4 | CLI + HTTP API | 📋 计划中 |
+| Phase 5 | 桌面聊天应用 | 📋 计划中 |
+| Phase 6 | Socialware 运行时 | 📋 计划中 |
 
 ## 参与贡献
 

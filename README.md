@@ -96,7 +96,7 @@ monorepo/
 | [docs/specs/](docs/specs/) | **协议规范** — architecture, bus, extensions, socialware, py-sdk |
 | [docs/socialware/](docs/socialware/) | **Socialware PRD** — EventWeaver, TaskArena, ResPool, AgentForge, CodeViber |
 | [docs/products/](docs/products/) | **产品文档** — 桌面应用, Chat UI, HTTP API, CLI |
-| [docs/plan/](docs/plan/) | **实施计划** — Phase 0–5 |
+| [docs/plan/](docs/plan/) | **实施计划** — Phase 0–6 |
 | [docs/eep/](docs/eep/) | **设计提案 (EEP)** — ezagent Enhancement Proposal |
 | [MONOREPO.md](MONOREPO.md) | **Monorepo 管理** — subtree 操作、CI 同步、分支策略 |
 
@@ -120,9 +120,10 @@ monorepo/
 | Phase 0 | 技术可行性验证 | ✅ 完成 |
 | Phase 1 | Rust Engine 核心 | 🔜 即将开始 |
 | Phase 2 | Extension Datatypes | 📋 计划中 |
-| Phase 3 | CLI + HTTP API | 📋 计划中 |
-| Phase 4 | 桌面聊天应用 | 📋 计划中 |
-| Phase 5 | Socialware 运行时 | 📋 计划中 |
+| Phase 3 | Relay 实现 | 📋 计划中 |
+| Phase 4 | CLI + HTTP API | 📋 计划中 |
+| Phase 5 | 桌面聊天应用 | 📋 计划中 |
+| Phase 6 | Socialware 运行时 | 📋 计划中 |
 
 ## 参与贡献
 

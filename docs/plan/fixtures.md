@@ -1148,8 +1148,8 @@ Error Fixture 存储在 `ezagent-error/` 目录中，结构与 `ezagent/` 完全
 | `02-ext-profiles.yaml` | Phase 2 | 00-identities | PF-001/PF-002/PF-003 profile docs |
 | `02-ext-watch.yaml` | Phase 2 | 01-R-alpha, 02-ext-reply-to | W-001/W-002 watch annotations |
 | `02-ext-command.yaml` | Phase 2 | 01-R-alpha, 02-ext-profiles | CMD-001/CMD-RESULT-001 command fixtures |
-| `03-socialware-registry.yaml` | Phase 5 | 00-identities | SW-REGISTRY + SW-EW/TA/RP/AF manifests |
-| `03-agent-forge.yaml` | Phase 5 | 03-socialware-registry | AF-TPL-001 + AF-AGENT-001 |
+| `03-socialware-registry.yaml` | Phase 6 | 00-identities | SW-REGISTRY + SW-EW/TA/RP/AF manifests |
+| `03-agent-forge.yaml` | Phase 6 | 03-socialware-registry | AF-TPL-001 + AF-AGENT-001 |
 | `99-errors.yaml` | 任意 | 01-R-alpha | ezagent-error/ 下所有异常 fixture |
 
 **Scenario 执行顺序**：按文件名前缀排序。同前缀的无序依赖可并行执行。
@@ -1245,6 +1245,19 @@ Error fixture 的生成方式（在 `99-errors.yaml` 中定义）：
 | TC-2-EXT14-001~008 | Ext §15 | Watch 设置、通知、channel watch、公开性、权限、保留 |
 | **Phase 2: Interaction** | | |
 | TC-2-INTERACT-001~005 | Ext §16 | signed/unsigned、多 extension 注入、升级链、agent 工作流、level 共存 |
+| **Phase 3: Relay** | | |
+| TC-3-BRIDGE-001~007 | Bus §6.2, §6.3; Relay §10 | Zenoh Router 启动、TLS、CRDT 路由、认证 |
+| TC-3-STORE-001~011 | Bus §4.5, §4.6; Relay §4.1, §4.2 | CRDT 持久化、离线同步、签名验证、性能 |
+| TC-3-IDENT-001~008 | Bus §6.2; Relay §6 | Entity 注册、公钥查询、域名匹配、密钥轮换 |
+| TC-3-BLOB-001~010 | Relay §4.3, §4.4 | Blob CRUD、去重、GC、大小限制 |
+| TC-3-ACL-001~008 | Bus §6.4 | Room 成员控制、Power Level、权限实时生效 |
+| TC-3-QUOTA-001~010 | Relay §5.1–§5.3 | 存储/带宽配额、超额处理、默认配额 |
+| TC-3-ADMIN-001~009 | Relay §7.1–§7.5 | Admin 认证、状态/Entity/GC 管理、重放防护 |
+| TC-3-MON-001~006 | Relay §8.1, §8.2 | Prometheus 指标、健康/就绪检查 |
+| TC-3-MULTI-001~005 | Bus §6.5; Relay §9 | 跨 Relay 解析、同步、Blob 拉取 |
+| TC-3-DISC-001~006 | Relay §7.6; Bus §6.3 | Profile/Room 发现、隐私控制 |
+| TC-3-WEB-001~008 | Relay §7.7; EEP-0001 | Web Fallback HTML 预览、安全头 |
+| TC-3-DEPLOY-001~005 | Relay §10 | Self-Host、Docker、多 Relay、优雅停机 |
 
 **规则覆盖统计**：
 
@@ -1252,4 +1265,5 @@ Error fixture 的生成方式（在 `99-errors.yaml` 中定义）：
 |-----------|-------------|-----------|
 | Bus Spec | 133 | 100% |
 | Extensions Spec | 110 | 100% |
-| **合计** | **243** | **100%** |
+| Relay Spec | TBD | 100% |
+| **合计** | **243+** | **100%** |

@@ -49,9 +49,9 @@ v0.9.5 完成了 Socialware DX 革新和全文档 DSL 对齐。v0.9.6 引入 **E
 | **README.md** | 文档导航新增 `eep/` 部分；阅读路径新增 URI 条目；版本号 v0.9.5→v0.9.6 |
 | **plan/README.md** | Test Case 编号规则新增 URI area；总览表更新数量 |
 | **plan/phase-2-extensions.md** | 新增 §5.18 URI Path 注册（TC-2-URI-001~003，+3 test cases） |
-| **plan/phase-3-cli-http.md** | 新增 §12 URI 导航（TC-3-CLI-URI-001~005，+5 test cases）；附录合计 77→82 |
-| **plan/phase-4-chat-app.md** | 新增 §11 URI Deep Link 与渲染（TC-4-URI-001~003，+3 test cases）；附录合计 69→72 |
-| **plan/phase-5-socialware.md** | 新增 §18 Socialware URI 注册（TC-5-URI-001~002，+2 test cases）；附录合计 130→132 |
+| **plan/phase-4-cli-http.md** | 新增 §12 URI 导航（TC-4-CLI-URI-001~005，+5 test cases）；附录合计 77→82 |
+| **plan/phase-5-chat-app.md** | 新增 §11 URI Deep Link 与渲染（TC-5-URI-001~003，+3 test cases）；附录合计 69→72 |
+| **plan/phase-6-socialware.md** | 新增 §18 Socialware URI 注册（TC-6-URI-001~002，+2 test cases）；附录合计 130→132 |
 
 ## 未修改文件
 
@@ -85,7 +85,7 @@ v0.9.5 完成了 Socialware DX 革新和全文档 DSL 对齐。v0.9.6 引入 **E
 | Phase 0 | 11 | 11 | — |
 | Phase 1 | ~120 | ~120 | — |
 | Phase 2 | ~100 | ~103 | +3 (URI Path 注册) |
-| Phase 3 | 77 | 82 | +5 (URI 导航) |
-| Phase 4 | 69 | 72 | +3 (URI Deep Link & 渲染) |
-| Phase 5 | 130 | 132 | +2 (Socialware URI 注册) |
+| Phase 4 | 77 | 82 | +5 (URI 导航) |
+| Phase 5 | 69 | 72 | +3 (URI Deep Link & 渲染) |
+| Phase 6 | 130 | 132 | +2 (Socialware URI 注册) |
 | **合计** | **~507** | **~520** | **+13** |

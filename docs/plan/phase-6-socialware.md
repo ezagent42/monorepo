@@ -1,9 +1,9 @@
-# Phase 5: Socialware
+# Phase 6: Socialware
 
 > **版本**：0.9.5
 > **目标**：Agent 驱动的协作——Role-Driven Message 架构 + Socialware 四原语运行时 + 四个参考实现 + AgentForge + Socialware DSL
 > **预估周期**：4-5 周
-> **前置依赖**：Phase 4 (Chat App) 完成
+> **前置依赖**：Phase 5 (Chat App) 完成
 > **Spec 依赖**：socialware-spec.md (v0.9.5), extensions-spec.md (EXT-17), eventweaver-prd.md, taskarena-prd.md, respool-prd.md, agentforge-prd.md (v0.1.1), codeviber-prd.md (v0.1)
 
 ---
@@ -35,7 +35,7 @@
 
 > **Spec 引用**：socialware-spec §2
 
-### TC-5-SW-001: Part A + Part B 声明解析
+### TC-6-SW-001: Part A + Part B 声明解析
 
 ```
 GIVEN  EventWeaver 的完整声明（Part A + Part B + Part C）
@@ -54,7 +54,7 @@ THEN   Part A 解析成功：
        Part C (UI Manifest) 传递给前端 Render Pipeline API
 ```
 
-### TC-5-SW-002: 声明不完整拒绝
+### TC-6-SW-002: 声明不完整拒绝
 
 ```
 GIVEN  Socialware 声明缺少 Part B 的 flows 声明
@@ -65,7 +65,7 @@ THEN   报错 "Incomplete declaration: flows is required in socialware_declarati
        加载失败
 ```
 
-### TC-5-SW-003: Hook priority 验证
+### TC-6-SW-003: Hook priority 验证
 
 ```
 GIVEN  Socialware Hook 声明 priority = 50（< 100）
@@ -76,7 +76,7 @@ THEN   拒绝注册，报错 "Socialware hooks must have priority >= 100"
        （priority < 100 保留给 Engine/Extension）
 ```
 
-### TC-5-SW-004: 多个 Socialware 声明隔离
+### TC-6-SW-004: 多个 Socialware 声明隔离
 
 ```
 GIVEN  EventWeaver 和 TaskArena 同时加载
@@ -96,7 +96,7 @@ THEN   EventWeaver 的 Hook 被触发
 
 > **Spec 引用**：socialware-spec §2, §3
 
-### TC-5-SW-010: Socialware 创建并获取 Identity
+### TC-6-SW-010: Socialware 创建并获取 Identity
 
 ```
 GIVEN  Platform Bus 已启动
@@ -109,7 +109,7 @@ THEN   EventWeaver 获得独立 Identity: @event-weaver:<relay>
        Identity 注册到 Platform Bus
 ```
 
-### TC-5-SW-011: Socialware Identity 在 Platform Bus 上可发现
+### TC-6-SW-011: Socialware Identity 在 Platform Bus 上可发现
 
 ```
 GIVEN  EventWeaver 已创建
@@ -120,7 +120,7 @@ THEN   @event-weaver:<relay> 出现在成员列表中
        sw:capability-manifest Message 已发送
 ```
 
-### TC-5-SW-012: Inner Bus 创建
+### TC-6-SW-012: Inner Bus 创建
 
 ```
 GIVEN  EventWeaver 已创建
@@ -138,7 +138,7 @@ THEN   Inner Bus (Bus 实例) 创建
 
 > **Spec 引用**：socialware-spec §1
 
-### TC-5-SW-020: Role 赋予与检查
+### TC-6-SW-020: Role 赋予与检查
 
 ```
 GIVEN  TaskArena 已加载
@@ -152,7 +152,7 @@ THEN   E-alice 拥有 ta:worker Role
        await arena.roles.check("@alice:...", "ta:reviewer") == False
 ```
 
-### TC-5-SW-021: Role 赋予 Entity 类型约束
+### TC-6-SW-021: Role 赋予 Entity 类型约束
 
 ```
 GIVEN  ta:marketplace Role 的 assignable_to = ["room"]
@@ -162,7 +162,7 @@ WHEN   尝试将 ta:marketplace 赋予 E-alice (Identity)
 THEN   拒绝，报错 "Role ta:marketplace can only be assigned to room"
 ```
 
-### TC-5-SW-022: Role 动态撤回
+### TC-6-SW-022: Role 动态撤回
 
 ```
 GIVEN  E-alice 拥有 ta:worker Role
@@ -173,7 +173,7 @@ THEN   E-alice 不再拥有 ta:worker
        后续 Flow transition 中 visible_to "role:ta:worker" 的按钮对 E-alice 不可见
 ```
 
-### TC-5-SW-023: Arena 边界 — internal
+### TC-6-SW-023: Arena 边界 — internal
 
 ```
 GIVEN  TaskArena 的 ta:task_workshop Arena (boundary=internal)
@@ -183,7 +183,7 @@ WHEN   Platform Bus 上的外部 Entity 尝试读取 workshop Room 的消息
 THEN   被拒绝（internal Arena 仅 Socialware 内部成员可访问）
 ```
 
-### TC-5-SW-024: Arena 边界 — external
+### TC-6-SW-024: Arena 边界 — external
 
 ```
 GIVEN  TaskArena 的 ta:task_marketplace Arena (boundary=external)
@@ -194,7 +194,7 @@ THEN   可发现（external Arena 在 Platform Bus 上可见）
        可以按 entry_policy 加入
 ```
 
-### TC-5-SW-025: Arena 边界 — federated
+### TC-6-SW-025: Arena 边界 — federated
 
 ```
 GIVEN  TaskArena 和 ResPool 之间的 federated Arena
@@ -205,7 +205,7 @@ THEN   通过 federated Arena 的专用通道通信
        不经过 Platform Bus 的公开 Timeline
 ```
 
-### TC-5-SW-026: Commitment 创建与查询
+### TC-6-SW-026: Commitment 创建与查询
 
 ```
 GIVEN  TaskArena 中 E-publisher 发送 ta:task.propose Message，E-worker 认领
@@ -220,7 +220,7 @@ THEN   Commitment 记录可查询：
        Commitment 状态为 "active"
 ```
 
-### TC-5-SW-027: Commitment 兑现触发 Flow
+### TC-6-SW-027: Commitment 兑现触发 Flow
 
 ```
 GIVEN  ta:reward_guarantee 已创建
@@ -233,7 +233,7 @@ THEN   Commitment 标记为 "fulfilled"
        Flow 记录 commitment fulfillment 事件
 ```
 
-### TC-5-SW-028: Flow 状态转换
+### TC-6-SW-028: Flow 状态转换
 
 ```
 GIVEN  task_lifecycle Flow，当前 state = "open"
@@ -247,7 +247,7 @@ THEN   state 变为 "claimed"
        UI 更新 badge + 按钮可见性
 ```
 
-### TC-5-SW-029: Flow 非法 transition 拒绝
+### TC-6-SW-029: Flow 非法 transition 拒绝
 
 ```
 GIVEN  Task state = "open"
@@ -258,7 +258,7 @@ THEN   拒绝，报错 "Invalid transition: open → approved not defined"
        state 保持 "open"
 ```
 
-### TC-5-SW-030: Flow preferences 影响行为
+### TC-6-SW-030: Flow preferences 影响行为
 
 ```
 GIVEN  ew:conflict_resolution Flow 的 preference:
@@ -276,7 +276,7 @@ THEN   Flow 自动执行 transition → merged
 
 > **Spec 引用**：socialware-spec §3
 
-### TC-5-SW-040: Socialware 注册到 Platform Bus
+### TC-6-SW-040: Socialware 注册到 Platform Bus
 
 ```
 GIVEN  Platform Bus 运行中
@@ -290,7 +290,7 @@ THEN   TaskArena Identity 加入 Platform Bus Room
          version: "0.1.0" }
 ```
 
-### TC-5-SW-041: 能力发现
+### TC-6-SW-041: 能力发现
 
 ```
 GIVEN  EventWeaver 和 TaskArena 都已注册
@@ -302,7 +302,7 @@ THEN   返回 TaskArena 的 capability manifest
        EventWeaver 不匹配 "task" → 不返回
 ```
 
-### TC-5-SW-042: Socialware 间 Message 交换
+### TC-6-SW-042: Socialware 间 Message 交换
 
 ```
 GIVEN  TaskArena 和 ResPool 都在 Platform Bus 上
@@ -320,7 +320,7 @@ THEN   ResPool 收到请求
 
 > **Spec 引用**：socialware-spec §4
 
-### TC-5-SW-050: Fork — 快照模式
+### TC-6-SW-050: Fork — 快照模式
 
 ```
 GIVEN  TaskArena 已运行，有 10 个 active task
@@ -336,7 +336,7 @@ THEN   TaskArena-CN 创建成功：
        EventWeaver 记录 ew:event.record Message { event_type: "socialware_forked" }
 ```
 
-### TC-5-SW-051: Fork — 空白模式
+### TC-6-SW-051: Fork — 空白模式
 
 ```
 GIVEN  TaskArena 已运行
@@ -350,7 +350,7 @@ THEN   TaskArena-Beta 创建成功：
        - 结构相同，数据独立
 ```
 
-### TC-5-SW-052: Compose — 联邦
+### TC-6-SW-052: Compose — 联邦
 
 ```
 GIVEN  TaskArena 和 ResPool 独立运行
@@ -368,7 +368,7 @@ THEN   WorkflowHub 创建成功：
        - 各自保持独立 Inner Bus
 ```
 
-### TC-5-SW-053: Merge — 同构合并
+### TC-6-SW-053: Merge — 同构合并
 
 ```
 GIVEN  TaskArena-A 和 TaskArena-B 是结构相同的两个实例
@@ -383,7 +383,7 @@ THEN   合并成功：
        - 原 A 和 B 的 Identity 被标记为 archived
 ```
 
-### TC-5-SW-054: Fork 后 Identity 独立
+### TC-6-SW-054: Fork 后 Identity 独立
 
 ```
 GIVEN  Fork 产生了 TaskArena 和 TaskArena-CN
@@ -402,7 +402,7 @@ THEN   两个 task 在各自 Inner Bus 中
 
 > **Spec 引用**：socialware-spec §5
 
-### TC-5-SW-060: Bootstrap EventWeaver 自举
+### TC-6-SW-060: Bootstrap EventWeaver 自举
 
 ```
 GIVEN  全新平台启动
@@ -416,7 +416,7 @@ THEN   EventWeaver 自身的创建被记录在自己的 DAG 中
        自举完成（EventWeaver 记录自己的诞生）
 ```
 
-### TC-5-SW-061: 后续 Socialware 经 EventWeaver 记录
+### TC-6-SW-061: 后续 Socialware 经 EventWeaver 记录
 
 ```
 GIVEN  Bootstrap EventWeaver 已运行
@@ -428,7 +428,7 @@ THEN   EventWeaver 自动记录：
        await ew.lifecycle.get(socialware="respool") 返回创建记录
 ```
 
-### TC-5-SW-062: Socialware 生命周期完整链
+### TC-6-SW-062: Socialware 生命周期完整链
 
 ```
 GIVEN  TaskArena 已运行
@@ -447,7 +447,7 @@ THEN   EventWeaver DAG 完整记录所有事件：
 
 > **Spec 引用**：socialware-spec §6
 
-### TC-5-SW-070: Identity 级 HiTL — Role 手动转移
+### TC-6-SW-070: Identity 级 HiTL — Role 手动转移
 
 ```
 GIVEN  E-agent-r1 拥有 ta:reviewer Role
@@ -462,7 +462,7 @@ THEN   E-alice 在 UI 中看到 review 相关的 Action 按钮
        所有参与者可见 Role 转移（透明）
 ```
 
-### TC-5-SW-071: Session 级 HiTL — 置信度触发
+### TC-6-SW-071: Session 级 HiTL — 置信度触发
 
 ```
 GIVEN  E-agent-r1 连续 3 次在 review 中被纠正
@@ -476,7 +476,7 @@ THEN   Hook 检测到条件满足
        该 session 的后续 review 由 E-alice 处理
 ```
 
-### TC-5-SW-072: Task 级 HiTL — Flow preference 标记
+### TC-6-SW-072: Task 级 HiTL — Flow preference 标记
 
 ```
 GIVEN  Task Message 标记 requires_human_review = true
@@ -487,7 +487,7 @@ THEN   Flow preference 生效：只有 Human Identity 可以 advance 到 approve
        Agent 的 advanceFlow 调用被拒绝
 ```
 
-### TC-5-SW-073: HiTL 透明性
+### TC-6-SW-073: HiTL 透明性
 
 ```
 GIVEN  HiTL 发生：Role 从 Agent 转移给 Human
@@ -499,7 +499,7 @@ THEN   存在 ew:event.record Message { event_type: "hitl_escalation",
        所有参与者可在 Timeline 中看到转移记录
 ```
 
-### TC-5-SW-074: HiTL 训练数据收集
+### TC-6-SW-074: HiTL 训练数据收集
 
 ```
 GIVEN  E-alice 通过 HiTL 处理了 5 个 review
@@ -538,7 +538,7 @@ THEN   返回 5 条记录
 ### §8.4 HiTL 场景
 - **TC-EW-030**: 冲突解决中的 HiTL 升级
 
-### TC-5-EW-001: DAG Index 查询性能
+### TC-6-EW-001: DAG Index 查询性能
 
 ```
 GIVEN  EventWeaver 中有 1000 个事件形成 DAG
@@ -549,7 +549,7 @@ THEN   返回结果 < 500ms
        DAG 结构正确（parent 引用无断链）
 ```
 
-### TC-5-EW-002: 多分支并行
+### TC-6-EW-002: 多分支并行
 
 ```
 GIVEN  R-ew-main 在 evt-005 处
@@ -563,7 +563,7 @@ THEN   await ew.branches.list(room_id) 返回 2 个分支
        主线继续不受影响
 ```
 
-### TC-5-EW-003: DAG 可视化数据输出
+### TC-6-EW-003: DAG 可视化数据输出
 
 ```
 GIVEN  EventWeaver DAG 有 20 个节点和因果边
@@ -602,7 +602,7 @@ THEN   props.data.query_results 包含：
 ### §9.4 信誉演进
 - **TC-TA-030**: 从 newcomer 升级到 active
 
-### TC-5-TA-001: 11-state 完整生命周期
+### TC-6-TA-001: 11-state 完整生命周期
 
 ```
 GIVEN  TaskArena 运行中
@@ -618,7 +618,7 @@ THEN   每个 transition 都：
        EventWeaver 记录完整事件链
 ```
 
-### TC-5-TA-002: 争议触发 EventWeaver 分支
+### TC-6-TA-002: 争议触发 EventWeaver 分支
 
 ```
 GIVEN  Task state = "rejected"
@@ -632,7 +632,7 @@ THEN   自动创建 EventWeaver branch
        E-arbiter 被赋予仲裁 Role
 ```
 
-### TC-5-TA-003: 奖励发放跨 Socialware
+### TC-6-TA-003: 奖励发放跨 Socialware
 
 ```
 GIVEN  TaskArena 和 ResPool 通过 Compose 关联
@@ -647,7 +647,7 @@ THEN   TaskArena 向 ResPool 发送 rp:allocation.request
        整个过程记录在 EventWeaver DAG 中
 ```
 
-### TC-5-TA-004: Kanban Board 渲染
+### TC-6-TA-004: Kanban Board 渲染
 
 ```
 GIVEN  TaskArena Room 有 5 个 task（2 open, 1 claimed, 1 in_review, 1 approved）
@@ -687,7 +687,7 @@ THEN   Kanban 显示 11 列（Flow states），其中 4 列有卡片
 ### §10.5 HiTL 场景
 - **TC-RP-040**: Human 劳动力资源的分配需要人工确认
 
-### TC-5-RP-001: 资源 Marketplace Tab 渲染
+### TC-6-RP-001: 资源 Marketplace Tab 渲染
 
 ```
 GIVEN  ResPool Room 有 3 个 rp_resource（GPU, USD, Human-hour）
@@ -701,7 +701,7 @@ THEN   表格显示：
        Design-HR  human       160 h/mo    40 h         $50/h
 ```
 
-### TC-5-RP-002: 配额 Hook 实时检查
+### TC-6-RP-002: 配额 Hook 实时检查
 
 ```
 GIVEN  E-worker 的 rp_quota = 100 GPU-hours
@@ -718,7 +718,7 @@ THEN   rp:check_quota Hook 拒绝：
 
 ## §11 跨 Socialware 集成
 
-### TC-5-CROSS-001: TaskArena + EventWeaver + ResPool 完整流程
+### TC-6-CROSS-001: TaskArena + EventWeaver + ResPool 完整流程
 
 ```
 GIVEN  三个 Socialware 均在 Platform Bus 上运行
@@ -737,7 +737,7 @@ THEN   EventWeaver 记录完整因果链：
        所有事件有正确的 causality 关系
 ```
 
-### TC-5-CROSS-002: 争议升级跨三个 Socialware
+### TC-6-CROSS-002: 争议升级跨三个 Socialware
 
 ```
 GIVEN  TaskArena task 被 rejected → 发起 dispute
@@ -752,7 +752,7 @@ THEN   EventWeaver DAG 记录分支和解决
        ResPool: 新的 rp:allocation.request → rp:allocation
 ```
 
-### TC-5-CROSS-003: Platform Bus 上的 Socialware 发现
+### TC-6-CROSS-003: Platform Bus 上的 Socialware 发现
 
 ```
 GIVEN  5 个 Socialware 在 Platform Bus 上
@@ -764,7 +764,7 @@ THEN   返回 5 个 Socialware 的 capability manifest
        每个含 name, version, capabilities, datatypes
 ```
 
-### TC-5-CROSS-004: Fork + 独立演化
+### TC-6-CROSS-004: Fork + 独立演化
 
 ```
 GIVEN  TaskArena 有 3 个 active task
@@ -783,7 +783,7 @@ THEN   TaskArena 有 5 个 task
 
 ## §12 Socialware UI 集成
 
-### TC-5-UI-001: structured_card + Flow Actions 端到端
+### TC-6-UI-001: structured_card + Flow Actions 端到端
 
 ```
 GIVEN  TaskArena Room，E-alice 有 ta:worker Role
@@ -803,7 +803,7 @@ THEN   badge → "Claimed" (黄色)
        Agent 响应
 ```
 
-### TC-5-UI-002: Room Tab 来自 Socialware UI Manifest
+### TC-6-UI-002: Room Tab 来自 Socialware UI Manifest
 
 ```
 GIVEN  TaskArena Part C 声明 views: [kanban board, review split_pane]
@@ -815,7 +815,7 @@ THEN   Tab header: [Messages] [Board] [Review]
        Review 使用 Level 2 自定义 split_pane 组件
 ```
 
-### TC-5-UI-003: EventWeaver DAG View (Level 2)
+### TC-6-UI-003: EventWeaver DAG View (Level 2)
 
 ```
 GIVEN  EventWeaver Part C 声明 views: [dag_view (Level 2)]
@@ -834,7 +834,7 @@ THEN   自定义 d3/cytoscape 组件渲染 DAG
 
 > **Spec 引用**：socialware-spec §7
 
-### TC-5-INST-001: registry.toml 读取与启动
+### TC-6-INST-001: registry.toml 读取与启动
 
 ```
 GIVEN  ezagent/socialware/registry.toml 包含 3 个条目:
@@ -847,7 +847,7 @@ THEN   event-weaver 和 task-arena 自动启动
        启动顺序遵循依赖关系: event-weaver 先于 task-arena
 ```
 
-### TC-5-INST-002: manifest.toml 加载
+### TC-6-INST-002: manifest.toml 加载
 
 ```
 GIVEN  ezagent/socialware/task-arena/manifest.toml 包含:
@@ -862,7 +862,7 @@ THEN   datatypes 注册到 Engine
        dependencies 验证通过（event-weaver 已启动，EXT-15 已启用）
 ```
 
-### TC-5-INST-003: 依赖缺失拒绝启动
+### TC-6-INST-003: 依赖缺失拒绝启动
 
 ```
 GIVEN  task-arena manifest 声明 dependencies.socialware = ["event-weaver"]
@@ -874,7 +874,7 @@ THEN   启动失败
        错误: "Dependency not satisfied: event-weaver is not running"
 ```
 
-### TC-5-INST-004: 命令命名空间唯一性检查
+### TC-6-INST-004: 命令命名空间唯一性检查
 
 ```
 GIVEN  task-arena 已安装 (ns=ta)
@@ -885,7 +885,7 @@ THEN   安装拒绝
        错误: "Command namespace 'ta' already registered by task-arena"
 ```
 
-### TC-5-INST-005: Socialware 停止与重启
+### TC-6-INST-005: Socialware 停止与重启
 
 ```
 GIVEN  task-arena 运行中
@@ -904,7 +904,7 @@ THEN   Identity 恢复（从本地密钥对）
        command_manifest 更新
 ```
 
-### TC-5-INST-006: Socialware 卸载
+### TC-6-INST-006: Socialware 卸载
 
 ```
 GIVEN  task-arena 运行中
@@ -924,7 +924,7 @@ THEN   task-arena 停止
 
 > **Spec 引用**：socialware-spec §8, extensions-spec §16
 
-### TC-5-CMD-001: 命令声明 → Profile Annotation 发布
+### TC-6-CMD-001: 命令声明 → Profile Annotation 发布
 
 ```
 GIVEN  task-arena manifest.toml [commands] 包含 7 个命令
@@ -936,7 +936,7 @@ THEN   Profile Annotation "command_manifest:task-arena" 写入:
        command_manifest_registry Index 包含 ta:* 命令
 ```
 
-### TC-5-CMD-002: 命令端到端执行 — 成功
+### TC-6-CMD-002: 命令端到端执行 — 成功
 
 ```
 GIVEN  TaskArena 运行中
@@ -954,7 +954,7 @@ THEN   1. pre_send Hook 验证通过（ns 存在、action 存在、params 合法
        7. 客户端显示结果卡片
 ```
 
-### TC-5-CMD-003: 命令端到端执行 — 失败
+### TC-6-CMD-003: 命令端到端执行 — 失败
 
 ```
 GIVEN  TaskArena 运行中
@@ -969,7 +969,7 @@ THEN   1. pre_send 验证通过（语法层合法）
        5. 客户端显示错误提示
 ```
 
-### TC-5-CMD-004: 多 Socialware 命令并存
+### TC-6-CMD-004: 多 Socialware 命令并存
 
 ```
 GIVEN  EventWeaver (ew), TaskArena (ta), ResPool (rp), AgentForge (af) 均已启动
@@ -981,7 +981,7 @@ THEN   4 个命名空间的命令均可发现
        各 Socialware 的 Hook 独立处理自己的命令
 ```
 
-### TC-5-CMD-005: 自动补全数据
+### TC-6-CMD-005: 自动补全数据
 
 ```
 GIVEN  客户端获取 command_manifest_registry Index
@@ -999,7 +999,7 @@ THEN   自动补全菜单显示所有可用命令（按 ns 分组）
 
 > **Spec 引用**：agentforge-prd.md
 
-### TC-5-AF-001: Agent 模板注册
+### TC-6-AF-001: Agent 模板注册
 
 ```
 GIVEN  AgentForge 运行中
@@ -1011,7 +1011,7 @@ THEN   模板写入 templates/code-reviewer.toml
        agent_template_list Index 包含 code-reviewer
 ```
 
-### TC-5-AF-002: Spawn Agent
+### TC-6-AF-002: Spawn Agent
 
 ```
 GIVEN  code-reviewer 模板已注册
@@ -1028,7 +1028,7 @@ THEN   1. 创建 Agent Identity: @review-bot:relay-a.example.com
        7. command_result: { status: "success", result: { agent_name: "Review-Bot", status: "ACTIVE" } }
 ```
 
-### TC-5-AF-003: @mention 触发 Agent 响应
+### TC-6-AF-003: @mention 触发 Agent 响应
 
 ```
 GIVEN  Review-Bot (ACTIVE) 在 R-alpha
@@ -1047,7 +1047,7 @@ THEN   1. af.on_mention Hook 检测到 @mention
        5. 最终 response 完整写入 Room
 ```
 
-### TC-5-AF-004: Agent 空闲休眠
+### TC-6-AF-004: Agent 空闲休眠
 
 ```
 GIVEN  Review-Bot (ACTIVE), idle_timeout = "1h"
@@ -1061,7 +1061,7 @@ THEN   Review-Bot status: ACTIVE → SLEEPING
        Agent Identity 保持（协议层可见）
 ```
 
-### TC-5-AF-005: @mention 自动唤醒
+### TC-6-AF-005: @mention 自动唤醒
 
 ```
 GIVEN  Review-Bot (SLEEPING), auto_wake_on_mention = true
@@ -1071,11 +1071,11 @@ WHEN   E-bob 发送: "@Review-Bot review this fix"
 THEN   1. af.auto_wake Hook 检测 SLEEPING + @mention
        2. Agent status: SLEEPING → ACTIVE
        3. Adapter 重建
-       4. 正常处理消息（同 TC-5-AF-003）
+       4. 正常处理消息（同 TC-6-AF-003）
        5. 用户无感知（不需要手动唤醒）
 ```
 
-### TC-5-AF-006: Destroy Agent
+### TC-6-AF-006: Destroy Agent
 
 ```
 GIVEN  Review-Bot (ACTIVE 或 SLEEPING)
@@ -1090,7 +1090,7 @@ THEN   1. Agent Hook 注销
        5. af_instance Annotation 更新: { status: "DESTROYED" }
 ```
 
-### TC-5-AF-007: 资源控制 — 并发限制
+### TC-6-AF-007: 资源控制 — 并发限制
 
 ```
 GIVEN  Review-Bot, max_concurrent = 2
@@ -1102,7 +1102,7 @@ THEN   新请求排队等待
        超时后返回: "Agent busy, please try again later"
 ```
 
-### TC-5-AF-008: 资源控制 — API 预算耗尽
+### TC-6-AF-008: 资源控制 — API 预算耗尽
 
 ```
 GIVEN  Review-Bot, api_budget_daily = 100
@@ -1114,7 +1114,7 @@ THEN   Agent status: ACTIVE → SLEEPING
        返回: "Daily API budget exhausted, agent is now sleeping"
 ```
 
-### TC-5-AF-009: Conversation Segment — Thread 模式
+### TC-6-AF-009: Conversation Segment — Thread 模式
 
 ```
 GIVEN  Review-Bot 在 Thread 中被 @mention
@@ -1126,7 +1126,7 @@ THEN   Segment = Thread 全部消息（而非 Room 主 Timeline）
        Token 预算内截断（如果超过 max_context_tokens）
 ```
 
-### TC-5-AF-010: Conversation Segment — Reply chain 模式
+### TC-6-AF-010: Conversation Segment — Reply chain 模式
 
 ```
 GIVEN  E-alice 发送 M-A → E-bob reply M-B → E-alice reply M-C → "@Review-Bot help"
@@ -1138,7 +1138,7 @@ THEN   Segment 包含: M-A → M-B → M-C → 当前消息
        Token 节省 > 60%
 ```
 
-### TC-5-AF-011: 多 Agent 并存
+### TC-6-AF-011: 多 Agent 并存
 
 ```
 GIVEN  Review-Bot (code-reviewer) 和 Tester-Bot (task-worker) 同时在 R-alpha
@@ -1156,7 +1156,7 @@ THEN   两个 Agent 独立响应
 
 > **Spec 引用**：codeviber-prd.md
 
-### TC-5-CV-001: Session 创建与 Mentor 通知
+### TC-6-CV-001: Session 创建与 Mentor 通知
 
 ```
 GIVEN  CodeViber 已启用 (ext.runtime.enabled: ["cv"])
@@ -1173,7 +1173,7 @@ THEN   1. EXT-17 namespace check: "cv" ∈ enabled ✓
        6. command_result: { status: "success", session_id: ..., notified_mentors: 2 }
 ```
 
-### TC-5-CV-002: Mentor 接受 Session
+### TC-6-CV-002: Mentor 接受 Session
 
 ```
 GIVEN  Session 已创建 (state = pending)
@@ -1187,7 +1187,7 @@ THEN   1. Auto Role check: @coding-bot 持有 session.accept capability ✓
        4. State Cache 更新
 ```
 
-### TC-5-CV-003: 问答完整流程
+### TC-6-CV-003: 问答完整流程
 
 ```
 GIVEN  Session state = active
@@ -1206,7 +1206,7 @@ THEN   1. Flow check: active + guidance.provide → active ✓
        3. confidence >= 0.5 → 不触发 escalation
 ```
 
-### TC-5-CV-004: 低置信度 Escalation
+### TC-6-CV-004: 低置信度 Escalation
 
 ```
 GIVEN  Session state = active
@@ -1221,7 +1221,7 @@ THEN   1. Commitment fulfilled ✓
        5. Flow state: active → escalated
 ```
 
-### TC-5-CV-005: Session 关闭
+### TC-6-CV-005: Session 关闭
 
 ```
 GIVEN  Session state = active
@@ -1233,7 +1233,7 @@ THEN   1. Role check: E-alice 持有 session.close capability ✓
        3. EventWeaver 记录 session 完整历史
 ```
 
-### TC-5-CV-006: 无 Mentor 时拒绝创建 Session
+### TC-6-CV-006: 无 Mentor 时拒绝创建 Session
 
 ```
 GIVEN  Room 中没有任何 Entity 持有 cv:mentor Role
@@ -1245,7 +1245,7 @@ THEN   CodeViber.on_session_request() 检测无 mentor
        command_result: { status: "error", error: "CV_NO_MENTOR" }
 ```
 
-### TC-5-CV-007: 无 AgentForge 时纯人类工作
+### TC-6-CV-007: 无 AgentForge 时纯人类工作
 
 ```
 GIVEN  CodeViber 已启用，AgentForge 未安装
@@ -1261,7 +1261,7 @@ THEN   CodeViber 正常工作
        不依赖 AgentForge
 ```
 
-### TC-5-CV-008: 跨 Socialware 协作 — CodeViber + TaskArena
+### TC-6-CV-008: 跨 Socialware 协作 — CodeViber + TaskArena
 
 ```
 GIVEN  CodeViber 和 TaskArena 同时在 R-alpha 启用
@@ -1283,7 +1283,7 @@ THEN   CodeViber 正常处理 session.request
 
 > **Spec 引用**：socialware-spec §9, §10
 
-### TC-5-DSL-001: @when 自动生成 Hook Pipeline
+### TC-6-DSL-001: @when 自动生成 Hook Pipeline
 
 ```
 GIVEN  CodeViber 声明包含:
@@ -1302,7 +1302,7 @@ THEN   自动注册以下 Hook:
        开发者未写任何 @hook 声明
 ```
 
-### TC-5-DSL-002: SocialwareContext 类型约束 — 发送
+### TC-6-DSL-002: SocialwareContext 类型约束 — 发送
 
 ```
 GIVEN  CodeViber @when handler 中的 ctx: SocialwareContext
@@ -1317,7 +1317,7 @@ THEN   Runtime 自动完成:
        Message 写入 Timeline
 ```
 
-### TC-5-DSL-003: SocialwareContext 类型约束 — 拒绝底层操作
+### TC-6-DSL-003: SocialwareContext 类型约束 — 拒绝底层操作
 
 ```
 GIVEN  CodeViber @when handler 中的 ctx: SocialwareContext
@@ -1329,7 +1329,7 @@ THEN   AttributeError: 'SocialwareContext' has no attribute 'messages'
        （类型系统在 IDE 中也会报错）
 ```
 
-### TC-5-DSL-004: SocialwareContext 类型约束 — 拒绝 Hook 注册
+### TC-6-DSL-004: SocialwareContext 类型约束 — 拒绝 Hook 注册
 
 ```
 GIVEN  CodeViber @when handler 中的 ctx: SocialwareContext
@@ -1340,7 +1340,7 @@ WHEN   handler 尝试调用:
 THEN   AttributeError: 'SocialwareContext' has no attribute 'hook'
 ```
 
-### TC-5-DSL-005: unsafe=True 模式允许底层操作
+### TC-6-DSL-005: unsafe=True 模式允许底层操作
 
 ```
 GIVEN  AgentForge 声明: @socialware("agent-forge", unsafe=True)
@@ -1352,7 +1352,7 @@ WHEN   handler 调用:
 THEN   成功发送（EngineContext 提供完整底层访问）
 ```
 
-### TC-5-DSL-006: 非 unsafe 模式下 @hook 被拒绝
+### TC-6-DSL-006: 非 unsafe 模式下 @hook 被拒绝
 
 ```
 GIVEN  CodeViber 声明: @socialware("code-viber") （无 unsafe=True）
@@ -1365,7 +1365,7 @@ THEN   加载时抛出 UnsafeRequiredError:
        "@hook decorator requires @socialware(unsafe=True)"
 ```
 
-### TC-5-DSL-007: Role check 自动拒绝无权限发送
+### TC-6-DSL-007: Role check 自动拒绝无权限发送
 
 ```
 GIVEN  CodeViber 已加载
@@ -1378,7 +1378,7 @@ THEN   Auto Role check Hook (pre_send, p100) 拒绝:
        Message 不写入 Timeline
 ```
 
-### TC-5-DSL-008: Flow validation 自动拒绝非法转换
+### TC-6-DSL-008: Flow validation 自动拒绝非法转换
 
 ```
 GIVEN  Session state = closed
@@ -1390,7 +1390,7 @@ THEN   Auto Flow check Hook (pre_send, p101) 拒绝:
        Message 不写入 Timeline
 ```
 
-### TC-5-DSL-009: ctx.succeed / ctx.fail 自动写入 command_result
+### TC-6-DSL-009: ctx.succeed / ctx.fail 自动写入 command_result
 
 ```
 GIVEN  CodeViber @when("session.request") handler
@@ -1405,7 +1405,7 @@ THEN   command_result Annotation 写入:
        SSE command.result 事件发出
 ```
 
-### TC-5-DSL-010: 声明式 Role/Flow/Commitment 解析
+### TC-6-DSL-010: 声明式 Role/Flow/Commitment 解析
 
 ```
 GIVEN  TaskArena 使用新 DSL 声明:
@@ -1427,7 +1427,7 @@ THEN   roles 展开为 Part B 标准格式
 
 > **Spec 引用**：socialware-spec §11
 
-### TC-5-COLLAB-001: Ad-hoc 协作 — 多 Socialware 共存
+### TC-6-COLLAB-001: Ad-hoc 协作 — 多 Socialware 共存
 
 ```
 GIVEN  R-alpha 启用 CodeViber (cv) 和 TaskArena (ta)
@@ -1441,7 +1441,7 @@ THEN   CodeViber 正常处理（cv namespace）
        EXT-17 namespace check 独立执行
 ```
 
-### TC-5-COLLAB-002: @mention 驱动的 AgentForge 唤醒
+### TC-6-COLLAB-002: @mention 驱动的 AgentForge 唤醒
 
 ```
 GIVEN  @coding-bot (SLEEPING) 持有 cv:mentor Role
@@ -1456,7 +1456,7 @@ THEN   AgentForge 的 @mention Hook 检测到 SLEEPING Agent 被 @mention
        CodeViber 不知道唤醒过程发生了什么
 ```
 
-### TC-5-COLLAB-003: role_staffing 自动 Spawn
+### TC-6-COLLAB-003: role_staffing 自动 Spawn
 
 ```
 GIVEN  ext.runtime.config:
@@ -1474,7 +1474,7 @@ THEN   AgentForge 读取 role_staffing 配置
        CodeViber 不感知此过程（只看到多了一个 cv:mentor）
 ```
 
-### TC-5-COLLAB-004: role_staffing 引用不存在的 Role
+### TC-6-COLLAB-004: role_staffing 引用不存在的 Role
 
 ```
 GIVEN  ext.runtime.config:
@@ -1489,7 +1489,7 @@ THEN   AgentForge 记录警告: "Role xx:nonexistent references unknown namespac
        不 spawn Agent
 ```
 
-### TC-5-COLLAB-005: Profile-based 能力发现
+### TC-6-COLLAB-005: Profile-based 能力发现
 
 ```
 GIVEN  CodeViber 在 Platform Bus 注册 Profile:
@@ -1501,7 +1501,7 @@ THEN   返回 CodeViber 的 Profile
        AgentForge 可以据此决定 spawn 何种 Agent 模板
 ```
 
-### TC-5-COLLAB-006: Compose 后跨 Socialware 规则
+### TC-6-COLLAB-006: Compose 后跨 Socialware 规则
 
 ```
 GIVEN  SmartTeam = Compose([CodeViber, TaskArena, AgentForge])
@@ -1520,7 +1520,7 @@ THEN   SmartTeam 的跨 SW 规则触发
 
 ### §18 Socialware URI 注册（EEP-0001）
 
-#### TC-5-URI-001: Socialware URI 路径注册
+#### TC-6-URI-001: Socialware URI 路径注册
 
 ```
 GIVEN  TaskArena manifest 声明:
@@ -1533,7 +1533,7 @@ THEN   URI 注册表中包含 /r/{room_id}/sw/ta/task/{ref_id} pattern
        pattern 关联到 Socialware ID "task-arena"
 ```
 
-#### TC-5-URI-002: Socialware URI namespace 一致性检查
+#### TC-6-URI-002: Socialware URI namespace 一致性检查
 
 ```
 GIVEN  manifest 声明:
@@ -1554,27 +1554,27 @@ THEN   加载失败
 
 | 区域 | 编号范围 | 数量 |
 |------|---------|------|
-| 声明解析 | TC-5-SW-001~004 | 4 |
-| Socialware Identity | TC-5-SW-010~012 | 3 |
-| 四原语运行时 | TC-5-SW-020~030 | 11 |
-| Platform Bus | TC-5-SW-040~042 | 3 |
-| 组合操作 | TC-5-SW-050~054 | 5 |
-| Bootstrap/生命周期 | TC-5-SW-060~062 | 3 |
-| Human-in-the-Loop | TC-5-SW-070~074 | 5 |
-| EventWeaver 新增 | TC-5-EW-001~003 | 3 |
+| 声明解析 | TC-6-SW-001~004 | 4 |
+| Socialware Identity | TC-6-SW-010~012 | 3 |
+| 四原语运行时 | TC-6-SW-020~030 | 11 |
+| Platform Bus | TC-6-SW-040~042 | 3 |
+| 组合操作 | TC-6-SW-050~054 | 5 |
+| Bootstrap/生命周期 | TC-6-SW-060~062 | 3 |
+| Human-in-the-Loop | TC-6-SW-070~074 | 5 |
+| EventWeaver 新增 | TC-6-EW-001~003 | 3 |
 | EventWeaver PRD 引用 | TC-EW-001~030 | 11 |
-| TaskArena 新增 | TC-5-TA-001~004 | 4 |
+| TaskArena 新增 | TC-6-TA-001~004 | 4 |
 | TaskArena PRD 引用 | TC-TA-001~030 | 12 |
-| ResPool 新增 | TC-5-RP-001~002 | 2 |
+| ResPool 新增 | TC-6-RP-001~002 | 2 |
 | ResPool PRD 引用 | TC-RP-001~040 | 11 |
-| 跨 Socialware 集成 | TC-5-CROSS-001~004 | 4 |
-| Socialware UI 集成 | TC-5-UI-001~003 | 3 |
-| Socialware 安装 | TC-5-INST-001~006 | 6 |
-| Socialware Commands | TC-5-CMD-001~005 | 5 |
-| AgentForge | TC-5-AF-001~011 | 11 |
-| **CodeViber** | **TC-5-CV-001~008** | **8** |
-| **Socialware DSL** | **TC-5-DSL-001~010** | **10** |
-| **Socialware 间协作** | **TC-5-COLLAB-001~006** | **6** |
-| **URI 注册** | **TC-5-URI-001~002** | **2** |
+| 跨 Socialware 集成 | TC-6-CROSS-001~004 | 4 |
+| Socialware UI 集成 | TC-6-UI-001~003 | 3 |
+| Socialware 安装 | TC-6-INST-001~006 | 6 |
+| Socialware Commands | TC-6-CMD-001~005 | 5 |
+| AgentForge | TC-6-AF-001~011 | 11 |
+| **CodeViber** | **TC-6-CV-001~008** | **8** |
+| **Socialware DSL** | **TC-6-DSL-001~010** | **10** |
+| **Socialware 间协作** | **TC-6-COLLAB-001~006** | **6** |
+| **URI 注册** | **TC-6-URI-001~002** | **2** |
 | **合计（含引用）** | | **132** |
 | **合计（新增 test case）** | | **98** |

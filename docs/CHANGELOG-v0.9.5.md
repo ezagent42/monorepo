@@ -57,7 +57,7 @@ v0.9.4 完成了 Monorepo 结构和 Extension 动态加载。v0.9.5 聚焦于 **
 | 文件 | 变更 |
 |------|------|
 | **socialware/agentforge-prd.md** (v0.1 → v0.1.1) | 新增 §10.4 Role-based Agent Matching（role_staffing 配置） |
-| **plan/phase-5-socialware.md** (→ v0.9.5) | 新增 §16-§18（+24 Test Cases → 130 总计）；验收标准加 v0.9.5 条目 |
+| **plan/phase-6-socialware.md** (→ v0.9.5) | 新增 §16-§18（+24 Test Cases → 130 总计）；验收标准加 v0.9.5 条目 |
 | **README.md** | Quick Start 改为 @when 风格；示例改为 CodeViber/TaskArena；文档导航加 docs/ + AgentForge + CodeViber；版本→v0.9.5 |
 
 ## 未修改文件
@@ -68,7 +68,7 @@ v0.9.4 完成了 Monorepo 结构和 Extension 动态加载。v0.9.5 聚焦于 **
 | specs/relay-spec.md | 不涉及 |
 | specs/repo-spec.md | 不涉及 |
 | products/*.md | 不涉及 Socialware DSL |
-| plan/phase-0~4 | phase-4 L546 `subscriptions.datatypes` 是 UI 侧概念，非 Socialware 声明 |
+| plan/phase-0~5 | phase-5 L546 `subscriptions.datatypes` 是 UI 侧概念，非 Socialware 声明 |
 
 ---
 
@@ -101,7 +101,7 @@ manifest.toml 统一变更：
 | 区域 | v0.9.3 | v0.9.5 | 差异 |
 |------|--------|--------|------|
 | 原有 | 106 | 106 | — |
-| CodeViber (TC-5-CV-*) | — | 8 | +8 |
-| DSL (TC-5-DSL-*) | — | 10 | +10 |
-| 协作 (TC-5-COLLAB-*) | — | 6 | +6 |
+| CodeViber (TC-6-CV-*) | — | 8 | +8 |
+| DSL (TC-6-DSL-*) | — | 10 | +10 |
+| 协作 (TC-6-COLLAB-*) | — | 6 | +6 |
 | **合计** | **106** | **130** | **+24** |
