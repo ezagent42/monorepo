@@ -36,6 +36,14 @@ pub struct RelayConfig {
     /// Port for the health-check HTTP endpoint.
     #[serde(default = "default_healthz_port")]
     pub healthz_port: u16,
+
+    /// Entity IDs with admin privileges for the Admin API.
+    #[serde(default)]
+    pub admin_entities: Vec<String>,
+
+    /// Default quota settings applied to all entities.
+    #[serde(default)]
+    pub quota: QuotaDefaults,
 }
 
 /// TLS certificate paths.
@@ -75,6 +83,53 @@ impl Default for BlobConfig {
             gc_interval_hours: default_gc_interval_hours(),
         }
     }
+}
+
+/// Default quota settings for all entities.
+#[derive(Debug, Clone, Deserialize)]
+pub struct QuotaDefaults {
+    /// Maximum total CRDT storage per entity in bytes (default: 1 GiB).
+    #[serde(default = "default_storage_total")]
+    pub storage_total: u64,
+
+    /// Maximum total blob storage per entity in bytes (default: 500 MiB).
+    #[serde(default = "default_blob_total")]
+    pub blob_total: u64,
+
+    /// Maximum single blob size in bytes (default: 50 MiB).
+    #[serde(default = "default_blob_single_max")]
+    pub blob_single_max: u64,
+
+    /// Maximum number of rooms an entity can participate in (default: 500).
+    #[serde(default = "default_rooms_max")]
+    pub rooms_max: u32,
+}
+
+impl Default for QuotaDefaults {
+    fn default() -> Self {
+        Self {
+            storage_total: default_storage_total(),
+            blob_total: default_blob_total(),
+            blob_single_max: default_blob_single_max(),
+            rooms_max: default_rooms_max(),
+        }
+    }
+}
+
+fn default_storage_total() -> u64 {
+    1024 * 1024 * 1024 // 1 GiB
+}
+
+fn default_blob_total() -> u64 {
+    500 * 1024 * 1024 // 500 MiB
+}
+
+fn default_blob_single_max() -> u64 {
+    50 * 1024 * 1024 // 50 MiB
+}
+
+fn default_rooms_max() -> u32 {
+    500
 }
 
 fn default_healthz_port() -> u16 {
@@ -197,6 +252,51 @@ key_path = "key.pem"
         assert_eq!(cfg.blob.orphan_retention_days, 7);
         assert_eq!(cfg.blob.gc_interval_hours, 24);
         assert!(cfg.tls.ca_path.is_none());
+    }
+
+    /// Config with admin_entities and quota parses correctly.
+    #[test]
+    fn parse_config_with_level2_fields() {
+        let toml = r#"
+domain = "relay.example.com"
+listen = "tls/0.0.0.0:7448"
+storage_path = "/tmp/relay"
+admin_entities = ["@admin:relay.example.com"]
+
+[tls]
+cert_path = "cert.pem"
+key_path = "key.pem"
+
+[quota]
+storage_total = 2147483648
+blob_total = 1073741824
+rooms_max = 100
+"#;
+        let cfg = RelayConfig::parse(toml).unwrap();
+        assert_eq!(cfg.admin_entities, vec!["@admin:relay.example.com"]);
+        assert_eq!(cfg.quota.storage_total, 2_147_483_648);
+        assert_eq!(cfg.quota.blob_total, 1_073_741_824);
+        assert_eq!(cfg.quota.rooms_max, 100);
+        // blob_single_max should use default
+        assert_eq!(cfg.quota.blob_single_max, 50 * 1024 * 1024);
+    }
+
+    /// Config without Level 2 fields still parses (defaults applied).
+    #[test]
+    fn parse_config_level2_defaults() {
+        let toml = r#"
+domain = "relay.example.com"
+listen = "tls/0.0.0.0:7448"
+storage_path = "/tmp/relay"
+
+[tls]
+cert_path = "cert.pem"
+key_path = "key.pem"
+"#;
+        let cfg = RelayConfig::parse(toml).unwrap();
+        assert!(cfg.admin_entities.is_empty());
+        assert_eq!(cfg.quota.storage_total, 1024 * 1024 * 1024);
+        assert_eq!(cfg.quota.rooms_max, 500);
     }
 
     /// Load config from a temporary file.
