@@ -194,9 +194,7 @@ mod tests {
             let persist = CrdtPersist::new(store);
             for i in 0..5 {
                 let update = make_yrs_update(&format!("key-{i}"), &format!("val-{i}"));
-                persist
-                    .apply_update(&format!("room-{i}"), &update)
-                    .unwrap();
+                persist.apply_update(&format!("room-{i}"), &update).unwrap();
             }
         }
 
@@ -206,10 +204,7 @@ mod tests {
             let persist = CrdtPersist::new(store);
             for i in 0..5 {
                 let state = persist.get_state(&format!("room-{i}")).unwrap();
-                assert!(
-                    state.is_some(),
-                    "expected room-{i} to have persisted state"
-                );
+                assert!(state.is_some(), "expected room-{i} to have persisted state");
                 assert!(!state.unwrap().is_empty());
             }
         }

@@ -105,8 +105,7 @@ fn tc_3_store_close_reopen_recovery() {
         let doc = Doc::new();
         let map = doc.get_or_insert_map("data");
         {
-            let update =
-                yrs::updates::decoder::Decode::decode_v1(&state.unwrap()).unwrap();
+            let update = yrs::updates::decoder::Decode::decode_v1(&state.unwrap()).unwrap();
             let mut txn = doc.transact_mut();
             txn.apply_update(update).unwrap();
         }

@@ -73,7 +73,8 @@ impl SyncServer {
         expected_author: &str,
     ) -> Result<()> {
         relay_core::identity::verify_envelope(envelope, pubkey, expected_author)?;
-        self.persist.apply_update(&envelope.doc_id, &envelope.payload)
+        self.persist
+            .apply_update(&envelope.doc_id, &envelope.payload)
     }
 }
 

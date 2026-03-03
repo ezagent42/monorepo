@@ -109,15 +109,11 @@ mod tests {
         assert_eq!(fed.peers()[0], "tls/relay-b.example.com:7448");
 
         // Local entity is not remote.
-        let is_remote = fed
-            .is_remote_entity("@alice:relay-a.example.com")
-            .unwrap();
+        let is_remote = fed.is_remote_entity("@alice:relay-a.example.com").unwrap();
         assert!(!is_remote);
 
         // Remote entity is detected.
-        let is_remote = fed
-            .is_remote_entity("@bob:relay-b.example.com")
-            .unwrap();
+        let is_remote = fed.is_remote_entity("@bob:relay-b.example.com").unwrap();
         assert!(is_remote);
 
         // Peer resolution returns the first peer.

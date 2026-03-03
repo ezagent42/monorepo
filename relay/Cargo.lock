@@ -2407,11 +2407,15 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "env_logger",
+ "ezagent-protocol",
  "log",
  "relay-blob",
  "relay-bridge",
  "relay-core",
+ "serde_json",
+ "tempfile",
  "tokio",
+ "yrs",
 ]
 
 [[package]]

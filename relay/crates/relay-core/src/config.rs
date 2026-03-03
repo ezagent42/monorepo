@@ -96,8 +96,7 @@ fn default_gc_interval_hours() -> u32 {
 impl RelayConfig {
     /// Parse a `RelayConfig` from a TOML string.
     pub fn parse(s: &str) -> Result<Self> {
-        let config: Self =
-            toml::from_str(s).map_err(|e| RelayError::Config(e.to_string()))?;
+        let config: Self = toml::from_str(s).map_err(|e| RelayError::Config(e.to_string()))?;
         config.validate()?;
         Ok(config)
     }

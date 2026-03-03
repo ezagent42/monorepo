@@ -316,11 +316,7 @@ mod tests {
         keys.sort();
         assert_eq!(
             keys,
-            vec![
-                "@alice:relay.com",
-                "@bob:relay.com",
-                "@carol:relay.com",
-            ]
+            vec!["@alice:relay.com", "@bob:relay.com", "@carol:relay.com",]
         );
     }
 }

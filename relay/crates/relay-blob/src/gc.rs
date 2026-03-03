@@ -56,10 +56,9 @@ impl BlobGc {
                 // Delete file first (crash-safe ordering).
                 let path = store.hash_to_path(key);
                 if path.exists() {
-                    std::fs::remove_file(&path)
-                        .map_err(|e| relay_core::error::RelayError::Storage(
-                            format!("gc remove file: {e}"),
-                        ))?;
+                    std::fs::remove_file(&path).map_err(|e| {
+                        relay_core::error::RelayError::Storage(format!("gc remove file: {e}"))
+                    })?;
                 }
                 // Then delete DB metadata.
                 store.store.delete_blob_meta(key)?;
@@ -118,7 +117,10 @@ mod tests {
         let report = gc.run(&bs).unwrap();
 
         assert_eq!(report.blobs_scanned, 1);
-        assert_eq!(report.blobs_deleted, 0, "referenced blob must not be deleted");
+        assert_eq!(
+            report.blobs_deleted, 0,
+            "referenced blob must not be deleted"
+        );
         // Blob should still be downloadable.
         assert!(bs.download(&hash).is_ok());
     }
@@ -155,7 +157,10 @@ mod tests {
         let report = gc.run(&bs).unwrap();
 
         assert_eq!(report.blobs_scanned, 1);
-        assert_eq!(report.blobs_deleted, 0, "fresh orphan within retention must be kept");
+        assert_eq!(
+            report.blobs_deleted, 0,
+            "fresh orphan within retention must be kept"
+        );
         assert!(bs.download(&hash).is_ok());
     }
 

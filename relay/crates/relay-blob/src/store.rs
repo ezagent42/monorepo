@@ -59,7 +59,10 @@ impl BlobStore {
     pub(crate) fn hash_to_path(&self, hash: &str) -> PathBuf {
         let shard1 = &hash[7..9];
         let shard2 = &hash[9..11];
-        self.blobs_dir.join(shard1).join(shard2).join(format!("{hash}.blob"))
+        self.blobs_dir
+            .join(shard1)
+            .join(shard2)
+            .join(format!("{hash}.blob"))
     }
 
     /// Upload binary data and return its content-addressed hash.
@@ -85,11 +88,9 @@ impl BlobStore {
         // Write binary data to the filesystem.
         let path = self.hash_to_path(&hash);
         if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)
-                .map_err(|e| RelayError::Storage(format!("mkdir: {e}")))?;
+            fs::create_dir_all(parent).map_err(|e| RelayError::Storage(format!("mkdir: {e}")))?;
         }
-        fs::write(&path, data)
-            .map_err(|e| RelayError::Storage(format!("write blob: {e}")))?;
+        fs::write(&path, data).map_err(|e| RelayError::Storage(format!("write blob: {e}")))?;
 
         // Write metadata to RocksDB.
         let now = chrono::Utc::now().timestamp() as u64;
@@ -214,7 +215,10 @@ mod tests {
     fn tc_3_blob_001_upload_and_get_hash() {
         let (bs, _dir) = test_blob_store(1024);
         let hash = bs.upload(b"hello world", "alice").unwrap();
-        assert!(hash.starts_with("sha256_"), "hash should start with sha256_ prefix");
+        assert!(
+            hash.starts_with("sha256_"),
+            "hash should start with sha256_ prefix"
+        );
         assert_eq!(hash.len(), 7 + 64, "sha256_ (7) + 64 hex chars");
         // All chars after the prefix should be lowercase hex.
         assert!(hash[7..].chars().all(|c| c.is_ascii_hexdigit()));
@@ -247,7 +251,9 @@ mod tests {
     #[test]
     fn tc_3_blob_004_not_found() {
         let (bs, _dir) = test_blob_store(1024);
-        let err = bs.download("sha256_0000000000000000000000000000000000000000000000000000000000000000").unwrap_err();
+        let err = bs
+            .download("sha256_0000000000000000000000000000000000000000000000000000000000000000")
+            .unwrap_err();
         assert!(
             matches!(err, RelayError::BlobNotFound(_)),
             "expected BlobNotFound, got: {err:?}"
@@ -261,7 +267,13 @@ mod tests {
         let data = vec![0u8; 200];
         let err = bs.upload(&data, "charlie").unwrap_err();
         assert!(
-            matches!(err, RelayError::BlobTooLarge { size: 200, limit: 100 }),
+            matches!(
+                err,
+                RelayError::BlobTooLarge {
+                    size: 200,
+                    limit: 100
+                }
+            ),
             "expected BlobTooLarge, got: {err:?}"
         );
     }

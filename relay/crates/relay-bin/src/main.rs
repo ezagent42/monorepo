@@ -55,7 +55,10 @@ async fn main() {
     let listener = match tokio::net::TcpListener::bind(addr).await {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("Error: failed to bind healthz port {}: {e}", config.healthz_port);
+            eprintln!(
+                "Error: failed to bind healthz port {}: {e}",
+                config.healthz_port
+            );
             std::process::exit(1);
         }
     };
