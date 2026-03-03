@@ -17,6 +17,7 @@ serde_json = { workspace = true }
 relay-core = { workspace = true }
 relay-bridge = { workspace = true }
 relay-blob = { workspace = true }
+prometheus = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
