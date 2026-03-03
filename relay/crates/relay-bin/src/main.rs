@@ -4,6 +4,7 @@
 //! exposes an HTTP `/healthz` endpoint, and waits for SIGTERM/ctrl-c
 //! for graceful shutdown.
 
+mod admin;
 mod metrics;
 
 use std::net::SocketAddr;

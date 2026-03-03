@@ -2427,6 +2427,8 @@ name = "relay-bin"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64",
+ "ed25519-dalek",
  "env_logger",
  "ezagent-protocol",
  "log",
@@ -2434,6 +2436,7 @@ dependencies = [
  "relay-blob",
  "relay-bridge",
  "relay-core",
+ "serde",
  "serde_json",
  "tempfile",
  "tokio",
