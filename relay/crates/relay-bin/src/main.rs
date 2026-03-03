@@ -42,11 +42,8 @@ async fn healthz(State(state): State<AppState>) -> impl IntoResponse {
     let storage_ok = state.ready.load(Ordering::Relaxed);
     let status = if storage_ok { "healthy" } else { "degraded" };
     let storage_check = if storage_ok { "ok" } else { "degraded" };
-    let code = if storage_ok {
-        StatusCode::OK
-    } else {
-        StatusCode::OK // degraded still returns 200 so LB keeps traffic
-    };
+    // Degraded still returns 200 so LB keeps traffic.
+    let code = StatusCode::OK;
     (
         code,
         Json(serde_json::json!({

@@ -2,12 +2,11 @@
 //!
 //! Exposes counters, gauges, and an HTTP handler for the `/metrics` endpoint.
 
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
 use prometheus::{Encoder, IntCounter, IntCounterVec, IntGauge, Opts, Registry, TextEncoder};
 
 /// All Prometheus metrics for the relay service.
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct RelayMetrics {
     /// The Prometheus registry holding all metrics.
     pub registry: Registry,
@@ -105,18 +104,6 @@ impl RelayMetrics {
             .expect("encode metrics");
         String::from_utf8(buffer).expect("utf8 metrics")
     }
-}
-
-/// Axum handler for `GET /metrics`.
-pub async fn metrics_handler(
-    axum::extract::State(metrics): axum::extract::State<RelayMetrics>,
-) -> impl IntoResponse {
-    let body = metrics.encode();
-    (
-        StatusCode::OK,
-        [("content-type", "text/plain; version=0.0.4; charset=utf-8")],
-        body,
-    )
 }
 
 #[cfg(test)]

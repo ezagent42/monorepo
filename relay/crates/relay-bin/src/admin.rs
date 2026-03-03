@@ -27,7 +27,8 @@ pub struct AdminState {
     pub entity_manager: Arc<EntityManagerImpl>,
     /// Per-entity quota enforcement and configuration.
     pub quota_manager: Arc<QuotaManager>,
-    /// Prometheus metrics for the relay service.
+    /// Prometheus metrics for the relay service (wired in future Level 3 handlers).
+    #[allow(dead_code)]
     pub metrics: RelayMetrics,
     /// List of entity IDs with admin privileges.
     pub admin_entities: Vec<String>,
