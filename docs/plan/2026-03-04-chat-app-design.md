@@ -66,51 +66,53 @@
 
 ---
 
-## §3 GitHub OAuth 认证
+## §3 GitHub Device Flow 认证
 
 ### §3.1 设计目标
 
-将 GitHub OAuth App 作为 ezagent 的用户认证方案，实现：
+将 GitHub App Device Flow 作为 ezagent 的用户认证方案。Device Flow（RFC 8628）专为桌面/CLI 应用设计，**只需 `client_id`，不需要 `client_secret`**，避免在可逆向的安装包中嵌入敏感凭证。
 
 1. **身份验证**：通过 GitHub 验证用户身份
 2. **Profile 预填**：自动获取 display_name、avatar_url、email
 3. **跨设备登录**：同一 GitHub 帐号在新设备上可恢复 Entity 密钥对
-4. **Relay 认证**：Relay 通过 GitHub token 验证连接者身份
+4. **无 Secret**：只需 client_id（公开值），无安全风险
 
-### §3.2 OAuth 流程
+### §3.2 Device Flow 流程
 
-```
 首次使用:
   1. App 打开 → Welcome 页面
   2. 点击 "Sign in with GitHub"
-     → Electron 打开 OAuth BrowserWindow
-     → 导航到 https://github.com/login/oauth/authorize?client_id=...&scope=user:email
-  3. 用户授权 → GitHub 回调 redirect_uri
-     → Electron 截获 authorization code
-  4. Electron Main Process:
-     → POST https://github.com/login/oauth/access_token { code, client_id, client_secret }
-     → 获取 access_token
+     → POST https://github.com/login/device/code
+       { client_id: "Iv23likJpbvAY27c18tA", scope: "read:user" }
+     → 返回 { device_code, user_code, verification_uri, interval, expires_in }
+  3. App 显示验证码界面:
+     - 大号显示 user_code（如 "ABCD-1234"）
+     - "Open GitHub" 按钮 → shell.openExternal(verification_uri)
+     - 提示 "Enter this code on GitHub to sign in"
+  4. App 以 interval 秒间隔轮询:
+     POST https://github.com/login/oauth/access_token
+       { client_id, device_code, grant_type: "urn:ietf:params:oauth:grant-type:device_code" }
+     轮询响应:
+       - error=authorization_pending → 继续轮询
+       - error=slow_down → 增加 interval 5 秒
+       - error=expired_token → 显示"验证码已过期，请重试"
+       - error=access_denied → 显示"用户拒绝授权"
+       - 成功 → 获取 access_token
   5. 调用后端: POST /api/auth/github { github_token: access_token }
      后端处理:
        a. GET https://api.github.com/user (验证 token, 获取 profile)
        b. 查询 github_id → entity_id 映射
-       c. 若新用户: 执行 ezagent init, 创建 Entity 密钥对, 存储映射, 返回 { entity_id, keypair }
-       d. 若已有: 返回 { entity_id, encrypted_keypair }
-  6. 存储密钥到 Electron Secure Storage (macOS Keychain / Windows Credential / libsecret)
+       c. 若新用户: 执行 ezagent init, 创建 Entity 密钥对, 存储映射
+       d. 若已有: 返回 entity_id + encrypted_keypair
+  6. 存储密钥到 Electron Secure Storage
   7. 进入主界面
 
 日常登录:
   1. App 启动 → 检查 Electron Secure Storage
   2. 若有密钥 → 自动登录 → 进入主界面
-  3. 若无密钥（新设备）→ GitHub OAuth → 从 Relay 恢复密钥
+  3. 若无密钥（新设备）→ Device Flow → 从 Relay 恢复密钥
 
-跨设备密钥恢复:
-  - 密钥对使用 GitHub user ID 衍生的密钥加密
-  - 加密后的密钥 Blob 存储在 Relay 上
-  - 新设备: GitHub OAuth → 衍生解密密钥 → 从 Relay 获取并解密密钥对
-```
-
-### §3.3 后端新增 API
+### §3.3 后端 API（不变）
 
 | Endpoint | Method | 说明 |
 |----------|--------|------|
@@ -118,12 +120,14 @@
 | `/api/auth/session` | GET | 当前会话信息 |
 | `/api/auth/logout` | POST | 清除会话 |
 
+后端 API 不变——Device Flow 的变化完全在 Electron 客户端侧。后端仍然接收 `github_token` 并调用 GitHub API 验证。
+
 ### §3.4 安全考虑
 
-- GitHub OAuth App 的 `client_secret` 存储在 Electron Main Process，不暴露给 Renderer
+- **无 `client_secret`**：Device Flow 只需 `client_id`，可安全硬编码在 app 中
+- `client_id: Iv23likJpbvAY27c18tA`（GitHub App "EZAgent Login"）
 - access_token 仅用于初始认证，日常操作使用 Ed25519 签名
 - 密钥 Blob 使用 AES-256-GCM 加密后存储在 Relay
-- Relay 验证连接时同时接受 Ed25519 签名和 GitHub token（过渡期）
 
 ---
 
