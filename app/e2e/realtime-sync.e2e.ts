@@ -1,7 +1,6 @@
 import { test, expect } from './fixtures/electron-app';
 import { api } from './helpers/api-client';
 import { WsClient } from './helpers/ws-client';
-import { SELECTORS } from './fixtures/test-data';
 
 test.describe('Real-time Sync (TC-5-SYNC)', () => {
   let roomId: string;

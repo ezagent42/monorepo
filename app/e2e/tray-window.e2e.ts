@@ -36,7 +36,7 @@ test.describe('Tray & Window (TC-5-PKG)', () => {
       executablePath: APP_PATH,
       env: { ...process.env, EZAGENT_E2E: '1' },
     });
-    const page = await app.firstWindow();
+    await app.firstWindow();
     await waitForDaemon(30_000);
 
     // Hide the window

@@ -47,7 +47,7 @@ test.describe('Room CRUD (TC-5-JOURNEY-001/002)', () => {
   });
 
   test('click room navigates to timeline', async ({ page }) => {
-    const room = await api.createRoom('E2E Timeline Nav');
+    await api.createRoom('E2E Timeline Nav');
 
     await page.reload();
     await page.waitForLoadState('domcontentloaded');

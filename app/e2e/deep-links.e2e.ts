@@ -3,13 +3,11 @@ import { api } from './helpers/api-client';
 
 test.describe('Deep Links & URI (TC-5-URI)', () => {
   let roomId: string;
-  let messageRefId: string;
 
   test.beforeAll(async () => {
     const room = await api.createRoom('E2E Deep Links');
     roomId = room.room_id || room.id;
-    const msg = await api.sendMessage(roomId, 'Deep link target message');
-    messageRefId = msg.ref_id || msg.id;
+    await api.sendMessage(roomId, 'Deep link target message');
   });
 
   test('deep link to room navigates correctly (TC-5-URI-001)', async ({ electronApp, page }) => {

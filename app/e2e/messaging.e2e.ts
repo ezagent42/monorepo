@@ -36,7 +36,7 @@ test.describe('Messaging (TC-5-UI, TC-5-JOURNEY-004)', () => {
   });
 
   test('message from API renders in timeline (TC-5-UI-003)', async ({ page }) => {
-    const msg = await api.sendMessage(roomId, 'API-sent message');
+    await api.sendMessage(roomId, 'API-sent message');
 
     await page.locator('text=E2E Messaging Suite').click({ timeout: 10_000 });
     await page.reload();

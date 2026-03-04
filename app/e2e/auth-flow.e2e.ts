@@ -20,7 +20,7 @@ test.describe('Auth Flow (TC-5-AUTH)', () => {
     expect(loginVisible || welcomeVisible).toBe(true);
   });
 
-  test('test-init creates valid session (TC-5-AUTH-002)', async ({ electronApp }) => {
+  test('test-init creates valid session (TC-5-AUTH-002)', async () => {
     const result = await initTestAuth();
     expect(result.entity_id).toBe('@e2e-tester:relay.ezagent.dev');
     expect(result.display_name).toBe('E2E Tester');

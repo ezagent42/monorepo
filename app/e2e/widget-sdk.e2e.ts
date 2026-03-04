@@ -1,6 +1,5 @@
 import { test, expect } from './fixtures/electron-app';
 import { api } from './helpers/api-client';
-import { SELECTORS } from './fixtures/test-data';
 
 test.describe('Widget SDK (TC-5-WIDGET)', () => {
   let roomId: string;
