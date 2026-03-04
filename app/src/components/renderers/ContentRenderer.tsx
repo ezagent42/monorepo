@@ -3,6 +3,7 @@
 import type { ResolvedRenderer } from '@/lib/pipeline/types';
 import type { Message } from '@/types';
 import { TextRenderer } from './text-renderer';
+import { StructuredCard } from './structured-card';
 
 interface ContentRendererProps {
   resolved: ResolvedRenderer;
@@ -23,6 +24,13 @@ export function ContentRenderer({ resolved }: ContentRendererProps) {
   switch (resolved.type) {
     case 'text':
       return <TextRenderer message={resolved.message} />;
+    case 'structured_card':
+      return (
+        <StructuredCard
+          message={resolved.message}
+          fieldMapping={resolved.config?.field_mapping ?? {}}
+        />
+      );
     case 'schema':
       // Level 0 fallback -- render schema fields as key:value pairs
       return <SchemaFallback message={resolved.message} />;
