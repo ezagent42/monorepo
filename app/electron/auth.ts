@@ -54,7 +54,7 @@ export async function startGitHubOAuth(): Promise<AuthResult> {
   }
 
   const deviceData = (await deviceRes.json()) as DeviceCodeResponse;
-  const { device_code, user_code, verification_uri, interval, expires_in } = deviceData;
+  const { device_code, verification_uri, interval, expires_in } = deviceData;
 
   // 2. Open browser for user to enter the code
   shell.openExternal(verification_uri);
