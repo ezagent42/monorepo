@@ -10,13 +10,11 @@ Starlette pins a single portal thread for all requests in the session.
 """
 
 import json
-import os
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
-from ezagent._native import PyEngine
 from ezagent.server import app, clear_session, reset_engine, set_engine_factory
 
 
@@ -102,7 +100,7 @@ def test_auth_github_invalid_token(mock_urlopen, client):
         url="https://api.github.com/user",
         code=401,
         msg="Unauthorized",
-        hdrs=None,
+        hdrs={},  # type: ignore[arg-type]
         fp=None,
     )
 
@@ -159,7 +157,7 @@ def test_auth_github_github_api_error(mock_urlopen, client):
         url="https://api.github.com/user",
         code=500,
         msg="Internal Server Error",
-        hdrs=None,
+        hdrs={},  # type: ignore[arg-type]
         fp=None,
     )
 
