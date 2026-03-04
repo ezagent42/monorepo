@@ -16,7 +16,7 @@
 │  │  ─────────────                                     │  │
 │  │  1. Launch /Applications/EZAgent.app               │  │
 │  │  2. Wait for daemon health (GET :6142/api/status)  │  │
-│  │  3. Inject auth session (bypass GitHub OAuth)      │  │
+│  │  3. Inject auth session (via test-init endpoint)    │  │
 │  │  4. Share ElectronApplication + Page via fixture    │  │
 │  └────────────────────────────────────────────────────┘  │
 │                          │                               │
@@ -52,7 +52,7 @@
 | Framework | Playwright `_electron` | Native Electron support, both renderer and main process access |
 | Test target | Packaged app (DMG-installed) | Tests exactly what users run, including bundled runtime |
 | Daemon | App auto-starts | Validates real startup flow; no pre-launch needed |
-| Auth | Token injection | GitHub OAuth browser flow is untestable in automation; already unit-tested |
+| Auth | Token injection via `test-init` | Production uses GitHub Device Flow; E2E tests use `POST /api/auth/test-init` to bypass Device Flow and inject a session directly |
 | Execution | Serial within suite | Suites share app state (rooms, messages); parallel would cause conflicts |
 | Screenshots | On failure | Auto-captured for debugging |
 | Test data cleanup | Per-suite setup/teardown | Each suite creates its own rooms/messages, cleans up after |
@@ -342,28 +342,30 @@ import { ElectronApplication } from 'playwright';
 /**
  * Injects a mock authenticated session into the app.
  *
- * Since the daemon runs on localhost without real GitHub OAuth enforcement,
- * we can create a session directly via the API or evaluate in the main process.
+ * Production auth uses GitHub Device Flow (RFC 8628), where the user
+ * authorizes via a browser at github.com/login/device. For E2E tests,
+ * we bypass Device Flow entirely and use the daemon's `test-init`
+ * endpoint to create an authenticated session directly.
  */
 export async function injectAuth(app: ElectronApplication) {
-  // Approach 1: Call the daemon's auth endpoint directly
-  // The local daemon accepts mock auth for development
-  const res = await fetch('http://localhost:6142/api/auth/github', {
+  // Use the daemon's test-init endpoint to create a session
+  // This bypasses the Device Flow and injects auth directly
+  const res = await fetch('http://localhost:6142/api/auth/test-init', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      code: 'e2e-test-code',
-      provider: 'github',
+      username: 'e2e-test-user',
+      display_name: 'E2E Test User',
     }),
   });
 
   if (!res.ok) {
-    // Approach 2: Evaluate in main process to set credentials
-    await app.evaluate(async () => {
-      // Inject credentials into the credential store
-      // This bypasses OAuth entirely
-    });
+    throw new Error(`test-init failed: ${res.status} ${await res.text()}`);
   }
+
+  // Reload the renderer so it picks up the new session
+  const page = await app.firstWindow();
+  await page.reload();
 }
 
 export async function clearAuth() {
@@ -667,5 +669,5 @@ For suites that need specific message types (render pipeline):
 | Framework | Playwright `_electron` |
 | Target | Packaged `/Applications/EZAgent.app` |
 | Daemon | Auto-started by app |
-| Auth | Token injection (bypasses GitHub OAuth) |
+| Auth | `test-init` endpoint (bypasses Device Flow) |
 | Estimated implementation | ~20 tasks |
