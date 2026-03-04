@@ -11,6 +11,10 @@
     "package": "pnpm build:electron && electron-builder",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test --config e2e/playwright.config.ts",
+    "test:e2e:headed": "playwright test --config e2e/playwright.config.ts --headed",
+    "test:e2e:debug": "playwright test --config e2e/playwright.config.ts --debug",
+    "test:e2e:report": "playwright show-report",
     "lint": "next lint"
   },
   "dependencies": {
@@ -43,12 +47,14 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^4.3.0",
     "autoprefixer": "^10.4.0",
     "concurrently": "^9.1.0",
@@ -63,6 +69,7 @@
     "typescript": "^5.7.0",
     "vitest": "^2.1.0",
     "wait-on": "^8.0.0",
+    "ws": "^8.19.0",
     "yaml": "^2.8.2"
   }
 }
