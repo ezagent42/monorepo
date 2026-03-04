@@ -32,8 +32,12 @@ dispatch each request to a different worker thread, which both breaks
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import threading
+import urllib.request
+import urllib.error
 from typing import Callable, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
@@ -108,6 +112,63 @@ def reset_engine() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Session storage (in-memory, single user for local desktop app)
+# ---------------------------------------------------------------------------
+
+_session: Optional[dict] = None
+
+
+def clear_session() -> None:
+    """Clear the current session.  Used by tests for teardown."""
+    global _session
+    _session = None
+
+
+# ---------------------------------------------------------------------------
+# GitHub API helper
+# ---------------------------------------------------------------------------
+
+
+def _fetch_github_user(github_token: str) -> dict:
+    """Call GitHub API to get user info from an OAuth token.
+
+    Uses ``urllib.request`` (stdlib) to avoid extra dependencies.
+
+    Returns:
+        dict with keys ``login``, ``id``, ``name``, ``avatar_url``.
+
+    Raises:
+        HTTPException: If the GitHub token is invalid or the API request fails.
+    """
+    req = urllib.request.Request(
+        "https://api.github.com/user",
+        headers={
+            "Authorization": f"Bearer {github_token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "ezagent42",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise HTTPException(
+                status_code=401,
+                detail={"error": {"code": "UNAUTHORIZED", "message": "Invalid GitHub token"}},
+            )
+        raise HTTPException(
+            status_code=502,
+            detail={"error": {"code": "GITHUB_API_ERROR", "message": f"GitHub API returned {exc.code}"}},
+        )
+    except urllib.error.URLError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": {"code": "GITHUB_API_ERROR", "message": str(exc.reason)}},
+        )
+
+
+# ---------------------------------------------------------------------------
 # Error mapping helper
 # ---------------------------------------------------------------------------
 
@@ -139,6 +200,10 @@ def _map_engine_error(e: RuntimeError) -> HTTPException:
 # ---------------------------------------------------------------------------
 # Request models
 # ---------------------------------------------------------------------------
+
+
+class GitHubAuthRequest(BaseModel):
+    github_token: str
 
 
 class CreateRoomRequest(BaseModel):
@@ -215,6 +280,84 @@ def get_pubkey(entity_id: str, engine: PyEngine = Depends(get_engine)):
     except RuntimeError as e:
         raise _map_engine_error(e)
     return {"pubkey": pubkey}
+
+
+# ---------------------------------------------------------------------------
+# Authentication (Task 8)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/auth/github")
+def auth_github(req: GitHubAuthRequest, engine: PyEngine = Depends(get_engine)):
+    """Exchange a GitHub OAuth token for an EZAgent entity + keypair.
+
+    Calls the GitHub API to retrieve user info, maps the GitHub username
+    to an entity_id, and initialises the engine identity for new users.
+    """
+    global _session
+
+    github_user = _fetch_github_user(req.github_token)
+
+    login: str = github_user.get("login", "")
+    github_id: int = github_user.get("id", 0)
+    display_name: str = github_user.get("name") or login
+    avatar_url: str = github_user.get("avatar_url", "")
+
+    entity_id = f"@{login}:relay.ezagent.dev"
+
+    # Check if engine already has this identity initialised.
+    is_new_user = True
+    try:
+        existing = engine.identity_whoami()
+        if existing == entity_id:
+            is_new_user = False
+    except RuntimeError:
+        # Identity not initialised yet -- expected for new users.
+        pass
+
+    # Generate a keypair and initialise the engine identity for new users.
+    keypair_bytes = os.urandom(32)
+    if is_new_user:
+        try:
+            engine.identity_init(entity_id, keypair_bytes)
+        except RuntimeError as e:
+            raise _map_engine_error(e)
+
+    keypair_b64 = base64.b64encode(keypair_bytes).decode()
+
+    _session = {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "avatar_url": avatar_url,
+        "github_id": github_id,
+    }
+
+    return {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "avatar_url": avatar_url,
+        "keypair": keypair_b64,
+        "is_new_user": is_new_user,
+    }
+
+
+@app.get("/api/auth/session")
+def auth_session():
+    """Return current session info, or 401 if not authenticated."""
+    if _session is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": {"code": "UNAUTHORIZED", "message": "Not authenticated"}},
+        )
+    return {**_session, "authenticated": True}
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    """Clear the current session."""
+    global _session
+    _session = None
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
