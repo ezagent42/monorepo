@@ -58,6 +58,10 @@ _engine_factory: Optional[Callable[[], PyEngine]] = None
 # Monotonically increasing version; bumped on reset / factory change.
 _engine_version: int = 0
 
+# In-memory cache: content_id → {"body": ..., "format": ...}
+# Used to enrich timeline refs with message body when listing messages.
+_message_body_cache: dict[str, dict] = {}
+
 
 def _default_engine_factory() -> PyEngine:
     """Create a bare PyEngine (identity uninitialised)."""
@@ -109,6 +113,7 @@ def reset_engine() -> None:
     """
     global _engine_version
     _engine_version += 1
+    _message_body_cache.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +241,16 @@ app = FastAPI(
     title="ezagent",
     version="0.1.0",
     description="EZAgent42 HTTP API",
+)
+
+# CORS: allow the Electron app (app:// protocol) and dev server to access the API
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -533,11 +548,28 @@ def send_message(
     req: SendMessageRequest,
     engine: PyEngine = Depends(get_engine),
 ):
-    """Send a message to a room."""
+    """Send a message to a room and return enriched response."""
     try:
         body_json = json.dumps(req.body)
         content_json = engine.message_send(room_id, body_json, req.format)
-        return json.loads(content_json)
+        content = json.loads(content_json)
+        # Cache body so list_messages can enrich timeline refs
+        cid = content.get("content_id", "")
+        if cid:
+            _message_body_cache[cid] = {"body": req.body, "format": req.format}
+        # Return enriched response matching frontend Message type
+        return {
+            "ref_id": cid,
+            "content_id": cid,
+            "room_id": room_id,
+            "author": content.get("author", ""),
+            "timestamp": content.get("created_at", ""),
+            "datatype": "message",
+            "body": req.body,
+            "format": req.format,
+            "annotations": {},
+            "ext": {},
+        }
     except RuntimeError as e:
         raise _map_engine_error(e)
 
@@ -549,7 +581,7 @@ def list_messages(
     before: Optional[str] = Query(default=None),
     engine: PyEngine = Depends(get_engine),
 ):
-    """List timeline refs for a room with optional pagination."""
+    """List messages for a room, enriched with body content."""
     try:
         ref_ids = engine.timeline_list(room_id)
 
@@ -570,7 +602,22 @@ def list_messages(
         results = []
         for ref_id in ref_ids:
             ref_json = engine.timeline_get_ref(room_id, ref_id)
-            results.append(json.loads(ref_json))
+            ref_data = json.loads(ref_json)
+            # Enrich with body from cache (content_id → body mapping)
+            content_id = ref_data.get("content_id", "")
+            cached = _message_body_cache.get(content_id, {})
+            enriched = {
+                "ref_id": ref_data.get("ref_id", ref_id),
+                "room_id": room_id,
+                "author": ref_data.get("author", ""),
+                "timestamp": ref_data.get("created_at", ""),
+                "datatype": "message",
+                "body": cached.get("body", ""),
+                "format": cached.get("format", "text/plain"),
+                "annotations": {},
+                "ext": ref_data.get("ext", {}),
+            }
+            results.append(enriched)
         return results
     except RuntimeError as e:
         raise _map_engine_error(e)
@@ -582,10 +629,23 @@ def get_message(
     ref_id: str,
     engine: PyEngine = Depends(get_engine),
 ):
-    """Get a specific timeline ref."""
+    """Get a specific message, enriched with body content."""
     try:
         ref_json = engine.timeline_get_ref(room_id, ref_id)
-        return json.loads(ref_json)
+        ref_data = json.loads(ref_json)
+        content_id = ref_data.get("content_id", "")
+        cached = _message_body_cache.get(content_id, {})
+        return {
+            "ref_id": ref_data.get("ref_id", ref_id),
+            "room_id": room_id,
+            "author": ref_data.get("author", ""),
+            "timestamp": ref_data.get("created_at", ""),
+            "datatype": "message",
+            "body": cached.get("body", ""),
+            "format": cached.get("format", "text/plain"),
+            "annotations": {},
+            "ext": ref_data.get("ext", {}),
+        }
     except RuntimeError as e:
         raise _map_engine_error(e)
 

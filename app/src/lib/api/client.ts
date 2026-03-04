@@ -70,4 +70,4 @@ export class ApiClient {
 }
 
 /** Default API client instance pointing to the local engine. */
-export const api = new ApiClient('http://localhost:8847');
+export const api = new ApiClient('http://localhost:6142');

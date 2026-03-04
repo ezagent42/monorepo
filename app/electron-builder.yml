@@ -13,9 +13,13 @@ directories:
 files:
   - out/**/*
   - dist-electron/**/*
-  - "!node_modules"
+  - package.json
 
 extraResources:
+  - from: assets/
+    to: assets/
+    filter:
+      - "**/*"
   - from: runtime/
     to: runtime/
     filter:
@@ -30,7 +34,7 @@ mac:
   target:
     - target: dmg
       arch:
-        - universal
+        - arm64
   category: public.app-category.productivity
   icon: build/icon.icns
   hardenedRuntime: true
@@ -50,7 +54,6 @@ win:
     - target: nsis
       arch:
         - x64
-  icon: build/icon.ico
 
 nsis:
   oneClick: false
@@ -65,4 +68,3 @@ linux:
       arch:
         - x64
   category: Network
-  icon: build/icons

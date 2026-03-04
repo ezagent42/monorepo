@@ -19,7 +19,7 @@ describe('WebSocket → Store handlers', () => {
   let client: WsClient;
 
   beforeEach(() => {
-    client = new WsClient('ws://localhost:8847/ws');
+    client = new WsClient('ws://localhost:6142/ws');
     registerDefaultHandlers(client);
 
     // Reset stores

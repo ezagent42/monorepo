@@ -9,14 +9,23 @@ import {
 } from '../daemon-config';
 
 describe('getDaemonCommand', () => {
-  it('returns "ezagent" as the command', () => {
+  it('uses python3.12 as default command (no resourcesPath)', () => {
     const { command } = getDaemonCommand();
-    expect(command).toBe('ezagent');
+    expect(command).toBe('python3.12');
   });
 
-  it('returns ["serve"] as the args', () => {
+  it('uses bundled python when resourcesPath provided', () => {
+    const { command } = getDaemonCommand('/app/Resources');
+    expect(command).toBe('/app/Resources/runtime/bin/python3.12');
+  });
+
+  it('passes uvicorn args to launch the FastAPI server', () => {
     const { args } = getDaemonCommand();
-    expect(args).toEqual(['serve']);
+    expect(args).toContain('-m');
+    expect(args).toContain('uvicorn');
+    expect(args).toContain('ezagent.server:app');
+    expect(args).toContain('--port');
+    expect(args).toContain(String(DAEMON_PORT));
   });
 
   it('returns the correct shape', () => {

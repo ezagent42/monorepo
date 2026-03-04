@@ -1,8 +1,10 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, protocol, net } from 'electron';
 import path from 'path';
+import fs from 'fs';
 import { startGitHubOAuth, getStoredCredentials, clearCredentials } from './auth';
 import { DaemonManager } from './daemon';
 import { TrayManager } from './tray';
+import { pathToFileURL } from 'url';
 
 const PROTOCOL = 'ezagent';
 
@@ -79,7 +81,7 @@ function createWindow() {
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../out/index.html'));
+    mainWindow.loadURL('app://./index.html');
   }
 
   mainWindow.once('ready-to-show', () => mainWindow?.show());
@@ -100,9 +102,35 @@ function createWindow() {
   });
 }
 
+// --- Custom protocol for serving static files ---
+// Register 'app://' scheme to serve Next.js static export files.
+// This resolves the issue where absolute paths like /_next/static/...
+// don't resolve correctly when loaded via file:// protocol.
+protocol.registerSchemesAsPrivileged([
+  { scheme: 'app', privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
+
 // --- App lifecycle ---
 
 app.whenReady().then(() => {
+  // Register the app:// protocol handler
+  const outDir = path.join(__dirname, '..', 'out');
+  protocol.handle('app', (request) => {
+    const url = new URL(request.url);
+    let filePath = path.join(outDir, url.pathname);
+
+    // If path is a directory or has no extension, try .html
+    if (!path.extname(filePath)) {
+      // Try /path.html first, then /path/index.html
+      if (fs.existsSync(filePath + '.html')) {
+        filePath = filePath + '.html';
+      } else if (fs.existsSync(path.join(filePath, 'index.html'))) {
+        filePath = path.join(filePath, 'index.html');
+      }
+    }
+
+    return net.fetch(pathToFileURL(filePath).toString());
+  });
   // 1. Start the daemon subprocess
   daemonManager.start();
 

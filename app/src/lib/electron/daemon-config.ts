@@ -20,13 +20,19 @@ export type DaemonStatus = 'stopped' | 'starting' | 'running' | 'error';
 /**
  * Returns the command and arguments used to start the ezagent daemon.
  *
- * The command is `ezagent` with the `serve` subcommand, which starts
- * the local HTTP API server.
+ * Uses the bundled Python runtime to launch the FastAPI server via uvicorn.
+ * In production, the Python runtime is at `{resourcesPath}/runtime/bin/python3.12`.
+ * In development, falls back to `python3.12` on PATH.
+ *
+ * @param resourcesPath - Electron's `process.resourcesPath` (or null in dev)
  */
-export function getDaemonCommand(): { command: string; args: string[] } {
+export function getDaemonCommand(resourcesPath?: string): { command: string; args: string[] } {
+  const pythonBin = resourcesPath
+    ? `${resourcesPath}/runtime/bin/python3.12`
+    : 'python3.12';
   return {
-    command: 'ezagent',
-    args: ['serve'],
+    command: pythonBin,
+    args: ['-m', 'uvicorn', 'ezagent.server:app', '--host', '127.0.0.1', '--port', String(DAEMON_PORT)],
   };
 }
 

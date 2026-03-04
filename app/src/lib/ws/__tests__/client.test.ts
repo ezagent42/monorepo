@@ -5,7 +5,7 @@ describe('WsClient', () => {
   let ws: WsClient;
 
   beforeEach(() => {
-    ws = new WsClient('ws://localhost:8847/ws');
+    ws = new WsClient('ws://localhost:6142/ws');
   });
 
   afterEach(() => {
@@ -13,7 +13,7 @@ describe('WsClient', () => {
   });
 
   it('stores the connection URL', () => {
-    expect(ws.url).toBe('ws://localhost:8847/ws');
+    expect(ws.url).toBe('ws://localhost:6142/ws');
   });
 
   it('starts in disconnected state', () => {

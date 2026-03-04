@@ -7,8 +7,8 @@ describe('ApiClient', () => {
   });
 
   it('constructs with base URL', () => {
-    const client = new ApiClient('http://localhost:8847');
-    expect(client.baseUrl).toBe('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
+    expect(client.baseUrl).toBe('http://localhost:6142');
   });
 
   it('GET request calls fetch correctly', async () => {
@@ -16,20 +16,20 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify(mockResponse), { status: 200 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     const result = await client.get('/api/rooms');
     expect(result).toEqual(mockResponse);
-    expect(fetch).toHaveBeenCalledWith('http://localhost:8847/api/rooms', expect.objectContaining({ method: 'GET' }));
+    expect(fetch).toHaveBeenCalledWith('http://localhost:6142/api/rooms', expect.objectContaining({ method: 'GET' }));
   });
 
   it('POST request sends JSON body', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ref_id: 'test' }), { status: 201 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     await client.post('/api/rooms/123/messages', { body: 'Hello' });
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8847/api/rooms/123/messages',
+      'http://localhost:6142/api/rooms/123/messages',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ body: 'Hello' }),
@@ -41,10 +41,10 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     await client.put('/api/rooms/123', { name: 'Updated' });
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8847/api/rooms/123',
+      'http://localhost:6142/api/rooms/123',
       expect.objectContaining({
         method: 'PUT',
         body: JSON.stringify({ name: 'Updated' }),
@@ -56,10 +56,10 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     await client.patch('/api/rooms/123', { name: 'Patched' });
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8847/api/rooms/123',
+      'http://localhost:6142/api/rooms/123',
       expect.objectContaining({
         method: 'PATCH',
         body: JSON.stringify({ name: 'Patched' }),
@@ -71,10 +71,10 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ ok: true }), { status: 200 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     await client.delete('/api/rooms/123/messages/456');
     expect(fetch).toHaveBeenCalledWith(
-      'http://localhost:8847/api/rooms/123/messages/456',
+      'http://localhost:6142/api/rooms/123/messages/456',
       expect.objectContaining({ method: 'DELETE' })
     );
   });
@@ -83,7 +83,7 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ error: { code: 'ROOM_NOT_FOUND', message: 'Not found' } }), { status: 404 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     await expect(client.get('/api/rooms/bad')).rejects.toThrow('ROOM_NOT_FOUND');
   });
 
@@ -91,7 +91,7 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ error: { code: 'UNAUTHORIZED', message: 'Not authenticated' } }), { status: 401 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     try {
       await client.get('/api/auth/session');
       expect.unreachable('Should have thrown');
@@ -107,7 +107,7 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ detail: 'Server error' }), { status: 500 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     await expect(client.get('/api/status')).rejects.toThrow('UNKNOWN');
   });
 
@@ -115,7 +115,7 @@ describe('ApiClient', () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({}), { status: 200 })
     );
-    const client = new ApiClient('http://localhost:8847');
+    const client = new ApiClient('http://localhost:6142');
     await client.get('/api/rooms');
     expect(fetch).toHaveBeenCalledWith(
       expect.any(String),

@@ -205,4 +205,4 @@ export class WsClient {
 /**
  * Singleton WsClient instance pre-configured for the local engine endpoint.
  */
-export const wsClient = new WsClient('ws://localhost:8847/ws');
+export const wsClient = new WsClient('ws://localhost:6142/ws');
