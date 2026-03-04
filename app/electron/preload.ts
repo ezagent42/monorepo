@@ -9,7 +9,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   app: {
     getVersion: () => ipcRenderer.invoke('app:version'),
     onDeepLink: (callback: (url: string) => void) => {
-      ipcRenderer.on('deep-link', (_event, url) => callback(url));
+      ipcRenderer.on('deep-link', (_event: Electron.IpcRendererEvent, url: string) => callback(url));
     },
   },
 });
