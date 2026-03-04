@@ -1,17 +1,23 @@
 'use client';
 
+import { useState } from 'react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { SearchBar } from './SearchBar';
+import { ChannelList } from './ChannelList';
 
 export function Sidebar() {
+  const [searchQuery, setSearchQuery] = useState('');
+
   return (
     <aside className="w-64 border-r bg-muted/40 flex flex-col">
       <div className="h-12 flex items-center px-4 font-semibold border-b">
         ezagent
       </div>
+      <SearchBar value={searchQuery} onChange={setSearchQuery} />
+      <Separator />
       <ScrollArea className="flex-1">
-        {/* RoomList will be added in Task 12 */}
-        {/* ChannelList will be added in Task 13 */}
-        <div className="p-4 text-sm text-muted-foreground">No rooms yet</div>
+        <ChannelList searchQuery={searchQuery} />
       </ScrollArea>
     </aside>
   );
