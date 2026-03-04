@@ -34,7 +34,7 @@ export const test = base.extend<ElectronFixtures>({
 
     // Init test auth
     await initTestAuth();
-    await injectCredentials(app);
+    injectCredentials();
 
     await use(app);
 
@@ -43,7 +43,8 @@ export const test = base.extend<ElectronFixtures>({
 
   page: async ({ electronApp }, use) => {
     const page = await electronApp.firstWindow();
-    // Wait for the renderer to finish loading (React hydration)
+    // Navigate to chat page (credentials were injected before this point)
+    await page.goto('app://./chat');
     await page.waitForLoadState('domcontentloaded');
     await use(page);
   },

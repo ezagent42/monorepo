@@ -14,11 +14,16 @@ test.describe('App Lifecycle (TC-5-PKG)', () => {
     const page = await app.firstWindow();
     await page.waitForLoadState('domcontentloaded');
 
-    // Window should be visible
-    const isVisible = await app.evaluate(async ({ BrowserWindow }) => {
-      const windows = BrowserWindow.getAllWindows();
-      return windows.length > 0 && windows[0].isVisible();
-    });
+    // Window may take a moment to become visible after load
+    let isVisible = false;
+    for (let i = 0; i < 10; i++) {
+      isVisible = await app.evaluate(async ({ BrowserWindow }) => {
+        const windows = BrowserWindow.getAllWindows();
+        return windows.length > 0 && windows[0].isVisible();
+      });
+      if (isVisible) break;
+      await page.waitForTimeout(500);
+    }
     expect(isVisible).toBe(true);
 
     await app.close();
@@ -30,10 +35,16 @@ test.describe('App Lifecycle (TC-5-PKG)', () => {
       env: { ...process.env, EZAGENT_E2E: '1' },
     });
     const page = await app.firstWindow();
-    const size = page.viewportSize();
-    expect(size).toBeTruthy();
-    expect(size!.width).toBeGreaterThanOrEqual(800);
-    expect(size!.height).toBeGreaterThanOrEqual(600);
+    await page.waitForLoadState('domcontentloaded');
+
+    // Use BrowserWindow API for reliable size check
+    const bounds = await app.evaluate(async ({ BrowserWindow }) => {
+      const win = BrowserWindow.getAllWindows()[0];
+      return win ? win.getBounds() : null;
+    });
+    expect(bounds).toBeTruthy();
+    expect(bounds!.width).toBeGreaterThanOrEqual(800);
+    expect(bounds!.height).toBeGreaterThanOrEqual(600);
 
     await app.close();
   });
@@ -78,9 +89,9 @@ test.describe('App Lifecycle (TC-5-PKG)', () => {
     await page.waitForLoadState('domcontentloaded');
 
     // React should hydrate — the page should NOT be stuck on "Loading..."
-    // Wait for either the login button or the chat UI to appear
+    // Wait for the app to render any interactive content
     const hydrated = await page.waitForSelector(
-      'button:has-text("Sign in with GitHub"), [data-testid="empty-state"], aside',
+      'button:has-text("Sign in with GitHub"), a:has-text("Open Chat"), [data-testid="empty-state"], aside',
       { timeout: 15_000 }
     ).then(() => true).catch(() => false);
 

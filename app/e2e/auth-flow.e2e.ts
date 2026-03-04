@@ -7,7 +7,8 @@ test.describe('Auth Flow (TC-5-AUTH)', () => {
   test('unauthenticated state shows login screen (TC-5-AUTH-001)', async ({ page }) => {
     // Clear any existing auth
     await clearTestAuth();
-    await page.reload();
+    // Navigate to root page to check unauthenticated state
+    await page.goto('app://./index.html');
     await page.waitForLoadState('domcontentloaded');
 
     // Should see the login/welcome page
@@ -20,7 +21,7 @@ test.describe('Auth Flow (TC-5-AUTH)', () => {
     expect(loginVisible || welcomeVisible).toBe(true);
   });
 
-  test('test-init creates valid session (TC-5-AUTH-002)', async () => {
+  test('test-init creates valid session (TC-5-AUTH-002)', async ({ electronApp }) => {
     const result = await initTestAuth();
     expect(result.entity_id).toBe('@e2e-tester:relay.ezagent.dev');
     expect(result.display_name).toBe('E2E Tester');
@@ -32,7 +33,7 @@ test.describe('Auth Flow (TC-5-AUTH)', () => {
 
   test('authenticated state shows main UI (TC-5-AUTH-003)', async ({ electronApp, page }) => {
     await initTestAuth();
-    await injectCredentials(electronApp);
+    injectCredentials();
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
 
@@ -45,7 +46,7 @@ test.describe('Auth Flow (TC-5-AUTH)', () => {
     expect(mainUI).toBe(true);
   });
 
-  test('logout clears session (TC-5-AUTH-004)', async () => {
+  test('logout clears session (TC-5-AUTH-004)', async ({ electronApp }) => {
     await initTestAuth();
     const sessionBefore = await api.getSession();
     expect(sessionBefore).toBeTruthy();
@@ -56,7 +57,7 @@ test.describe('Auth Flow (TC-5-AUTH)', () => {
     expect(sessionAfter).toBeNull();
   });
 
-  test('re-authentication after logout works (TC-5-AUTH-005)', async () => {
+  test('re-authentication after logout works (TC-5-AUTH-005)', async ({ electronApp }) => {
     await initTestAuth();
     await api.logout();
 

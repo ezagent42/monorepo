@@ -4,9 +4,12 @@ import { api } from './helpers/api-client';
 test.describe('Widget SDK (TC-5-WIDGET)', () => {
   let roomId: string;
 
-  test.beforeAll(async () => {
-    const room = await api.createRoom('E2E Widget SDK');
-    roomId = room.room_id || room.id;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  test.beforeEach(async ({ electronApp }) => {
+    if (!roomId) {
+      const room = await api.createRoom('E2E Widget SDK');
+      roomId = room.room_id || room.id;
+    }
   });
 
   test('widget host renders for custom content (TC-5-WIDGET-001)', async ({ page }) => {

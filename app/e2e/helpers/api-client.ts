@@ -86,6 +86,7 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body }),
     });
+    if (!res.ok) throw new Error(`editMessage failed: ${res.status} ${await res.text()}`);
     return res.json();
   }
 
@@ -102,6 +103,7 @@ export class ApiClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ emoji }),
     });
+    if (!res.ok) throw new Error(`addReaction failed: ${res.status} ${await res.text()}`);
     return res.json();
   }
 

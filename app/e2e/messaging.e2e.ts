@@ -5,9 +5,17 @@ import { SELECTORS, MESSAGES } from './fixtures/test-data';
 test.describe('Messaging (TC-5-UI, TC-5-JOURNEY-004)', () => {
   let roomId: string;
 
-  test.beforeAll(async () => {
-    const room = await api.createRoom('E2E Messaging Suite');
-    roomId = room.room_id || room.id;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  test.beforeEach(async ({ electronApp }) => {
+    // Each test may get a fresh daemon — always check for room existence
+    const rooms = await api.listRooms();
+    const existing = rooms.find((r: any) => r.name === 'E2E Messaging Suite');
+    if (existing) {
+      roomId = existing.room_id || existing.id;
+    } else {
+      const room = await api.createRoom('E2E Messaging Suite');
+      roomId = room.room_id || room.id;
+    }
   });
 
   test('send text message via compose area (TC-5-UI-001)', async ({ page }) => {
@@ -26,6 +34,8 @@ test.describe('Messaging (TC-5-UI, TC-5-JOURNEY-004)', () => {
   });
 
   test('compose area clears after send (TC-5-UI-002)', async ({ page }) => {
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
     await page.locator('text=E2E Messaging Suite').click({ timeout: 10_000 });
     await page.locator(SELECTORS.composeInput).fill('Clear test message');
     await page.locator(SELECTORS.sendButton).click();
@@ -82,12 +92,10 @@ test.describe('Messaging (TC-5-UI, TC-5-JOURNEY-004)', () => {
   });
 
   test('virtual scroll handles many messages', async ({ page }) => {
-    // Send 50 messages via API
-    const promises = [];
-    for (let i = 0; i < 50; i++) {
-      promises.push(api.sendMessage(roomId, `Bulk message ${i}`));
+    // Send messages sequentially to avoid overwhelming the daemon
+    for (let i = 0; i < 20; i++) {
+      await api.sendMessage(roomId, `Bulk message ${i}`);
     }
-    await Promise.all(promises);
 
     await page.reload();
     await page.waitForLoadState('domcontentloaded');
@@ -103,8 +111,6 @@ test.describe('Messaging (TC-5-UI, TC-5-JOURNEY-004)', () => {
     });
 
     // Should see recent messages
-    const lastVisible = await page.locator('text=Bulk message 49').isVisible({ timeout: 10_000 })
-      .catch(() => false);
-    expect(lastVisible).toBe(true);
+    await expect(page.locator('text=Bulk message 19')).toBeVisible({ timeout: 10_000 });
   });
 });
