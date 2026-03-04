@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { RoomTabConfig } from '@/types';
 
 interface RoomTabContainerProps {
@@ -10,6 +10,11 @@ interface RoomTabContainerProps {
   children: React.ReactNode; // Default tab content (Timeline)
 }
 
+/**
+ * Container that renders all tab panels at once but hides inactive ones
+ * via CSS (`display: none`), preserving DOM state (scroll position, input
+ * values, etc.) across tab switches.
+ */
 export function RoomTabContainer({ roomId, tabs, children }: RoomTabContainerProps) {
   const [activeTab, setActiveTab] = useState('messages');
 
@@ -34,15 +39,29 @@ export function RoomTabContainer({ roomId, tabs, children }: RoomTabContainerPro
           </TabsTrigger>
         ))}
       </TabsList>
-      <TabsContent value="messages" className="flex-1 flex flex-col mt-0">
+      {/* Render all panels; hide inactive ones to preserve DOM state */}
+      <div
+        role="tabpanel"
+        className="flex-1 flex flex-col mt-0"
+        style={{ display: activeTab === 'messages' ? undefined : 'none' }}
+        data-state={activeTab === 'messages' ? 'active' : 'inactive'}
+        data-testid="tab-panel-messages"
+      >
         {children}
-      </TabsContent>
+      </div>
       {tabs.map((tab) => (
-        <TabsContent key={tab.tab_label} value={tab.tab_label} className="flex-1 mt-0">
+        <div
+          key={tab.tab_label}
+          role="tabpanel"
+          className="flex-1 mt-0"
+          style={{ display: activeTab === tab.tab_label ? undefined : 'none' }}
+          data-state={activeTab === tab.tab_label ? 'active' : 'inactive'}
+          data-testid={`tab-panel-${tab.tab_label}`}
+        >
           <div className="flex-1 flex items-center justify-center text-muted-foreground">
             {tab.tab_label} view ({tab.layout})
           </div>
-        </TabsContent>
+        </div>
       ))}
     </Tabs>
   );

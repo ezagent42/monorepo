@@ -1,7 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
-// Mock the shadcn Tabs UI wrapper to avoid Radix jsdom pointer-event issues
+// Mock the shadcn Tabs UI wrapper to avoid Radix jsdom pointer-event issues.
+// Note: TabsContent is no longer imported by RoomTabContainer (persistence uses
+// raw divs with display:none), but we keep it exported from the mock in case
+// other tests still reference it.
 vi.mock('@/components/ui/tabs', () => {
   const React = require('react');
 
@@ -113,6 +116,9 @@ describe('RoomTabContainer', () => {
     const tasksTab = screen.getByRole('tab', { name: 'Tasks' });
     fireEvent.click(tasksTab);
 
+    // Tasks panel becomes visible (active), messages panel hidden
+    expect(screen.getByTestId('tab-panel-Tasks')).not.toHaveStyle({ display: 'none' });
+    expect(screen.getByTestId('tab-panel-messages')).toHaveStyle({ display: 'none' });
     expect(screen.getByText('Tasks view (kanban)')).toBeInTheDocument();
   });
 
@@ -126,5 +132,38 @@ describe('RoomTabContainer', () => {
       </RoomTabContainer>,
     );
     expect(screen.getByText('Timeline Content')).toBeInTheDocument();
+  });
+
+  it('preserves all tab panels in DOM when switching tabs (persistence)', () => {
+    render(
+      <RoomTabContainer
+        roomId="room-1"
+        tabs={[{ tab_label: 'Tasks', layout: 'kanban', as_room_tab: true }]}
+      >
+        <div>Timeline Content</div>
+      </RoomTabContainer>,
+    );
+
+    // Initially messages panel is visible, tasks panel is hidden but in DOM
+    expect(screen.getByTestId('tab-panel-messages')).not.toHaveStyle({ display: 'none' });
+    expect(screen.getByTestId('tab-panel-Tasks')).toHaveStyle({ display: 'none' });
+    // Both contents are in the DOM (persistence)
+    expect(screen.getByText('Timeline Content')).toBeInTheDocument();
+    expect(screen.getByText('Tasks view (kanban)')).toBeInTheDocument();
+
+    // Switch to Tasks
+    const tasksTab = screen.getByRole('tab', { name: 'Tasks' });
+    fireEvent.click(tasksTab);
+
+    // Messages panel now hidden, tasks panel visible, but timeline content still in DOM
+    expect(screen.getByTestId('tab-panel-messages')).toHaveStyle({ display: 'none' });
+    expect(screen.getByTestId('tab-panel-Tasks')).not.toHaveStyle({ display: 'none' });
+    expect(screen.getByText('Timeline Content')).toBeInTheDocument();
+
+    // Switch back to Messages — tasks content still preserved
+    const messagesTab = screen.getByRole('tab', { name: 'Messages' });
+    fireEvent.click(messagesTab);
+    expect(screen.getByText('Tasks view (kanban)')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-panel-messages')).not.toHaveStyle({ display: 'none' });
   });
 });
