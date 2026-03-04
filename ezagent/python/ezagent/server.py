@@ -341,6 +341,64 @@ def auth_github(req: GitHubAuthRequest, engine: PyEngine = Depends(get_engine)):
     }
 
 
+@app.post("/api/auth/test-init")
+def auth_test_init(
+    engine: PyEngine = Depends(get_engine),
+):
+    """Initialise identity for E2E testing — only available when EZAGENT_E2E=1.
+
+    This bypasses GitHub OAuth entirely, creating a test entity with a
+    random keypair. Used by Playwright E2E tests.
+    """
+    if os.environ.get("EZAGENT_E2E") != "1":
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "FORBIDDEN", "message": "test-init only available in E2E mode (EZAGENT_E2E=1)"}},
+        )
+
+    global _session
+
+    entity_id = "@e2e-tester:relay.ezagent.dev"
+    display_name = "E2E Tester"
+
+    # Check if already initialised.
+    try:
+        existing = engine.identity_whoami()
+        if existing == entity_id:
+            _session = {
+                "entity_id": entity_id,
+                "display_name": display_name,
+                "avatar_url": "",
+                "github_id": 0,
+            }
+            return {
+                "entity_id": entity_id,
+                "display_name": display_name,
+                "is_new_user": False,
+            }
+    except RuntimeError:
+        pass
+
+    keypair_bytes = os.urandom(32)
+    try:
+        engine.identity_init(entity_id, keypair_bytes)
+    except RuntimeError as e:
+        raise _map_engine_error(e)
+
+    _session = {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "avatar_url": "",
+        "github_id": 0,
+    }
+
+    return {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "is_new_user": True,
+    }
+
+
 @app.get("/api/auth/session")
 def auth_session():
     """Return current session info, or 401 if not authenticated."""
