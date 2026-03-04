@@ -1,4 +1,4 @@
-import { ElectronApplication } from 'playwright';
+import type { ElectronApplication } from '@playwright/test';
 import { api } from './api-client';
 
 /**

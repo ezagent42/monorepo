@@ -1,5 +1,4 @@
-import { test as base, expect, ElectronApplication, Page } from '@playwright/test';
-import { _electron as electron } from 'playwright';
+import { test as base, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
 import { waitForDaemon } from '../helpers/wait-helpers';
 import { initTestAuth, injectCredentials } from '../helpers/auth-helpers';
 
@@ -13,7 +12,6 @@ type ElectronFixtures = {
 /**
  * Shared fixture that launches the packaged EZAgent app.
  *
- * The app is launched once per worker (shared across all tests in a suite).
  * The fixture:
  * 1. Launches /Applications/EZAgent.app with EZAGENT_E2E=1
  * 2. Waits for the daemon to become healthy
@@ -21,8 +19,8 @@ type ElectronFixtures = {
  * 4. Injects credentials into the Electron main process
  * 5. Provides `electronApp` and `page` to each test
  */
-export const test = base.extend<{}, ElectronFixtures>({
-  electronApp: [async ({}, use) => {
+export const test = base.extend<ElectronFixtures>({
+  electronApp: async ({}, use) => {
     const app = await electron.launch({
       executablePath: APP_PATH,
       env: {
@@ -41,14 +39,14 @@ export const test = base.extend<{}, ElectronFixtures>({
     await use(app);
 
     await app.close();
-  }, { scope: 'worker' }],
+  },
 
-  page: [async ({ electronApp }, use) => {
+  page: async ({ electronApp }, use) => {
     const page = await electronApp.firstWindow();
     // Wait for the renderer to finish loading (React hydration)
     await page.waitForLoadState('domcontentloaded');
     await use(page);
-  }, { scope: 'worker' }],
+  },
 });
 
 export { expect };
