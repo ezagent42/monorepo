@@ -805,20 +805,20 @@ THEN   两端实时看到对方消息（延迟 < 2s LAN / < 5s 跨网络）
 
 ---
 
-## §8b GitHub OAuth 认证
+## §8b GitHub Device Flow 认证
 
 > **Spec 引用**：app-prd §4.9
 
-### TC-5-AUTH-001: GitHub OAuth 首次登录
+### TC-5-AUTH-001: Device Flow 首次登录
 
 ```
 GIVEN  全新安装，无本地密钥
 
 WHEN   用户点击 "Sign in with GitHub"
-       → Electron 打开 OAuth BrowserWindow
-       → 用户授权 GitHub OAuth App
-       → Electron 截获 authorization code
-       → 交换为 access_token
+       → App 调用 POST https://github.com/login/device/code
+       → App 显示 user_code + "Open GitHub" 按钮
+       → 用户在浏览器中输入验证码并授权
+       → App 轮询获取 access_token
        → POST /api/auth/github { github_token }
 
 THEN   后端验证 token，获取 GitHub Profile
@@ -832,12 +832,12 @@ THEN   后端验证 token，获取 GitHub Profile
 ### TC-5-AUTH-002: 已登录用户自动登录
 
 ```
-GIVEN  之前已通过 GitHub 登录，密钥存在于 Secure Storage
+GIVEN  之前已通过 Device Flow 登录，密钥存在于 Secure Storage
 
 WHEN   用户重启 App
 
 THEN   自动从 Secure Storage 加载密钥
-       无需再次 GitHub OAuth
+       无需再次 Device Flow
        直接进入主界面
        启动时间 < 3 秒
 ```
@@ -849,7 +849,7 @@ GIVEN  用户 alice 在设备 A 已登录
        密钥 Blob 已加密存储在 Relay
 
 WHEN   用户在设备 B（全新安装）点击 "Sign in with GitHub"
-       → GitHub OAuth → 获取同一 GitHub ID
+       → Device Flow → 获取同一 GitHub ID
 
 THEN   后端发现 github_id → entity_id 映射已存在
        返回加密的密钥 Blob
@@ -858,15 +858,16 @@ THEN   后端发现 github_id → entity_id 映射已存在
        两台设备可作为同一用户使用
 ```
 
-### TC-5-AUTH-004: OAuth 失败处理
+### TC-5-AUTH-004: Device Flow 失败处理
 
 ```
-GIVEN  网络不稳定 或 用户取消 OAuth 授权
+GIVEN  网络不稳定 或 用户拒绝授权 或 验证码过期
 
-WHEN   OAuth 流程中断
+WHEN   Device Flow 中断
 
-THEN   欢迎页面显示错误提示："登录失败，请重试"
-       提供"重试"按钮
+THEN   验证码过期: 显示"验证码已过期，请重试"，提供重试按钮
+       用户拒绝: 显示"授权被拒绝"
+       网络错误: 显示"网络错误，请重试"
        不创建任何 Entity
 ```
 
@@ -1063,7 +1064,7 @@ THEN   剪贴板中包含 ezagent://relay.test/r/{R-alpha-id}/m/{ref_id}
 | Widget SDK | TC-5-WIDGET-001~008 | 8 |
 | 信息架构 | TC-5-UI-001~009 | 9 |
 | 用户旅程 | TC-5-JOURNEY-001~004 | 4 |
-| GitHub OAuth 认证 | TC-5-AUTH-001~005 | 5 |
+| GitHub Device Flow 认证 | TC-5-AUTH-001~005 | 5 |
 | Desktop 打包 | TC-5-PKG-001~006 | 6 |
 | CRDT 实时同步 UI | TC-5-SYNC-001~005 | 5 |
 | URI Deep Link & 渲染 | TC-5-URI-001~003 | 3 |
