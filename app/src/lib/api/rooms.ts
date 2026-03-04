@@ -9,8 +9,7 @@
  */
 
 import { api } from './client';
-import type { Room, RoomMember } from '@/types';
-import type { RoomTabConfig } from '@/types';
+import type { Room, RoomMember, RoomTabConfig } from '@/types';
 
 /**
  * List all rooms the current user has joined.
