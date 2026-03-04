@@ -1,20 +1,711 @@
-# EZAgent Chat App E2E Test Implementation Plan
+# EZAgent Chat App E2E Test & Device Flow Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Implement a full-coverage E2E test suite using Playwright Electron integration against the packaged EZAgent desktop app, covering all 82 test cases from the design doc.
+**Goal:** (1) Migrate GitHub auth from OAuth Web Flow to Device Flow (no client_secret needed for desktop app), update all related docs/specs/plans; (2) Implement full-coverage E2E test suite using Playwright Electron integration against the packaged EZAgent desktop app.
 
-**Architecture:** Playwright `_electron` API launches `/Applications/EZAgent.app`, which auto-starts its bundled Python daemon on port 6142. Tests interact with the renderer via `page`, the main process via `electronApp.evaluate()`, and the backend via direct HTTP/WebSocket calls. Auth is handled via a test-mode init endpoint (`EZAGENT_E2E=1`) for most suites, plus a real GitHub OAuth App for the auth-flow suite.
+**Architecture:** GitHub App Device Flow replaces OAuth App Web Flow. Playwright `_electron` API launches `/Applications/EZAgent.app`, which auto-starts its bundled Python daemon on port 6142. Tests interact with renderer via `page`, main process via `electronApp.evaluate()`, backend via HTTP/WebSocket to `localhost:6142`. Auth for E2E uses test-init endpoint (`EZAGENT_E2E=1`).
 
 **Tech Stack:** @playwright/test, Electron 33, TypeScript, ws (WebSocket client), Node.js fetch API
+
+**GitHub App Client ID:** `Iv23likJpbvAY27c18tA`
 
 **Design doc:** `docs/plan/2026-03-04-chat-app-e2e-design.md`
 
 ---
 
-## Milestone 1: Infrastructure Setup (Tasks 1–5)
+## Milestone 0: Device Flow Migration & Doc Updates (Tasks 1–8)
 
-### Task 1: Install Playwright and create config
+### Task 1: Update app-prd.md — Device Flow auth
+
+**Files:**
+- Modify: `docs/products/app-prd.md:43-49` (§2.1 首次使用)
+- Modify: `docs/products/app-prd.md:260-306` (§4.9 GitHub OAuth 认证 → GitHub Device Flow 认证)
+- Modify: `docs/products/app-prd.md:325-327` (验收标准 APP-13~15)
+
+**Step 1: Update §2.1 首次使用**
+
+Replace lines 43-49 with:
+```
+2. 欢迎页面 → 点击 "Sign in with GitHub"
+   → App 调用 GitHub Device Flow API 获取 device_code + user_code
+   → 显示验证码（如 ABCD-1234）→ 自动打开浏览器到 github.com/login/device
+   → 用户输入验证码并授权
+   → App 轮询获取 access_token
+   → 后端执行 ezagent init（创建 Entity 密钥对）
+   → 绑定 GitHub ID → Entity ID 映射
+   → 密钥存储到 Electron Secure Storage
+   → 选择 Relay (默认 relay.ezagent.dev)
+```
+
+**Step 2: Rewrite §4.9**
+
+Replace §4.9 (lines 260-306) with:
+
+```markdown
+## §4.9 GitHub Device Flow 认证
+
+### §4.9.1 设计目标
+
+使用 GitHub App Device Flow 作为用户认证方案。Device Flow 专为桌面/CLI 应用设计，只需 `client_id`，**不需要 `client_secret`**（解决桌面安装包无法保密 secret 的问题）。
+
+### §4.9.2 Device Flow 流程
+
+首次使用:
+  App 打开 → Welcome 页面 → "Sign in with GitHub"
+    → POST https://github.com/login/device/code { client_id, scope: "read:user" }
+    → 返回 { device_code, user_code, verification_uri, interval }
+    → App 显示 user_code（如 "ABCD-1234"）+ "Open GitHub" 按钮
+    → 自动打开浏览器到 https://github.com/login/device
+    → 用户在浏览器输入 user_code，点击授权
+    → App 以 interval 间隔轮询:
+      POST https://github.com/login/oauth/access_token
+        { client_id, device_code, grant_type: "urn:ietf:params:oauth:grant-type:device_code" }
+    → 轮询返回 access_token 后:
+      调用后端 POST /api/auth/github { github_token }
+    → 后端验证 token, 获取 GitHub Profile
+    → 新用户: 执行 ezagent init, 创建 Entity 密钥对
+    → 密钥存储到 Electron Secure Storage
+    → 进入主界面
+
+日常登录:
+  App 启动 → 检查 Secure Storage
+    → 有密钥 → 自动登录 → 主界面
+    → 无密钥 (新设备) → Device Flow → 从 Relay 恢复密钥
+
+跨设备密钥恢复:
+  密钥对使用 GitHub user ID 衍生的密钥加密
+  加密 Blob 存储在 Relay 上
+  新设备: Device Flow → 衍生解密密钥 → 解密密钥对
+
+### §4.9.3 后端 API
+
+| Endpoint | Method | 说明 |
+|----------|--------|------|
+| `/api/auth/github` | POST | GitHub token 换取 Entity + 密钥对 |
+| `/api/auth/session` | GET | 当前会话信息 |
+| `/api/auth/logout` | POST | 清除会话 |
+
+### §4.9.4 安全要求
+
+- **无 `client_secret`**：Device Flow 只需 `client_id`（公开值），无需在二进制中嵌入 secret
+- `client_id` 硬编码在 Electron app 中：`Iv23likJpbvAY27c18tA`
+- access_token 仅用于初始认证，日常操作使用 Ed25519 签名
+- 密钥 Blob 使用 AES-256-GCM 加密后存储在 Relay
+```
+
+**Step 3: Update 验收标准 APP-13**
+
+Replace APP-13 (line 325):
+```
+| APP-13 | 首次打开 → GitHub Device Flow 登录（显示验证码 → 浏览器授权）→ 自动创建 Entity + 进入主界面 | 流程完整 |
+```
+
+**Step 4: Add 变更日志 entry**
+
+Add to 变更日志 table:
+```
+| 0.2 | 2026-03-04 | §4.9 GitHub OAuth Web Flow → GitHub Device Flow（无 client_secret） |
+```
+
+**Step 5: Commit**
+
+```bash
+git add docs/products/app-prd.md
+git commit -m "docs(app): update app-prd §4.9 OAuth Web Flow → Device Flow"
+```
+
+---
+
+### Task 2: Update chat-app-design.md — Device Flow
+
+**Files:**
+- Modify: `docs/plan/2026-03-04-chat-app-design.md:69-127` (§3 GitHub OAuth 认证)
+
+**Step 1: Rewrite §3**
+
+Replace §3 (lines 69-127) with:
+
+```markdown
+## §3 GitHub Device Flow 认证
+
+### §3.1 设计目标
+
+将 GitHub App Device Flow 作为 ezagent 的用户认证方案。Device Flow（RFC 8628）专为桌面/CLI 应用设计，**只需 `client_id`，不需要 `client_secret`**，避免在可逆向的安装包中嵌入敏感凭证。
+
+1. **身份验证**：通过 GitHub 验证用户身份
+2. **Profile 预填**：自动获取 display_name、avatar_url、email
+3. **跨设备登录**：同一 GitHub 帐号在新设备上可恢复 Entity 密钥对
+4. **无 Secret**：只需 client_id（公开值），无安全风险
+
+### §3.2 Device Flow 流程
+
+首次使用:
+  1. App 打开 → Welcome 页面
+  2. 点击 "Sign in with GitHub"
+     → POST https://github.com/login/device/code
+       { client_id: "Iv23likJpbvAY27c18tA", scope: "read:user" }
+     → 返回 { device_code, user_code, verification_uri, interval, expires_in }
+  3. App 显示验证码界面:
+     - 大号显示 user_code（如 "ABCD-1234"）
+     - "Open GitHub" 按钮 → shell.openExternal(verification_uri)
+     - 提示 "Enter this code on GitHub to sign in"
+  4. App 以 interval 秒间隔轮询:
+     POST https://github.com/login/oauth/access_token
+       { client_id, device_code, grant_type: "urn:ietf:params:oauth:grant-type:device_code" }
+     轮询响应:
+       - error=authorization_pending → 继续轮询
+       - error=slow_down → 增加 interval 5 秒
+       - error=expired_token → 显示"验证码已过期，请重试"
+       - error=access_denied → 显示"用户拒绝授权"
+       - 成功 → 获取 access_token
+  5. 调用后端: POST /api/auth/github { github_token: access_token }
+     后端处理:
+       a. GET https://api.github.com/user (验证 token, 获取 profile)
+       b. 查询 github_id → entity_id 映射
+       c. 若新用户: 执行 ezagent init, 创建 Entity 密钥对, 存储映射
+       d. 若已有: 返回 entity_id + encrypted_keypair
+  6. 存储密钥到 Electron Secure Storage
+  7. 进入主界面
+
+日常登录:
+  1. App 启动 → 检查 Electron Secure Storage
+  2. 若有密钥 → 自动登录 → 进入主界面
+  3. 若无密钥（新设备）→ Device Flow → 从 Relay 恢复密钥
+
+### §3.3 后端 API（不变）
+
+| Endpoint | Method | 说明 |
+|----------|--------|------|
+| `/api/auth/github` | POST | GitHub token 换取 Entity + 密钥对 |
+| `/api/auth/session` | GET | 当前会话信息 |
+| `/api/auth/logout` | POST | 清除会话 |
+
+后端 API 不变——Device Flow 的变化完全在 Electron 客户端侧。后端仍然接收 `github_token` 并调用 GitHub API 验证。
+
+### §3.4 安全考虑
+
+- **无 `client_secret`**：Device Flow 只需 `client_id`，可安全硬编码在 app 中
+- `client_id: Iv23likJpbvAY27c18tA`（GitHub App "EZAgent Login"）
+- access_token 仅用于初始认证，日常操作使用 Ed25519 签名
+- 密钥 Blob 使用 AES-256-GCM 加密后存储在 Relay
+```
+
+**Step 2: Commit**
+
+```bash
+git add docs/plan/2026-03-04-chat-app-design.md
+git commit -m "docs(app): update design doc §3 OAuth Web Flow → Device Flow"
+```
+
+---
+
+### Task 3: Update phase-5-chat-app.md — Device Flow test cases
+
+**Files:**
+- Modify: `docs/plan/phase-5-chat-app.md:808-884` (§8b TC-5-AUTH-*)
+
+**Step 1: Rewrite §8b test cases**
+
+Replace §8b (lines 808-884) with:
+
+```markdown
+## §8b GitHub Device Flow 认证
+
+> **Spec 引用**：app-prd §4.9
+
+### TC-5-AUTH-001: Device Flow 首次登录
+
+GIVEN  全新安装，无本地密钥
+
+WHEN   用户点击 "Sign in with GitHub"
+       → App 调用 POST https://github.com/login/device/code
+       → App 显示 user_code + "Open GitHub" 按钮
+       → 用户在浏览器中输入验证码并授权
+       → App 轮询获取 access_token
+       → POST /api/auth/github { github_token }
+
+THEN   后端验证 token，获取 GitHub Profile
+       创建 Entity 密钥对
+       返回 { entity_id, keypair, profile }
+       密钥存储到 Electron Secure Storage
+       UI 显示用户头像和名称（来自 GitHub）
+       进入主界面
+
+### TC-5-AUTH-002: 已登录用户自动登录
+
+GIVEN  之前已通过 Device Flow 登录，密钥存在于 Secure Storage
+
+WHEN   用户重启 App
+
+THEN   自动从 Secure Storage 加载密钥
+       无需再次 Device Flow
+       直接进入主界面
+       启动时间 < 3 秒
+
+### TC-5-AUTH-003: 跨设备密钥恢复
+
+GIVEN  用户 alice 在设备 A 已登录
+       密钥 Blob 已加密存储在 Relay
+
+WHEN   用户在设备 B（全新安装）点击 "Sign in with GitHub"
+       → Device Flow → 获取同一 GitHub ID
+
+THEN   后端发现 github_id → entity_id 映射已存在
+       返回加密的密钥 Blob
+       Electron 使用 GitHub user ID 衍生密钥解密
+       设备 B 恢复同一 Entity 密钥对
+       两台设备可作为同一用户使用
+
+### TC-5-AUTH-004: Device Flow 失败处理
+
+GIVEN  网络不稳定 或 用户拒绝授权 或 验证码过期
+
+WHEN   Device Flow 中断
+
+THEN   验证码过期: 显示"验证码已过期，请重试"，提供重试按钮
+       用户拒绝: 显示"授权被拒绝"
+       网络错误: 显示"网络错误，请重试"
+       不创建任何 Entity
+
+### TC-5-AUTH-005: 登出
+
+GIVEN  用户已登录
+
+WHEN   用户在设置中点击 "Sign out"
+
+THEN   调用 POST /api/auth/logout
+       清除 Electron Secure Storage 中的密钥
+       返回欢迎页面
+       Tray 状态变为离线 (◇)
+```
+
+**Step 2: Commit**
+
+```bash
+git add docs/plan/phase-5-chat-app.md
+git commit -m "docs(app): update TC-5-AUTH test cases for Device Flow"
+```
+
+---
+
+### Task 4: Update http-spec.md — add Device Flow note
+
+**Files:**
+- Modify: `docs/products/http-spec.md:102-109` (§2.6 title + note)
+- Modify: `docs/products/http-spec.md:450-457` (变更日志)
+
+**Step 1: Update §2.6 title and add Device Flow note**
+
+Change title from:
+```
+### §2.6 Authentication (GitHub OAuth)
+```
+To:
+```
+### §2.6 Authentication (GitHub Device Flow)
+```
+
+Add note after the endpoint table (after line 108):
+```markdown
+> **注意**：客户端使用 GitHub App Device Flow（RFC 8628）获取 access_token，只需 `client_id`，无需 `client_secret`。后端 API 不变——仍接收 `github_token` 并调用 GitHub API 验证。Device Flow 的变化完全在 Electron 客户端侧。
+```
+
+**Step 2: Add 变更日志 entry**
+
+Add to 变更日志:
+```
+| 0.1.4 | 2026-03-04 | §2.6 标题更新: GitHub OAuth → GitHub Device Flow |
+```
+
+**Step 3: Commit**
+
+```bash
+git add docs/products/http-spec.md
+git commit -m "docs(app): update http-spec §2.6 OAuth → Device Flow"
+```
+
+---
+
+### Task 5: Update chat-app-implementation.md — Tasks 8-10
+
+**Files:**
+- Modify: `docs/plan/2026-03-04-chat-app-implementation.md:854-890` (Milestone 3, Tasks 8-10)
+
+**Step 1: Rewrite Tasks 9-10 in the implementation plan**
+
+Task 8 (backend auth endpoints) stays the same — backend API is unchanged.
+
+Replace Task 9 (lines 868-877) with:
+```markdown
+### Task 9: Electron GitHub Device Flow
+
+**Files:**
+- Rewrite: `app/electron/auth.ts` — replace OAuth BrowserWindow with Device Flow
+- Modify: `app/electron/main.ts` — register IPC handlers (unchanged)
+
+Implements the Device Flow: POST to `/login/device/code` to get `user_code` + `device_code`, display code to user via IPC to renderer, open browser to `github.com/login/device`, poll `/login/oauth/access_token` with `device_code` at `interval` until success/failure, then call backend `/api/auth/github` with the token.
+
+Client ID: `Iv23likJpbvAY27c18tA` (GitHub App "EZAgent Login")
+
+**Covers:** TC-5-AUTH-001, TC-5-AUTH-004
+```
+
+Replace Task 10 (lines 880-890) with:
+```markdown
+### Task 10: Welcome page — Device Flow UI
+
+**Files:**
+- Rewrite: `app/src/app/welcome/page.tsx` — Device Flow verification code display
+- Modify: `app/src/lib/electron/ipc.ts` — add device flow IPC methods
+- Test: `app/src/app/welcome/__tests__/welcome.test.tsx`
+
+Welcome page shows "Sign in with GitHub" button. On click, triggers Device Flow via IPC. App transitions to verification code display: large user_code, "Open GitHub" button, polling status indicator. On success, stores credentials and redirects to `/chat`.
+
+**Covers:** TC-5-AUTH-001, TC-5-AUTH-002, TC-5-AUTH-005, TC-5-JOURNEY-001
+```
+
+**Step 2: Commit**
+
+```bash
+git add docs/plan/2026-03-04-chat-app-implementation.md
+git commit -m "docs(app): update implementation plan Tasks 9-10 for Device Flow"
+```
+
+---
+
+### Task 6: Rewrite electron/auth.ts — Device Flow implementation
+
+**Files:**
+- Rewrite: `app/electron/auth.ts`
+
+**Step 1: Rewrite auth.ts with Device Flow**
+
+Replace the entire `app/electron/auth.ts` with:
+
+```typescript
+import { shell } from 'electron';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+const GITHUB_CLIENT_ID = 'Iv23likJpbvAY27c18tA';
+const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
+const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
+const BACKEND_URL = process.env.EZAGENT_BACKEND_URL || 'http://localhost:6142';
+const CREDENTIALS_PATH = path.join(os.homedir(), '.ezagent', 'app-credentials.json');
+
+export interface DeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
+
+export interface AuthResult {
+  entity_id: string;
+  display_name: string;
+  avatar_url?: string;
+  is_new_user: boolean;
+}
+
+/**
+ * Initiates GitHub Device Flow authentication.
+ *
+ * 1. Requests a device code from GitHub
+ * 2. Returns the user_code for the renderer to display
+ * 3. Opens the browser to the verification URI
+ * 4. Polls for the access token
+ * 5. Exchanges the token with the backend
+ *
+ * No client_secret needed — Device Flow is designed for public clients.
+ */
+export async function startGitHubOAuth(): Promise<AuthResult> {
+  // 1. Request device code
+  const deviceRes = await fetch(GITHUB_DEVICE_CODE_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      scope: 'read:user',
+    }),
+  });
+
+  if (!deviceRes.ok) {
+    throw new Error(`Device code request failed: ${deviceRes.status}`);
+  }
+
+  const deviceData = (await deviceRes.json()) as DeviceCodeResponse;
+  const { device_code, user_code, verification_uri, interval, expires_in } = deviceData;
+
+  // 2. Open browser for user to enter the code
+  shell.openExternal(verification_uri);
+
+  // 3. Poll for access token
+  const accessToken = await pollForToken(device_code, interval, expires_in);
+
+  // 4. Exchange with backend
+  const backendRes = await fetch(`${BACKEND_URL}/api/auth/github`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ github_token: accessToken }),
+  });
+
+  if (!backendRes.ok) {
+    const errorText = await backendRes.text().catch(() => 'Unknown error');
+    throw new Error(`Backend auth failed (${backendRes.status}): ${errorText}`);
+  }
+
+  const result = (await backendRes.json()) as AuthResult;
+
+  // 5. Store credentials
+  await storeCredentials(result);
+
+  return result;
+}
+
+/**
+ * Returns the device code response for the renderer to display the user_code.
+ * Call this separately if you want to show the code in UI before polling starts.
+ */
+export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
+  const res = await fetch(GITHUB_DEVICE_CODE_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      scope: 'read:user',
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Device code request failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Polls GitHub for the access token after the user has entered the device code.
+ */
+async function pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<string> {
+  const deadline = Date.now() + expiresIn * 1000;
+  let pollInterval = interval * 1000;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, pollInterval));
+
+    const res = await fetch(GITHUB_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: GITHUB_CLIENT_ID,
+        device_code: deviceCode,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      }),
+    });
+
+    const data = (await res.json()) as {
+      access_token?: string;
+      error?: string;
+      interval?: number;
+    };
+
+    if (data.access_token) {
+      return data.access_token;
+    }
+
+    if (data.error === 'authorization_pending') {
+      continue;
+    }
+
+    if (data.error === 'slow_down') {
+      pollInterval += 5_000;
+      continue;
+    }
+
+    if (data.error === 'expired_token') {
+      throw new Error('Device code expired. Please try again.');
+    }
+
+    if (data.error === 'access_denied') {
+      throw new Error('User denied authorization.');
+    }
+
+    throw new Error(`Unexpected error: ${data.error}`);
+  }
+
+  throw new Error('Device code expired (timeout). Please try again.');
+}
+
+/**
+ * Stores auth credentials to ~/.ezagent/app-credentials.json.
+ * Uses plain JSON (Electron safeStorage can be added later for encryption).
+ */
+async function storeCredentials(data: AuthResult): Promise<void> {
+  const dir = path.dirname(CREDENTIALS_PATH);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(data), { mode: 0o600 });
+}
+
+/**
+ * Reads stored credentials. Returns null if none exist.
+ */
+export async function getStoredCredentials(): Promise<AuthResult | null> {
+  if (!fs.existsSync(CREDENTIALS_PATH)) {
+    return null;
+  }
+  try {
+    const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf-8');
+    return JSON.parse(raw) as AuthResult;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Deletes stored credentials.
+ */
+export async function clearCredentials(): Promise<void> {
+  if (fs.existsSync(CREDENTIALS_PATH)) {
+    fs.unlinkSync(CREDENTIALS_PATH);
+  }
+}
+```
+
+**Step 2: Recompile and verify**
+
+Run:
+```bash
+cd app && pnpm exec tsc -p electron/tsconfig.json
+```
+
+Expected: No errors.
+
+**Step 3: Verify unit tests still pass**
+
+Run:
+```bash
+cd app && pnpm test -- --run
+```
+
+Expected: All 245 tests pass (auth.ts is Electron code, not tested by Vitest).
+
+**Step 4: Commit**
+
+```bash
+git add app/electron/auth.ts
+git commit -m "feat(app): rewrite auth.ts from OAuth Web Flow to Device Flow (no client_secret)"
+```
+
+---
+
+### Task 7: Update Welcome page UI for Device Flow
+
+**Files:**
+- Modify: `app/src/app/welcome/page.tsx`
+- Modify: `app/electron/preload.ts` (add device code IPC)
+- Modify: `app/electron/main.ts` (add device code IPC handler)
+
+**Step 1: Update preload.ts with device flow methods**
+
+Add to the `electronAPI` in `app/electron/preload.ts`:
+
+```typescript
+contextBridge.exposeInMainWorld('electronAPI', {
+  auth: {
+    startGitHubOAuth: () => ipcRenderer.invoke('auth:github-oauth'),
+    getStoredCredentials: () => ipcRenderer.invoke('auth:get-credentials'),
+    clearCredentials: () => ipcRenderer.invoke('auth:clear-credentials'),
+  },
+  app: {
+    getVersion: () => ipcRenderer.invoke('app:version'),
+    onDeepLink: (callback: (url: string) => void) => {
+      ipcRenderer.on('deep-link', (_event: Electron.IpcRendererEvent, url: string) => callback(url));
+    },
+  },
+});
+```
+
+No changes needed — `startGitHubOAuth` already maps to the IPC handler which calls the rewritten `auth.ts`. The Device Flow opens the browser automatically (no BrowserWindow popup).
+
+**Step 2: Update Welcome page to show Device Flow status**
+
+The welcome page's "Sign in with GitHub" button already calls `window.electronAPI.auth.startGitHubOAuth()`. The Device Flow happens entirely in the main process: it opens the browser, polls for the token, and returns the result. The welcome page just needs to show a "waiting for authorization..." state while polling.
+
+Read and update `app/src/app/welcome/page.tsx` to:
+- Show "Waiting for GitHub authorization..." after clicking sign in
+- Show the user_code if available (optional enhancement — the basic flow works without UI changes since Device Flow opens browser automatically)
+
+**Step 3: Recompile Electron and verify**
+
+Run:
+```bash
+cd app && pnpm exec tsc -p electron/tsconfig.json
+```
+
+**Step 4: Commit**
+
+```bash
+git add app/electron/preload.ts app/electron/main.ts app/src/app/welcome/page.tsx
+git commit -m "feat(app): update welcome page for Device Flow auth"
+```
+
+---
+
+### Task 8: Rebuild DMG with Device Flow, update E2E design doc
+
+**Files:**
+- Modify: `docs/plan/2026-03-04-chat-app-e2e-design.md` (update auth sections)
+
+**Step 1: Update E2E design doc auth references**
+
+In `docs/plan/2026-03-04-chat-app-e2e-design.md`:
+- Update §3 `helpers/auth-helpers.ts` to reference Device Flow
+- Update Suite 2 description to reflect Device Flow test approach
+- Note that E2E tests use `test-init` endpoint (not Device Flow) for auth
+
+**Step 2: Rebuild DMG**
+
+```bash
+cd app
+pnpm exec tsc -p electron/tsconfig.json
+pnpm run build
+rm -rf release/
+pnpm exec electron-builder --mac dmg
+```
+
+**Step 3: Reinstall to /Applications**
+
+```bash
+rm -rf /Applications/EZAgent.app
+cp -R release/mac-arm64/EZAgent.app /Applications/
+cp release/EZAgent-*-arm64.dmg /Users/h2oslabs/Workspace/ezagent42/monorepo/
+```
+
+**Step 4: Commit**
+
+```bash
+git add docs/plan/2026-03-04-chat-app-e2e-design.md
+git commit -m "docs(app): update E2E design for Device Flow + rebuild DMG"
+```
+
+---
+## Milestone 1: Infrastructure Setup (Tasks 9–13)
+
+### Task 9: Install Playwright and create config
 
 **Files:**
 - Modify: `app/package.json` (add devDependencies + scripts)
@@ -81,7 +772,7 @@ git commit -m "feat(app): add Playwright E2E infrastructure and config"
 
 ---
 
-### Task 2: Add test-mode auth endpoint to daemon
+### Task 10: Add test-mode auth endpoint to daemon
 
 The daemon's `POST /api/auth/github` requires a real GitHub token (calls GitHub API). For E2E tests, we need a bypass endpoint that initializes identity and session without GitHub.
 
@@ -169,7 +860,7 @@ git commit -m "feat(ezagent): add test-init auth endpoint for E2E testing (gated
 
 ---
 
-### Task 3: Create E2E helper modules
+### Task 11: Create E2E helper modules
 
 **Files:**
 - Create: `app/e2e/helpers/wait-helpers.ts`
@@ -506,7 +1197,7 @@ git commit -m "feat(app): add E2E helper modules (API client, WS client, auth, w
 
 ---
 
-### Task 4: Create Electron app fixture
+### Task 12: Create Electron app fixture
 
 **Files:**
 - Create: `app/e2e/fixtures/electron-app.ts`
@@ -680,7 +1371,7 @@ git commit -m "feat(app): add Electron fixture and test data constants for E2E"
 
 ---
 
-### Task 5: Update Electron main.ts to support EZAGENT_E2E env
+### Task 13: Update Electron main.ts to support EZAGENT_E2E env
 
 The daemon must be started with `EZAGENT_E2E=1` environment variable passed through so the test-init endpoint works.
 
@@ -730,9 +1421,9 @@ git commit -m "feat(app): pass environment variables through to daemon subproces
 
 ---
 
-## Milestone 2: Suite 1 — App Lifecycle (Tasks 6–7)
+## Milestone 2: E2E Test Suites (Tasks 14–23)
 
-### Task 6: Write app-lifecycle E2E tests
+### Task 14: Write app-lifecycle E2E tests
 
 **Files:**
 - Create: `app/e2e/app-lifecycle.e2e.ts`
@@ -871,7 +1562,7 @@ git commit -m "test(app): add E2E app lifecycle tests (TC-5-PKG-003~006)"
 
 ---
 
-### Task 7: Write auth-flow E2E tests
+### Task 15: Write auth-flow E2E tests
 
 **Files:**
 - Create: `app/e2e/auth-flow.e2e.ts`
@@ -973,9 +1664,8 @@ git commit -m "test(app): add E2E auth flow tests (TC-5-AUTH-001~005)"
 
 ---
 
-## Milestone 3: Suite 3 — Room CRUD (Task 8)
 
-### Task 8: Write room-crud E2E tests
+### Task 16: Write room-crud E2E tests
 
 **Files:**
 - Create: `app/e2e/room-crud.e2e.ts`
@@ -1100,9 +1790,8 @@ git commit -m "test(app): add E2E room CRUD tests (TC-5-JOURNEY-001/002)"
 
 ---
 
-## Milestone 4: Suite 4 — Messaging (Task 9)
 
-### Task 9: Write messaging E2E tests
+### Task 17: Write messaging E2E tests
 
 **Files:**
 - Create: `app/e2e/messaging.e2e.ts`
@@ -1241,9 +1930,8 @@ git commit -m "test(app): add E2E messaging tests (TC-5-UI-001~005)"
 
 ---
 
-## Milestone 5: Suite 5 — Render Pipeline (Task 10)
 
-### Task 10: Write render-pipeline E2E tests
+### Task 18: Write render-pipeline E2E tests
 
 **Files:**
 - Create: `app/e2e/render-pipeline.e2e.ts`
@@ -1383,9 +2071,8 @@ git commit -m "test(app): add E2E render pipeline tests (TC-5-RENDER, TC-5-DECOR
 
 ---
 
-## Milestone 6: Suite 6 — Tabs & Panels (Task 11)
 
-### Task 11: Write tabs-panels E2E tests
+### Task 19: Write tabs-panels E2E tests
 
 **Files:**
 - Create: `app/e2e/tabs-panels.e2e.ts`
@@ -1485,9 +2172,8 @@ git commit -m "test(app): add E2E tabs and panels tests (TC-5-TAB, TC-5-UI)"
 
 ---
 
-## Milestone 7: Suite 7 — Deep Links (Task 12)
 
-### Task 12: Write deep-links E2E tests
+### Task 20: Write deep-links E2E tests
 
 **Files:**
 - Create: `app/e2e/deep-links.e2e.ts`
@@ -1559,9 +2245,8 @@ git commit -m "test(app): add E2E deep link tests (TC-5-URI-001~003)"
 
 ---
 
-## Milestone 8: Suite 8 — Tray & Window (Task 13)
 
-### Task 13: Write tray-window E2E tests
+### Task 21: Write tray-window E2E tests
 
 **Files:**
 - Create: `app/e2e/tray-window.e2e.ts`
@@ -1682,9 +2367,8 @@ git commit -m "test(app): add E2E tray and window lifecycle tests (TC-5-PKG-003~
 
 ---
 
-## Milestone 9: Suite 9 — Widget SDK (Task 14)
 
-### Task 14: Write widget-sdk E2E tests
+### Task 22: Write widget-sdk E2E tests
 
 **Files:**
 - Create: `app/e2e/widget-sdk.e2e.ts`
@@ -1747,9 +2431,8 @@ git commit -m "test(app): add E2E widget SDK tests (TC-5-WIDGET)"
 
 ---
 
-## Milestone 10: Suite 10 — Real-time Sync (Task 15)
 
-### Task 15: Write realtime-sync E2E tests
+### Task 23: Write realtime-sync E2E tests
 
 **Files:**
 - Create: `app/e2e/realtime-sync.e2e.ts`
@@ -1844,9 +2527,10 @@ git commit -m "test(app): add E2E real-time sync tests (TC-5-SYNC-001~005)"
 
 ---
 
-## Milestone 11: Full Suite Run & Cleanup (Tasks 16–17)
+## Milestone 3: Full Suite Run & Cleanup (Tasks 24–26)
 
-### Task 16: Run full E2E suite and fix failures
+
+### Task 24: Run full E2E suite and fix failures
 
 **Step 1: Kill any running EZAgent instances**
 
@@ -1878,7 +2562,7 @@ git commit -m "fix(app): fix E2E test failures from full suite run"
 
 ---
 
-### Task 17: Add E2E section to vitest config exclude
+### Task 25: Add E2E section to vitest config exclude
 
 The existing Vitest config includes `**/*.e2e.ts` in its test pattern. We need to exclude the Playwright E2E files from Vitest since they use `@playwright/test` (not Vitest).
 
@@ -1932,9 +2616,8 @@ git commit -m "fix(app): exclude e2e/ directory from Vitest (uses Playwright)"
 
 ---
 
-## Milestone 12: Documentation & Final Commit (Task 18)
 
-### Task 18: Remove old skipped E2E files and update docs
+### Task 26: Remove old skipped E2E files and update docs
 
 **Files:**
 - Delete: `app/src/__tests__/e2e/cross-device-auth.e2e.ts`
@@ -1970,23 +2653,16 @@ git commit -m "refactor(app): replace manual E2E docs with Playwright E2E suite"
 
 ---
 
+
 ## Summary
 
 | Milestone | Tasks | Tests Added | Description |
 |-----------|-------|-------------|-------------|
-| 1: Infrastructure | 1–5 | 0 | Playwright config, helpers, fixtures, test-init endpoint |
-| 2: App Lifecycle | 6–7 | ~12 | Launch, daemon, quit, auth flow |
-| 3: Room CRUD | 8 | ~6 | Create, list, navigate rooms |
-| 4: Messaging | 9 | ~6 | Send, receive, order, virtual scroll |
-| 5: Render Pipeline | 10 | ~6 | Text, markdown, code, decorators |
-| 6: Tabs & Panels | 11 | ~4 | Tab switching, info panel, sidebar |
-| 7: Deep Links | 12 | ~3 | URI navigation, error handling |
-| 8: Tray & Window | 13 | ~3 | Hide/show, tray persistence |
-| 9: Widget SDK | 14 | ~2 | Widget render, error boundary |
-| 10: Real-time Sync | 15 | ~5 | WebSocket, typing, presence |
-| 11: Full Suite Run | 16 | 0 | Triage and fix failures |
-| 12: Cleanup | 17–18 | 0 | Config, remove old files |
+| **0: Device Flow Migration** | 1–8 | 0 | Update 6 docs, rewrite auth.ts, rebuild DMG |
+| **1: E2E Infrastructure** | 9–13 | 0 | Playwright config, helpers, fixtures, test-init endpoint |
+| **2: E2E Test Suites** | 14–23 | ~47 | 10 suites covering all TC-5-* test cases |
+| **3: Full Suite Run & Cleanup** | 24–26 | 0 | Triage failures, config fix, remove old files |
 
-**Total: 18 tasks, ~47 E2E tests across 10 suites**
+**Total: 26 tasks, ~47 E2E tests across 10 suites**
 
 Note: The test count is lower than the 82 design test cases because some TC-5-* cases test backend API behavior that's already validated by the unit test suite. The E2E tests focus on **user-visible integration** — the complete chain from UI interaction through daemon API to rendered result. Additional test cases from the design doc can be added incrementally as the API matures (e.g., structured_card, media_message, document_link renderers depend on backend support for those content types).
