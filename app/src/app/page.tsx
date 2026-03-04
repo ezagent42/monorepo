@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { electronAuth } from '@/lib/electron/ipc';
 import WelcomePage from './welcome/page';
@@ -29,8 +30,16 @@ export default function Home() {
 
   // In Next.js static export, we use client-side routing
   if (isAuthenticated) {
-    // Will be replaced with proper routing in Task 11
-    return <div>Authenticated! Chat UI coming in Milestone 4.</div>;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Link
+          href="/chat"
+          className="text-primary underline underline-offset-4 hover:text-primary/80"
+        >
+          Open Chat
+        </Link>
+      </div>
+    );
   }
 
   // Render welcome page inline (static export doesn't support next/navigation redirect)
