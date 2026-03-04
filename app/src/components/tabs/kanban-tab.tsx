@@ -34,6 +34,12 @@ export interface KanbanColumn {
 /**
  * Kanban board tab - displays messages as cards in columns by Flow state.
  * Drag-and-drop triggers flow transitions.
+ *
+ * Real-time sync (TC-5-SYNC-004): The messages prop comes from the Zustand
+ * message store, which is updated by WebSocket event handlers
+ * (registerDefaultHandlers). When flow_state changes arrive via WS, the store
+ * updates and React re-renders this board automatically — no additional
+ * plumbing is required.
  */
 export function KanbanTab({ messages, columns, viewerRoles, onTransition }: KanbanTabProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
