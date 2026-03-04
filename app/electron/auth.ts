@@ -1,14 +1,21 @@
-import { BrowserWindow, safeStorage } from 'electron';
-import path from 'path';
+import { shell } from 'electron';
 import fs from 'fs';
+import path from 'path';
 import os from 'os';
 
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || 'PLACEHOLDER_CLIENT_ID';
-const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || 'PLACEHOLDER_CLIENT_SECRET';
-const GITHUB_AUTH_URL = 'https://github.com/login/oauth/authorize';
+const GITHUB_CLIENT_ID = 'Iv23likJpbvAY27c18tA';
+const GITHUB_DEVICE_CODE_URL = 'https://github.com/login/device/code';
 const GITHUB_TOKEN_URL = 'https://github.com/login/oauth/access_token';
-const BACKEND_URL = process.env.EZAGENT_BACKEND_URL || 'http://localhost:8847';
+const BACKEND_URL = process.env.EZAGENT_BACKEND_URL || 'http://localhost:6142';
 const CREDENTIALS_PATH = path.join(os.homedir(), '.ezagent', 'app-credentials.json');
+
+export interface DeviceCodeResponse {
+  device_code: string;
+  user_code: string;
+  verification_uri: string;
+  expires_in: number;
+  interval: number;
+}
 
 export interface AuthResult {
   entity_id: string;
@@ -18,62 +25,19 @@ export interface AuthResult {
 }
 
 /**
- * Opens a BrowserWindow for GitHub OAuth authorization.
- * Intercepts the redirect to extract the authorization code,
- * exchanges it for an access token, and sends it to the backend.
+ * Initiates GitHub Device Flow authentication.
+ *
+ * 1. Requests a device code from GitHub
+ * 2. Returns the user_code for the renderer to display
+ * 3. Opens the browser to the verification URI
+ * 4. Polls for the access token
+ * 5. Exchanges the token with the backend
+ *
+ * No client_secret needed — Device Flow is designed for public clients.
  */
 export async function startGitHubOAuth(): Promise<AuthResult> {
-  // 1. Open BrowserWindow to GitHub OAuth
-  const authWindow = new BrowserWindow({
-    width: 600,
-    height: 700,
-    show: true,
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-    },
-  });
-
-  const authUrl = `${GITHUB_AUTH_URL}?client_id=${encodeURIComponent(GITHUB_CLIENT_ID)}&scope=read:user`;
-  authWindow.loadURL(authUrl);
-
-  // 2. Listen for redirect with code
-  const code = await new Promise<string>((resolve, reject) => {
-    authWindow.webContents.on('will-redirect', (_event, url) => {
-      try {
-        const urlObj = new URL(url);
-        const authCode = urlObj.searchParams.get('code');
-        if (authCode) {
-          resolve(authCode);
-          authWindow.close();
-        }
-      } catch {
-        // Ignore malformed URLs
-      }
-    });
-
-    // Also handle will-navigate for some OAuth flows where the redirect
-    // is a navigation rather than a redirect
-    authWindow.webContents.on('will-navigate', (_event, url) => {
-      try {
-        const urlObj = new URL(url);
-        const authCode = urlObj.searchParams.get('code');
-        if (authCode) {
-          resolve(authCode);
-          authWindow.close();
-        }
-      } catch {
-        // Ignore malformed URLs
-      }
-    });
-
-    authWindow.on('closed', () => {
-      reject(new Error('Auth window closed by user'));
-    });
-  });
-
-  // 3. Exchange code for access token
-  const tokenResponse = await fetch(GITHUB_TOKEN_URL, {
+  // 1. Request device code
+  const deviceRes = await fetch(GITHUB_DEVICE_CODE_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -81,39 +45,36 @@ export async function startGitHubOAuth(): Promise<AuthResult> {
     },
     body: JSON.stringify({
       client_id: GITHUB_CLIENT_ID,
-      client_secret: GITHUB_CLIENT_SECRET,
-      code,
+      scope: 'read:user',
     }),
   });
 
-  const tokenData = (await tokenResponse.json()) as {
-    access_token?: string;
-    error?: string;
-    error_description?: string;
-  };
-
-  if (tokenData.error) {
-    throw new Error(tokenData.error_description || tokenData.error);
+  if (!deviceRes.ok) {
+    throw new Error(`Device code request failed: ${deviceRes.status}`);
   }
 
-  const accessToken = tokenData.access_token;
-  if (!accessToken) {
-    throw new Error('No access token received from GitHub');
-  }
+  const deviceData = (await deviceRes.json()) as DeviceCodeResponse;
+  const { device_code, user_code, verification_uri, interval, expires_in } = deviceData;
 
-  // 4. Send token to backend
-  const backendResponse = await fetch(`${BACKEND_URL}/api/auth/github`, {
+  // 2. Open browser for user to enter the code
+  shell.openExternal(verification_uri);
+
+  // 3. Poll for access token
+  const accessToken = await pollForToken(device_code, interval, expires_in);
+
+  // 4. Exchange with backend
+  const backendRes = await fetch(`${BACKEND_URL}/api/auth/github`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ github_token: accessToken }),
   });
 
-  if (!backendResponse.ok) {
-    const errorText = await backendResponse.text().catch(() => 'Unknown error');
-    throw new Error(`Backend auth failed (${backendResponse.status}): ${errorText}`);
+  if (!backendRes.ok) {
+    const errorText = await backendRes.text().catch(() => 'Unknown error');
+    throw new Error(`Backend auth failed (${backendRes.status}): ${errorText}`);
   }
 
-  const result = (await backendResponse.json()) as AuthResult;
+  const result = (await backendRes.json()) as AuthResult;
 
   // 5. Store credentials
   await storeCredentials(result);
@@ -122,53 +83,114 @@ export async function startGitHubOAuth(): Promise<AuthResult> {
 }
 
 /**
- * Encrypts and stores auth credentials using Electron's safeStorage API.
- * Credentials are written to ~/.ezagent/app-credentials.json.
+ * Returns the device code response for the renderer to display the user_code.
+ * Call this separately if you want to show the code in UI before polling starts.
+ */
+export async function requestDeviceCode(): Promise<DeviceCodeResponse> {
+  const res = await fetch(GITHUB_DEVICE_CODE_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({
+      client_id: GITHUB_CLIENT_ID,
+      scope: 'read:user',
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Device code request failed: ${res.status}`);
+  }
+
+  return res.json();
+}
+
+/**
+ * Polls GitHub for the access token after the user has entered the device code.
+ */
+async function pollForToken(deviceCode: string, interval: number, expiresIn: number): Promise<string> {
+  const deadline = Date.now() + expiresIn * 1000;
+  let pollInterval = interval * 1000;
+
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, pollInterval));
+
+    const res = await fetch(GITHUB_TOKEN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        client_id: GITHUB_CLIENT_ID,
+        device_code: deviceCode,
+        grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+      }),
+    });
+
+    const data = (await res.json()) as {
+      access_token?: string;
+      error?: string;
+      interval?: number;
+    };
+
+    if (data.access_token) {
+      return data.access_token;
+    }
+
+    if (data.error === 'authorization_pending') {
+      continue;
+    }
+
+    if (data.error === 'slow_down') {
+      pollInterval += 5_000;
+      continue;
+    }
+
+    if (data.error === 'expired_token') {
+      throw new Error('Device code expired. Please try again.');
+    }
+
+    if (data.error === 'access_denied') {
+      throw new Error('User denied authorization.');
+    }
+
+    throw new Error(`Unexpected error: ${data.error}`);
+  }
+
+  throw new Error('Device code expired (timeout). Please try again.');
+}
+
+/**
+ * Stores auth credentials to ~/.ezagent/app-credentials.json.
+ * Uses plain JSON (Electron safeStorage can be added later for encryption).
  */
 async function storeCredentials(data: AuthResult): Promise<void> {
   const dir = path.dirname(CREDENTIALS_PATH);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-
-  if (!safeStorage.isEncryptionAvailable()) {
-    // Fallback: store unencrypted if safeStorage is not available
-    // (e.g., on some Linux systems without a keyring)
-    fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(data), { mode: 0o600 });
-    return;
-  }
-
-  const encrypted = safeStorage.encryptString(JSON.stringify(data));
-  fs.writeFileSync(CREDENTIALS_PATH, encrypted, { mode: 0o600 });
+  fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(data), { mode: 0o600 });
 }
 
 /**
- * Reads and decrypts stored credentials.
- * Returns null if no credentials exist or decryption is unavailable.
+ * Reads stored credentials. Returns null if none exist.
  */
 export async function getStoredCredentials(): Promise<AuthResult | null> {
   if (!fs.existsSync(CREDENTIALS_PATH)) {
     return null;
   }
-
   try {
-    if (!safeStorage.isEncryptionAvailable()) {
-      // Fallback: try reading as plain JSON
-      const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf-8');
-      return JSON.parse(raw) as AuthResult;
-    }
-
-    const encrypted = fs.readFileSync(CREDENTIALS_PATH);
-    const decrypted = safeStorage.decryptString(encrypted);
-    return JSON.parse(decrypted) as AuthResult;
+    const raw = fs.readFileSync(CREDENTIALS_PATH, 'utf-8');
+    return JSON.parse(raw) as AuthResult;
   } catch {
-    // Corrupted or unreadable credentials
     return null;
   }
 }
 
 /**
- * Deletes stored credentials file.
+ * Deletes stored credentials.
  */
 export async function clearCredentials(): Promise<void> {
   if (fs.existsSync(CREDENTIALS_PATH)) {
