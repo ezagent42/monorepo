@@ -865,26 +865,28 @@ Add `POST /api/auth/github`, `GET /api/auth/session`, `POST /api/auth/logout` to
 
 ---
 
-### Task 9: Electron GitHub OAuth flow
+### Task 9: Electron GitHub Device Flow
 
 **Files:**
-- Create: `app/electron/auth.ts`
-- Modify: `app/electron/main.ts` — register IPC handlers
+- Rewrite: `app/electron/auth.ts` — replace OAuth BrowserWindow with Device Flow
+- Modify: `app/electron/main.ts` — register IPC handlers (unchanged)
 
-Implements the OAuth BrowserWindow that opens GitHub authorization, intercepts the redirect, exchanges the code for a token, and calls the backend `/api/auth/github`.
+Implements the Device Flow: POST to `/login/device/code` to get `user_code` + `device_code`, display code to user via IPC to renderer, open browser to `github.com/login/device`, poll `/login/oauth/access_token` with `device_code` at `interval` until success/failure, then call backend `/api/auth/github` with the token.
+
+Client ID: `Iv23likJpbvAY27c18tA` (GitHub App "EZAgent Login")
 
 **Covers:** TC-5-AUTH-001, TC-5-AUTH-004
 
 ---
 
-### Task 10: Welcome page + auth flow UI
+### Task 10: Welcome page — Device Flow UI
 
 **Files:**
-- Create: `app/src/app/welcome/page.tsx`
-- Create: `app/src/lib/electron/ipc.ts`
+- Rewrite: `app/src/app/welcome/page.tsx` — Device Flow verification code display
+- Modify: `app/src/lib/electron/ipc.ts` — add device flow IPC methods
 - Test: `app/src/app/welcome/__tests__/welcome.test.tsx`
 
-Implements the welcome/onboarding page with "Sign in with GitHub" button. Uses Electron IPC to trigger OAuth. On success, stores credentials and redirects to `/chat`.
+Welcome page shows "Sign in with GitHub" button. On click, triggers Device Flow via IPC. App transitions to verification code display: large user_code, "Open GitHub" button, polling status indicator. On success, stores credentials and redirects to `/chat`.
 
 **Covers:** TC-5-AUTH-001, TC-5-AUTH-002, TC-5-AUTH-005, TC-5-JOURNEY-001
 
