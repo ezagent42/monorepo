@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { useRoomStore } from '@/stores/room-store';
 import { useMessageStore } from '@/stores/message-store';
 import { Timeline } from '@/components/chat/Timeline';
+import { RoomHeader } from '@/components/chat/RoomHeader';
+import { ComposeArea } from '@/components/chat/ComposeArea';
 import { listMessages } from '@/lib/api/messages';
 
 export default function ChatPage() {
@@ -28,5 +30,11 @@ export default function ChatPage() {
     );
   }
 
-  return <Timeline roomId={activeRoomId} />;
+  return (
+    <>
+      <RoomHeader />
+      <Timeline roomId={activeRoomId} />
+      <ComposeArea roomId={activeRoomId} />
+    </>
+  );
 }
