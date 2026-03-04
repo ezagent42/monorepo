@@ -13,6 +13,7 @@ export default defineConfig({
     include: [
       '**/*.{test,spec,e2e}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
     ],
+    exclude: ['node_modules/**', 'e2e/**'],
   },
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },

@@ -17,6 +17,7 @@
 
 import { ChildProcess, spawn } from 'child_process';
 import http from 'http';
+import path from 'path';
 
 // --- Constants (mirrored in src/lib/electron/daemon-config.ts for testing) ---
 
@@ -28,8 +29,29 @@ export type DaemonStatus = 'stopped' | 'starting' | 'running' | 'error';
 
 // --- Pure helpers (mirrored in src/lib/electron/daemon-config.ts) ---
 
+/**
+ * Returns the command to start the daemon using the bundled Python runtime.
+ * In production: uses `{resourcesPath}/runtime/bin/python3.12`
+ * In development: uses `python3.12` on PATH
+ */
 function getDaemonCommand(): { command: string; args: string[] } {
-  return { command: 'ezagent', args: ['serve'] };
+  let pythonBin = 'python3.12';
+  try {
+    // In packaged app, process.resourcesPath points to the app's Resources dir
+    const resourcesPath = process.resourcesPath;
+    const bundledPython = path.join(resourcesPath, 'runtime', 'bin', 'python3.12');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require('fs');
+    if (fs.existsSync(bundledPython)) {
+      pythonBin = bundledPython;
+    }
+  } catch {
+    // process.resourcesPath may not exist in dev; fall through to PATH
+  }
+  return {
+    command: pythonBin,
+    args: ['-m', 'uvicorn', 'ezagent.server:app', '--host', '127.0.0.1', '--port', String(DAEMON_PORT)],
+  };
 }
 
 function getHealthCheckUrl(): string {
@@ -71,6 +93,9 @@ export class DaemonManager {
     this.process = spawn(command, args, {
       stdio: 'pipe',
       detached: false,
+      env: {
+        ...process.env,
+      },
     });
 
     this.process.on('error', (err: Error) => {
