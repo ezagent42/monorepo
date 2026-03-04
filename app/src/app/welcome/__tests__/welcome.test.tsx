@@ -37,7 +37,10 @@ describe('WelcomePage', () => {
     render(<WelcomePage />);
     fireEvent.click(screen.getByText('Sign in with GitHub'));
     await waitFor(() => {
-      expect(screen.getByText('Signing in...')).toBeInTheDocument();
+      expect(screen.getByText('Waiting for GitHub authorization...')).toBeInTheDocument();
+      expect(
+        screen.getByText('A browser window has opened. Please authorize there and return here.')
+      ).toBeInTheDocument();
     });
   });
 

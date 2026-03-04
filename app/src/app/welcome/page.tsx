@@ -40,8 +40,13 @@ export default function WelcomePage() {
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <Button onClick={handleGitHubLogin} disabled={isLoading} className="w-full">
-            {isLoading ? 'Signing in...' : 'Sign in with GitHub'}
+            {isLoading ? 'Waiting for GitHub authorization...' : 'Sign in with GitHub'}
           </Button>
+          {isLoading && (
+            <p className="text-sm text-muted-foreground text-center">
+              A browser window has opened. Please authorize there and return here.
+            </p>
+          )}
           {error && <p className="text-sm text-destructive text-center">{error}</p>}
         </CardContent>
       </Card>
