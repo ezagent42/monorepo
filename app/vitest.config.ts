@@ -10,6 +10,9 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     css: true,
     passWithNoTests: true,
+    include: [
+      '**/*.{test,spec,e2e}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}',
+    ],
   },
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },

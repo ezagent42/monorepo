@@ -3,6 +3,7 @@
  *
  * Endpoints:
  *   GET  /api/rooms              — list joined rooms
+ *   POST /api/rooms              — create a new room
  *   GET  /api/rooms/{id}         — get room config
  *   GET  /api/rooms/{id}/views   — room tab views
  *   GET  /api/rooms/{id}/members — room member list
@@ -16,6 +17,13 @@ import type { Room, RoomMember, RoomTabConfig } from '@/types';
  */
 export function listRooms(): Promise<Room[]> {
   return api.get<Room[]>('/api/rooms');
+}
+
+/**
+ * Create a new room.
+ */
+export function createRoom(body: { name: string; description: string }): Promise<Room> {
+  return api.post<Room>('/api/rooms', body);
 }
 
 /**
