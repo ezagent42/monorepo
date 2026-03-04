@@ -27,7 +27,7 @@ vi.mock('@/components/ui/tabs', () => {
     );
   }
 
-  const TabsList = React.forwardRef<HTMLDivElement, any>(
+  const TabsList = React.forwardRef(
     ({ className, children, __tabValue, __tabOnChange, ...props }: any, ref: any) => (
       <div ref={ref} role="tablist" className={className} {...props}>
         {React.Children.map(children, (child: any) =>
@@ -42,7 +42,7 @@ vi.mock('@/components/ui/tabs', () => {
     ),
   );
 
-  const TabsTrigger = React.forwardRef<HTMLButtonElement, any>(
+  const TabsTrigger = React.forwardRef(
     ({ value, className, children, __tabValue, __tabOnChange, ...props }: any, ref: any) => (
       <button
         ref={ref}
@@ -59,7 +59,7 @@ vi.mock('@/components/ui/tabs', () => {
     ),
   );
 
-  const TabsContent = React.forwardRef<HTMLDivElement, any>(
+  const TabsContent = React.forwardRef(
     ({ value, className, children, __tabValue, __tabOnChange, ...props }: any, ref: any) => {
       if (value !== __tabValue) return null;
       return (

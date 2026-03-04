@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { UriLink, buildEzagentUri } from '../uri-link';
 import { MessageBubble } from '@/components/chat/MessageBubble';
@@ -26,7 +26,7 @@ vi.mock('@radix-ui/react-context-menu', async () => {
         <div ref={ref} role="menuitem" onClick={onSelect} {...props}>{children}</div>
       )
     ),
-    Separator: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+    Separator: React.forwardRef<HTMLHRElement, React.HTMLAttributes<HTMLHRElement>>(
       (props, ref) => <hr ref={ref} {...props} />
     ),
     Label: React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(

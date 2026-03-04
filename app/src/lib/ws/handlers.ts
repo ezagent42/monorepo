@@ -23,12 +23,12 @@ export function registerDefaultHandlers(client: WsClient): void {
     }
   });
 
-  client.on('message.edited', (event: WsEvent) => {
+  client.on('message.edited', (_event: WsEvent) => {
     // Edited messages could be handled by a full message replace
     // For now, treat as annotation update if ref_id present
   });
 
-  client.on('message.deleted', (event: WsEvent) => {
+  client.on('message.deleted', (_event: WsEvent) => {
     // Message deletion - could be handled via annotation or store method
   });
 

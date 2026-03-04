@@ -144,10 +144,8 @@ export class TrayManager {
     // Fallback: create a simple 16x16 programmatic icon (white circle on transparent)
     // This is a minimal PNG encoded as a data URL — a 16x16 filled circle.
     const size = { width: 16, height: 16 };
-    const img = nativeImage.createEmpty();
 
-    // Since nativeImage.createEmpty() gives us nothing useful for a tray,
-    // create a simple buffer with a tiny PNG.
+    // Create a simple buffer with a tiny PNG as fallback.
     // For now, use a 1x1 pixel as absolute minimum — the real icon comes from assets/.
     const fallback = nativeImage.createFromBuffer(
       Buffer.from(
