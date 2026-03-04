@@ -99,13 +99,15 @@ HTTP API path 保留 `/api/` 前缀以区分本地管理接口。URI path 设计
 |-----------|----------|--------|------|
 | status | `/api/status` | GET | 节点状态 |
 
-### §2.6 Authentication (GitHub OAuth)
+### §2.6 Authentication (GitHub Device Flow)
 
 | Operation | Endpoint | Method | 说明 |
 |-----------|----------|--------|------|
 | auth.github | `/api/auth/github` | POST | GitHub token 换取 Entity + 密钥对 |
 | auth.session | `/api/auth/session` | GET | 当前会话信息 |
 | auth.logout | `/api/auth/logout` | POST | 清除会话 |
+
+> **注意**：客户端使用 GitHub App Device Flow（RFC 8628）获取 access_token，只需 `client_id`，无需 `client_secret`。后端 API 不变——仍接收 `github_token` 并调用 GitHub API 验证。Device Flow 的变化完全在 Electron 客户端侧。
 
 **GitHub 认证请求体** (`POST /api/auth/github`)：
 
@@ -451,6 +453,7 @@ async def get_renderers():
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 0.1.4 | 2026-03-04 | §2.6 标题更新: GitHub OAuth → GitHub Device Flow |
 | 0.1.3 | 2026-03-04 | 新增 §2.6 Authentication (GitHub OAuth) 端点 |
 | 0.1.2 | 2026-02-27 | §1 移除 Static Files / Chat UI；端口 8000 → 8847；§1.1 start/serve 命令更新 |
 | 0.1.1 | 2026-02-26 | 新增 §3.14 EXT-15 Command 端点, §3b Socialware 管理 + Agent 管理端点, WebSocket command.* 事件 |
