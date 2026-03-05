@@ -23,6 +23,7 @@ export interface SendMessageBody {
   body: string;
   datatype?: string;
   format?: string;
+  ext?: Record<string, unknown>;
 }
 
 export interface SendMessageResponse {

@@ -6,12 +6,16 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { sendMessage } from '@/lib/api/messages';
 import { useMessageStore } from '@/stores/message-store';
 import { EmojiPicker } from './EmojiPicker';
+import { ReplyPreview } from './ReplyPreview';
+import type { Message } from '@/types';
 
 interface ComposeAreaProps {
   roomId: string;
+  replyTo?: Message | null;
+  onCancelReply?: () => void;
 }
 
-export function ComposeArea({ roomId }: ComposeAreaProps) {
+export function ComposeArea({ roomId, replyTo, onCancelReply }: ComposeAreaProps) {
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -22,17 +26,22 @@ export function ComposeArea({ roomId }: ComposeAreaProps) {
     if (!body || sending) return;
     setSending(true);
     try {
-      const result = await sendMessage(roomId, { body });
+      const msgBody: { body: string; ext?: Record<string, unknown> } = { body };
+      if (replyTo) {
+        msgBody.ext = { reply_to: { ref_id: replyTo.ref_id } };
+      }
+      const result = await sendMessage(roomId, msgBody);
       // Optimistic: add message locally
       addMessage(roomId, result as any);
       setText('');
+      onCancelReply?.();
     } catch {
       // TODO: show error toast
     } finally {
       setSending(false);
       textareaRef.current?.focus();
     }
-  }, [text, sending, roomId, addMessage]);
+  }, [text, sending, roomId, addMessage, replyTo, onCancelReply]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -48,6 +57,7 @@ export function ComposeArea({ roomId }: ComposeAreaProps) {
 
   return (
     <div className="border-t p-3">
+      {replyTo && <ReplyPreview message={replyTo} onClose={() => onCancelReply?.()} />}
       <div className="flex items-end gap-2">
         <textarea
           ref={textareaRef}
