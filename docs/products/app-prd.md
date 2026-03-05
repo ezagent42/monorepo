@@ -2,7 +2,7 @@
 
 > **状态**：Draft
 > **日期**：2026-03-04
-> **前置文档**：ezagent-http-spec-v0.1, ezagent-chat-ui-spec-v0.1
+> **前置文档**：ezagent-http-spec-v0.1, ezagent-chat-ui-spec-v0.1, app-operations-spec-v0.1
 > **作者**：Allen & Claude collaborative design
 > **历史**：从 ezagent-py-spec v0.8 §10-§11 提取 + 新增产品需求
 

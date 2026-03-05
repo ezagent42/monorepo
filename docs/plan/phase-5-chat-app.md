@@ -4,7 +4,7 @@
 > **目标**：终端用户可用——Next.js + Electron Chat UI + Render Pipeline + GitHub OAuth + Desktop 打包
 > **预估周期**：3-4 周
 > **前置依赖**：Phase 4 (CLI + HTTP API) 完成
-> **Spec 依赖**：chat-ui-spec.md, app-prd.md, 2026-03-04-chat-app-design.md
+> **Spec 依赖**：chat-ui-spec.md, app-prd.md, app-operations-spec.md, 2026-03-04-chat-app-design.md
 
 ---
 
