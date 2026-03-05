@@ -5,6 +5,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { SearchBar } from './SearchBar';
 import { ChannelList } from './ChannelList';
+import { ProfilePopover } from '@/components/profile/ProfilePopover';
 
 export function Sidebar() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -19,6 +20,10 @@ export function Sidebar() {
       <ScrollArea className="flex-1">
         <ChannelList searchQuery={searchQuery} />
       </ScrollArea>
+      <Separator />
+      <div className="p-2">
+        <ProfilePopover />
+      </div>
     </aside>
   );
 }
