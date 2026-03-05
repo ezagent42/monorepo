@@ -2,9 +2,13 @@
  * Messages API — wraps timeline/message endpoints.
  *
  * Endpoints:
- *   GET  /api/rooms/{id}/messages                      — paginated message list
- *   POST /api/rooms/{id}/messages                      — send a message
- *   POST /api/rooms/{id}/messages/{ref}/reactions       — add reaction
+ *   GET    /api/rooms/{id}/messages                      — paginated message list
+ *   POST   /api/rooms/{id}/messages                      — send a message
+ *   PUT    /api/rooms/{id}/messages/{ref}                — edit a message
+ *   DELETE /api/rooms/{id}/messages/{ref}                — delete a message
+ *   POST   /api/rooms/{id}/messages/{ref}/reactions       — add reaction
+ *   DELETE /api/rooms/{id}/messages/{ref}/reactions/{emoji} — remove reaction
+ *   POST   /api/rooms/{id}/moderation                    — moderate a message
  */
 
 import { api } from './client';
@@ -55,6 +59,20 @@ export function sendMessage(
 }
 
 /**
+ * Edit an existing message.
+ */
+export function editMessage(roomId: string, refId: string, body: { body: string }): Promise<void> {
+  return api.put<void>(`/api/rooms/${roomId}/messages/${refId}`, body);
+}
+
+/**
+ * Delete a message.
+ */
+export function deleteMessage(roomId: string, refId: string): Promise<void> {
+  return api.delete<void>(`/api/rooms/${roomId}/messages/${refId}`);
+}
+
+/**
  * Add a reaction (emoji) to a message.
  */
 export function addReaction(
@@ -66,4 +84,18 @@ export function addReaction(
     `/api/rooms/${roomId}/messages/${refId}/reactions`,
     { emoji },
   );
+}
+
+/**
+ * Remove a reaction (emoji) from a message.
+ */
+export function removeReaction(roomId: string, refId: string, emoji: string): Promise<void> {
+  return api.delete<void>(`/api/rooms/${roomId}/messages/${refId}/reactions/${encodeURIComponent(emoji)}`);
+}
+
+/**
+ * Moderate a message (e.g. pin, redact).
+ */
+export function moderateMessage(roomId: string, body: { action: string; ref_id: string }): Promise<void> {
+  return api.post<void>(`/api/rooms/${roomId}/moderation`, body);
 }
