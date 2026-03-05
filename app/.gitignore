@@ -7,8 +7,10 @@ node_modules/
 
 # Build output
 dist/
+dist-electron/
 out/
 build/
+.next/
 
 # Logs
 *.log

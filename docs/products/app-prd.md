@@ -1,8 +1,8 @@
-# ezagent Chat App — Product Requirements Document v0.1
+# ezagent Chat App — Product Requirements Document v0.2
 
 > **状态**：Draft
-> **日期**：2026-02-25
-> **前置文档**：ezagent-http-spec-v0.1, ezagent-chat-ui-spec-v0.1
+> **日期**：2026-03-04
+> **前置文档**：ezagent-http-spec-v0.1, ezagent-chat-ui-spec-v0.1, app-operations-spec-v0.1
 > **作者**：Allen & Claude collaborative design
 > **历史**：从 ezagent-py-spec v0.8 §10-§11 提取 + 新增产品需求
 
@@ -26,7 +26,7 @@ ezagent Chat App 是 ezagent 协议的终端用户入口。用户通过类似 Sl
 
 | 形态 | 技术 | 分发方式 |
 |------|------|---------:|
-| Desktop App (Tray + UI) | 内嵌 Python runtime + Engine + React WebView | DMG (macOS), MSI (Windows), AppImage (Linux) |
+| Desktop App (Tray + UI) | Electron + Next.js static export + 内嵌 Python runtime + Engine | DMG (macOS), MSI (Windows), AppImage (Linux) |
 | Homebrew | `brew install ezagent` → CLI + App + LaunchAgent | macOS |
 | CLI only | `pip install ezagent` | 所有平台 |
 
@@ -38,8 +38,17 @@ ezagent Chat App 是 ezagent 协议的终端用户入口。用户通过类似 Sl
 
 ```
 1. 下载 → 安装 → 双击打开
-2. 欢迎页面：输入 name + 选择 Relay (默认 relay.ezagent.dev)
-   → 自动执行 ezagent init
+   → Electron 启动内嵌 Python runtime → python -m ezagent.server
+   → FastAPI 启动于 localhost:8847
+2. 欢迎页面 → 点击 "Sign in with GitHub"
+   → App 调用 GitHub Device Flow API 获取 device_code + user_code
+   → 显示验证码（如 ABCD-1234）→ 自动打开浏览器到 github.com/login/device
+   → 用户输入验证码并授权
+   → App 轮询获取 access_token
+   → 后端执行 ezagent init（创建 Entity 密钥对）
+   → 绑定 GitHub ID → Entity ID 映射
+   → 密钥存储到 Electron Secure Storage
+   → 选择 Relay (默认 relay.ezagent.dev)
 3. 进入主界面（空状态）
    → 提示 "Create a room" 或 "Enter invite code"
 4. 创建第一个 Room → 发送第一条消息
@@ -250,6 +259,58 @@ Tray 状态指示:
 
 ---
 
+## §4.9 GitHub Device Flow 认证
+
+### §4.9.1 设计目标
+
+使用 GitHub App Device Flow 作为用户认证方案。Device Flow 专为桌面/CLI 应用设计，只需 `client_id`，**不需要 `client_secret`**（解决桌面安装包无法保密 secret 的问题）。
+
+### §4.9.2 Device Flow 流程
+
+首次使用:
+  App 打开 → Welcome 页面 → "Sign in with GitHub"
+    → POST https://github.com/login/device/code { client_id, scope: "read:user" }
+    → 返回 { device_code, user_code, verification_uri, interval }
+    → App 显示 user_code（如 "ABCD-1234"）+ "Open GitHub" 按钮
+    → 自动打开浏览器到 https://github.com/login/device
+    → 用户在浏览器输入 user_code，点击授权
+    → App 以 interval 间隔轮询:
+      POST https://github.com/login/oauth/access_token
+        { client_id, device_code, grant_type: "urn:ietf:params:oauth:grant-type:device_code" }
+    → 轮询返回 access_token 后:
+      调用后端 POST /api/auth/github { github_token }
+    → 后端验证 token, 获取 GitHub Profile
+    → 新用户: 执行 ezagent init, 创建 Entity 密钥对
+    → 密钥存储到 Electron Secure Storage
+    → 进入主界面
+
+日常登录:
+  App 启动 → 检查 Secure Storage
+    → 有密钥 → 自动登录 → 主界面
+    → 无密钥 (新设备) → Device Flow → 从 Relay 恢复密钥
+
+跨设备密钥恢复:
+  密钥对使用 GitHub user ID 衍生的密钥加密
+  加密 Blob 存储在 Relay 上
+  新设备: Device Flow → 衍生解密密钥 → 解密密钥对
+
+### §4.9.3 后端 API
+
+| Endpoint | Method | 说明 |
+|----------|--------|------|
+| `/api/auth/github` | POST | GitHub token 换取 Entity + 密钥对 |
+| `/api/auth/session` | GET | 当前会话信息 |
+| `/api/auth/logout` | POST | 清除会话 |
+
+### §4.9.4 安全要求
+
+- **无 `client_secret`**：Device Flow 只需 `client_id`（公开值），无需在二进制中嵌入 secret
+- `client_id` 硬编码在 Electron app 中：`Iv23likJpbvAY27c18tA`
+- access_token 仅用于初始认证，日常操作使用 Ed25519 签名
+- 密钥 Blob 使用 AES-256-GCM 加密后存储在 Relay
+
+---
+
 ## §5 验收标准
 
 | # | 场景 | 预期 |
@@ -266,6 +327,9 @@ Tray 状态指示:
 | APP-10 | Tray Quit → Agent 离线 | daemon 停止 |
 | APP-11 | 浏览器/其他应用触发 `ezagent://` URI → App 打开并导航到对应资源 | Deep Link 正常 |
 | APP-12 | 右键 Room/Message → "Copy ezagent URI" → 粘贴到其他应用 | URI 格式正确 |
+| APP-13 | 首次打开 → GitHub Device Flow 登录（显示验证码 → 浏览器授权）→ 自动创建 Entity + 进入主界面 | 流程完整 |
+| APP-14 | 新设备 GitHub 登录 → 恢复已有 Entity 密钥对 | 跨设备可用 |
+| APP-15 | 已登录用户重启 App → 自动登录（无需再次 OAuth） | Session 持久化 |
 
 ---
 
@@ -273,5 +337,7 @@ Tray 状态指示:
 
 | 版本 | 日期 | 变更 |
 |------|------|------|
+| 0.3 | 2026-03-04 | §1.3 交付形态更新为 Electron + Next.js；§2.1 首次使用更新为 GitHub OAuth 流程；新增 §4.9 GitHub OAuth 认证；验收标准新增 APP-13/14/15 |
+| 0.2 | 2026-03-04 | §4.9 GitHub OAuth Web Flow → GitHub Device Flow（无 client_secret） |
 | 0.2 | 2026-02-27 | §1.3 交付形态重写（Tray 模式）；§4 打包流程完全重写（Tray + daemon + LaunchAgent）；新增 §4.7 Tray 功能定义；验收标准新增 APP-9/APP-10 |
 | 0.1 | 2026-02-25 | 从 py-spec v0.8 §10-§11 提取。新增用户旅程、信息架构、验收标准 |

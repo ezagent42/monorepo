@@ -1,0 +1,53 @@
+import { test as base, expect, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
+import { waitForDaemon } from '../helpers/wait-helpers';
+import { initTestAuth, injectCredentials } from '../helpers/auth-helpers';
+
+const APP_PATH = '/Applications/EZAgent.app/Contents/MacOS/EZAgent';
+
+type ElectronFixtures = {
+  electronApp: ElectronApplication;
+  page: Page;
+};
+
+/**
+ * Shared fixture that launches the packaged EZAgent app.
+ *
+ * The fixture:
+ * 1. Launches /Applications/EZAgent.app with EZAGENT_E2E=1
+ * 2. Waits for the daemon to become healthy
+ * 3. Initialises a test session via /api/auth/test-init
+ * 4. Injects credentials into the Electron main process
+ * 5. Provides `electronApp` and `page` to each test
+ */
+export const test = base.extend<ElectronFixtures>({
+  electronApp: async ({}, use) => {
+    const app = await electron.launch({
+      executablePath: APP_PATH,
+      env: {
+        ...process.env,
+        EZAGENT_E2E: '1',
+      },
+    });
+
+    // Wait for daemon
+    await waitForDaemon(30_000);
+
+    // Init test auth
+    await initTestAuth();
+    injectCredentials();
+
+    await use(app);
+
+    await app.close();
+  },
+
+  page: async ({ electronApp }, use) => {
+    const page = await electronApp.firstWindow();
+    // Navigate to chat page (credentials were injected before this point)
+    await page.goto('app://./chat');
+    await page.waitForLoadState('domcontentloaded');
+    await use(page);
+  },
+});
+
+export { expect };

@@ -32,8 +32,12 @@ dispatch each request to a different worker thread, which both breaks
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import threading
+import urllib.request
+import urllib.error
 from typing import Callable, Optional
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Response, WebSocket, WebSocketDisconnect
@@ -53,6 +57,10 @@ _engine_factory: Optional[Callable[[], PyEngine]] = None
 
 # Monotonically increasing version; bumped on reset / factory change.
 _engine_version: int = 0
+
+# In-memory cache: content_id → {"body": ..., "format": ...}
+# Used to enrich timeline refs with message body when listing messages.
+_message_body_cache: dict[str, dict] = {}
 
 
 def _default_engine_factory() -> PyEngine:
@@ -105,6 +113,64 @@ def reset_engine() -> None:
     """
     global _engine_version
     _engine_version += 1
+    _message_body_cache.clear()
+
+
+# ---------------------------------------------------------------------------
+# Session storage (in-memory, single user for local desktop app)
+# ---------------------------------------------------------------------------
+
+_session: Optional[dict] = None
+
+
+def clear_session() -> None:
+    """Clear the current session.  Used by tests for teardown."""
+    global _session
+    _session = None
+
+
+# ---------------------------------------------------------------------------
+# GitHub API helper
+# ---------------------------------------------------------------------------
+
+
+def _fetch_github_user(github_token: str) -> dict:
+    """Call GitHub API to get user info from an OAuth token.
+
+    Uses ``urllib.request`` (stdlib) to avoid extra dependencies.
+
+    Returns:
+        dict with keys ``login``, ``id``, ``name``, ``avatar_url``.
+
+    Raises:
+        HTTPException: If the GitHub token is invalid or the API request fails.
+    """
+    req = urllib.request.Request(
+        "https://api.github.com/user",
+        headers={
+            "Authorization": f"Bearer {github_token}",
+            "Accept": "application/vnd.github+json",
+            "User-Agent": "ezagent42",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as exc:
+        if exc.code == 401:
+            raise HTTPException(
+                status_code=401,
+                detail={"error": {"code": "UNAUTHORIZED", "message": "Invalid GitHub token"}},
+            )
+        raise HTTPException(
+            status_code=502,
+            detail={"error": {"code": "GITHUB_API_ERROR", "message": f"GitHub API returned {exc.code}"}},
+        )
+    except urllib.error.URLError as exc:
+        raise HTTPException(
+            status_code=502,
+            detail={"error": {"code": "GITHUB_API_ERROR", "message": str(exc.reason)}},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +207,10 @@ def _map_engine_error(e: RuntimeError) -> HTTPException:
 # ---------------------------------------------------------------------------
 
 
+class GitHubAuthRequest(BaseModel):
+    github_token: str
+
+
 class CreateRoomRequest(BaseModel):
     name: str
 
@@ -171,6 +241,16 @@ app = FastAPI(
     title="ezagent",
     version="0.1.0",
     description="EZAgent42 HTTP API",
+)
+
+# CORS: allow the Electron app (app:// protocol) and dev server to access the API
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 
@@ -215,6 +295,142 @@ def get_pubkey(entity_id: str, engine: PyEngine = Depends(get_engine)):
     except RuntimeError as e:
         raise _map_engine_error(e)
     return {"pubkey": pubkey}
+
+
+# ---------------------------------------------------------------------------
+# Authentication (Task 8)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/auth/github")
+def auth_github(req: GitHubAuthRequest, engine: PyEngine = Depends(get_engine)):
+    """Exchange a GitHub OAuth token for an EZAgent entity + keypair.
+
+    Calls the GitHub API to retrieve user info, maps the GitHub username
+    to an entity_id, and initialises the engine identity for new users.
+    """
+    global _session
+
+    github_user = _fetch_github_user(req.github_token)
+
+    login: str = github_user.get("login", "")
+    github_id: int = github_user.get("id", 0)
+    display_name: str = github_user.get("name") or login
+    avatar_url: str = github_user.get("avatar_url", "")
+
+    entity_id = f"@{login}:relay.ezagent.dev"
+
+    # Check if engine already has this identity initialised.
+    is_new_user = True
+    try:
+        existing = engine.identity_whoami()
+        if existing == entity_id:
+            is_new_user = False
+    except RuntimeError:
+        # Identity not initialised yet -- expected for new users.
+        pass
+
+    # Generate a keypair and initialise the engine identity for new users.
+    keypair_bytes = os.urandom(32)
+    if is_new_user:
+        try:
+            engine.identity_init(entity_id, keypair_bytes)
+        except RuntimeError as e:
+            raise _map_engine_error(e)
+
+    keypair_b64 = base64.b64encode(keypair_bytes).decode()
+
+    _session = {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "avatar_url": avatar_url,
+        "github_id": github_id,
+    }
+
+    return {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "avatar_url": avatar_url,
+        "keypair": keypair_b64,
+        "is_new_user": is_new_user,
+    }
+
+
+@app.post("/api/auth/test-init")
+def auth_test_init(
+    engine: PyEngine = Depends(get_engine),
+):
+    """Initialise identity for E2E testing — only available when EZAGENT_E2E=1.
+
+    This bypasses GitHub OAuth entirely, creating a test entity with a
+    random keypair. Used by Playwright E2E tests.
+    """
+    if os.environ.get("EZAGENT_E2E") != "1":
+        raise HTTPException(
+            status_code=403,
+            detail={"error": {"code": "FORBIDDEN", "message": "test-init only available in E2E mode (EZAGENT_E2E=1)"}},
+        )
+
+    global _session
+
+    entity_id = "@e2e-tester:relay.ezagent.dev"
+    display_name = "E2E Tester"
+
+    # Check if already initialised.
+    try:
+        existing = engine.identity_whoami()
+        if existing == entity_id:
+            _session = {
+                "entity_id": entity_id,
+                "display_name": display_name,
+                "avatar_url": "",
+                "github_id": 0,
+            }
+            return {
+                "entity_id": entity_id,
+                "display_name": display_name,
+                "is_new_user": False,
+            }
+    except RuntimeError:
+        pass
+
+    keypair_bytes = os.urandom(32)
+    try:
+        engine.identity_init(entity_id, keypair_bytes)
+    except RuntimeError as e:
+        raise _map_engine_error(e)
+
+    _session = {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "avatar_url": "",
+        "github_id": 0,
+    }
+
+    return {
+        "entity_id": entity_id,
+        "display_name": display_name,
+        "is_new_user": True,
+    }
+
+
+@app.get("/api/auth/session")
+def auth_session():
+    """Return current session info, or 401 if not authenticated."""
+    if _session is None:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": {"code": "UNAUTHORIZED", "message": "Not authenticated"}},
+        )
+    return {**_session, "authenticated": True}
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    """Clear the current session."""
+    global _session
+    _session = None
+    return {"status": "ok"}
 
 
 # ---------------------------------------------------------------------------
@@ -332,11 +548,28 @@ def send_message(
     req: SendMessageRequest,
     engine: PyEngine = Depends(get_engine),
 ):
-    """Send a message to a room."""
+    """Send a message to a room and return enriched response."""
     try:
         body_json = json.dumps(req.body)
         content_json = engine.message_send(room_id, body_json, req.format)
-        return json.loads(content_json)
+        content = json.loads(content_json)
+        # Cache body so list_messages can enrich timeline refs
+        cid = content.get("content_id", "")
+        if cid:
+            _message_body_cache[cid] = {"body": req.body, "format": req.format}
+        # Return enriched response matching frontend Message type
+        return {
+            "ref_id": cid,
+            "content_id": cid,
+            "room_id": room_id,
+            "author": content.get("author", ""),
+            "timestamp": content.get("created_at", ""),
+            "datatype": "message",
+            "body": req.body,
+            "format": req.format,
+            "annotations": {},
+            "ext": {},
+        }
     except RuntimeError as e:
         raise _map_engine_error(e)
 
@@ -348,7 +581,7 @@ def list_messages(
     before: Optional[str] = Query(default=None),
     engine: PyEngine = Depends(get_engine),
 ):
-    """List timeline refs for a room with optional pagination."""
+    """List messages for a room, enriched with body content."""
     try:
         ref_ids = engine.timeline_list(room_id)
 
@@ -369,7 +602,22 @@ def list_messages(
         results = []
         for ref_id in ref_ids:
             ref_json = engine.timeline_get_ref(room_id, ref_id)
-            results.append(json.loads(ref_json))
+            ref_data = json.loads(ref_json)
+            # Enrich with body from cache (content_id → body mapping)
+            content_id = ref_data.get("content_id", "")
+            cached = _message_body_cache.get(content_id, {})
+            enriched = {
+                "ref_id": ref_data.get("ref_id", ref_id),
+                "room_id": room_id,
+                "author": ref_data.get("author", ""),
+                "timestamp": ref_data.get("created_at", ""),
+                "datatype": "message",
+                "body": cached.get("body", ""),
+                "format": cached.get("format", "text/plain"),
+                "annotations": {},
+                "ext": ref_data.get("ext", {}),
+            }
+            results.append(enriched)
         return results
     except RuntimeError as e:
         raise _map_engine_error(e)
@@ -381,10 +629,23 @@ def get_message(
     ref_id: str,
     engine: PyEngine = Depends(get_engine),
 ):
-    """Get a specific timeline ref."""
+    """Get a specific message, enriched with body content."""
     try:
         ref_json = engine.timeline_get_ref(room_id, ref_id)
-        return json.loads(ref_json)
+        ref_data = json.loads(ref_json)
+        content_id = ref_data.get("content_id", "")
+        cached = _message_body_cache.get(content_id, {})
+        return {
+            "ref_id": ref_data.get("ref_id", ref_id),
+            "room_id": room_id,
+            "author": ref_data.get("author", ""),
+            "timestamp": ref_data.get("created_at", ""),
+            "datatype": "message",
+            "body": cached.get("body", ""),
+            "format": cached.get("format", "text/plain"),
+            "annotations": {},
+            "ext": ref_data.get("ext", {}),
+        }
     except RuntimeError as e:
         raise _map_engine_error(e)
 

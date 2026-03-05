@@ -1,10 +1,10 @@
 # Phase 5: Chat App
 
-> **版本**：0.9
-> **目标**：终端用户可用——React Chat UI + Render Pipeline + Desktop 打包
+> **版本**：1.0
+> **目标**：终端用户可用——Next.js + Electron Chat UI + Render Pipeline + GitHub OAuth + Desktop 打包
 > **预估周期**：3-4 周
 > **前置依赖**：Phase 4 (CLI + HTTP API) 完成
-> **Spec 依赖**：chat-ui-spec.md, app-prd.md
+> **Spec 依赖**：chat-ui-spec.md, app-prd.md, app-operations-spec.md, 2026-03-04-chat-app-design.md
 
 ---
 
@@ -745,16 +745,23 @@ THEN   Info Panel 区域切换为 Thread Panel
 
 > **Spec 引用**：app-prd §2
 
-### TC-5-JOURNEY-001: 首次使用完整流程
+### TC-5-JOURNEY-001: 首次使用完整流程（GitHub OAuth）
 
 ```
 GIVEN  全新安装
 
-WHEN   双击打开 → 欢迎页面
-       输入 name="alice", relay="relay.ezagent.dev"
-       → 点击 "Create Identity"
+WHEN   双击打开
+       → Electron 启动内嵌 Python runtime → FastAPI on :8847
+       → 欢迎页面
+       → 点击 "Sign in with GitHub"
+       → Electron 打开 GitHub OAuth 授权窗口
+       → 用户授权 GitHub App
+       → 获取 GitHub Profile (name, avatar, email)
 
-THEN   自动执行 ezagent init
+THEN   后端执行 ezagent init，创建 Entity 密钥对
+       绑定 GitHub ID → Entity ID 映射
+       密钥存储到 Electron Secure Storage
+       选择 Relay (默认 relay.ezagent.dev)
        进入主界面（空状态）
        提示 "Create a room" 或 "Enter invite code"
 ```
@@ -794,6 +801,87 @@ WHEN   Peer-A 发送 "Hello"
 
 THEN   两端实时看到对方消息（延迟 < 2s LAN / < 5s 跨网络）
        消息顺序一致（CRDT 保证最终一致性）
+```
+
+---
+
+## §8b GitHub Device Flow 认证
+
+> **Spec 引用**：app-prd §4.9
+
+### TC-5-AUTH-001: Device Flow 首次登录
+
+```
+GIVEN  全新安装，无本地密钥
+
+WHEN   用户点击 "Sign in with GitHub"
+       → App 调用 POST https://github.com/login/device/code
+       → App 显示 user_code + "Open GitHub" 按钮
+       → 用户在浏览器中输入验证码并授权
+       → App 轮询获取 access_token
+       → POST /api/auth/github { github_token }
+
+THEN   后端验证 token，获取 GitHub Profile
+       创建 Entity 密钥对
+       返回 { entity_id, keypair, profile }
+       密钥存储到 Electron Secure Storage
+       UI 显示用户头像和名称（来自 GitHub）
+       进入主界面
+```
+
+### TC-5-AUTH-002: 已登录用户自动登录
+
+```
+GIVEN  之前已通过 Device Flow 登录，密钥存在于 Secure Storage
+
+WHEN   用户重启 App
+
+THEN   自动从 Secure Storage 加载密钥
+       无需再次 Device Flow
+       直接进入主界面
+       启动时间 < 3 秒
+```
+
+### TC-5-AUTH-003: 跨设备密钥恢复
+
+```
+GIVEN  用户 alice 在设备 A 已登录
+       密钥 Blob 已加密存储在 Relay
+
+WHEN   用户在设备 B（全新安装）点击 "Sign in with GitHub"
+       → Device Flow → 获取同一 GitHub ID
+
+THEN   后端发现 github_id → entity_id 映射已存在
+       返回加密的密钥 Blob
+       Electron 使用 GitHub user ID 衍生密钥解密
+       设备 B 恢复同一 Entity 密钥对
+       两台设备可作为同一用户使用
+```
+
+### TC-5-AUTH-004: Device Flow 失败处理
+
+```
+GIVEN  网络不稳定 或 用户拒绝授权 或 验证码过期
+
+WHEN   Device Flow 中断
+
+THEN   验证码过期: 显示"验证码已过期，请重试"，提供重试按钮
+       用户拒绝: 显示"授权被拒绝"
+       网络错误: 显示"网络错误，请重试"
+       不创建任何 Entity
+```
+
+### TC-5-AUTH-005: 登出
+
+```
+GIVEN  用户已登录
+
+WHEN   用户在设置中点击 "Sign out"
+
+THEN   调用 POST /api/auth/logout
+       清除 Electron Secure Storage 中的密钥
+       返回欢迎页面
+       Tray 状态变为离线 (◇)
 ```
 
 ---
@@ -976,7 +1064,8 @@ THEN   剪贴板中包含 ezagent://relay.test/r/{R-alpha-id}/m/{ref_id}
 | Widget SDK | TC-5-WIDGET-001~008 | 8 |
 | 信息架构 | TC-5-UI-001~009 | 9 |
 | 用户旅程 | TC-5-JOURNEY-001~004 | 4 |
+| GitHub Device Flow 认证 | TC-5-AUTH-001~005 | 5 |
 | Desktop 打包 | TC-5-PKG-001~006 | 6 |
 | CRDT 实时同步 UI | TC-5-SYNC-001~005 | 5 |
 | URI Deep Link & 渲染 | TC-5-URI-001~003 | 3 |
-| **合计** | | **72** |
+| **合计** | | **77** |

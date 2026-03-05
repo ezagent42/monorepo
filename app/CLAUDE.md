@@ -14,14 +14,29 @@ EZAgent 桌面客户端应用，提供聊天 UI 和协作空间交互。License:
 - **React** — UI 框架
 - 桌面打包方案参考 Phase 5 计划
 
+## 构建（Makefile）
+
+**所有构建/打包操作必须通过 `app/Makefile`**（PreToolUse hook 强制执行）：
+
+```bash
+cd app/
+make package      # 构建 .app（Next.js + Electron TS + electron-builder）
+make dmg          # 构建 DMG 安装包
+make install      # 打包并安装到 /Applications
+make test         # 单元测试
+make test-e2e     # E2E 测试
+make clean        # 清理构建产物
+```
+
+禁止直接调用 `electron-builder` 或 `pnpm run package`/`build:electron`。
+
 ## 开发指南
 
 ### 包管理
 
 - 使用 `pnpm`（禁止 `npm` / `npx`）
-- 安装依赖：`pnpm install`
+- 安装依赖：`pnpm install` 或 `make deps`
 - 开发服务器：`pnpm run dev`
-- 构建：`pnpm run build`
 
 ### UI 规范
 

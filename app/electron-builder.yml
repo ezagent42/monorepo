@@ -1,0 +1,70 @@
+# electron-builder configuration for EZAgent desktop app
+# https://www.electron.build/configuration
+
+appId: dev.ezagent.app
+productName: EZAgent
+copyright: "Copyright © 2024-2026 EZAgent42"
+
+asar: true
+
+directories:
+  output: release
+
+files:
+  - out/**/*
+  - dist-electron/**/*
+  - package.json
+
+extraResources:
+  - from: assets/
+    to: assets/
+    filter:
+      - "**/*"
+  - from: runtime/
+    to: runtime/
+    filter:
+      - "**/*"
+
+protocols:
+  - name: EZAgent Protocol
+    schemes:
+      - ezagent
+
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  hardenedRuntime: true
+  gatekeeperAssess: false
+
+dmg:
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+
+linux:
+  target:
+    - target: AppImage
+      arch:
+        - x64
+  category: Network
