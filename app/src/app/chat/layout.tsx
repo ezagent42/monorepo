@@ -6,6 +6,8 @@ import { InfoPanel } from '@/components/info-panel/InfoPanel';
 import { useUiStore } from '@/stores/ui-store';
 import { useRoomStore } from '@/stores/room-store';
 import { listRooms } from '@/lib/api/rooms';
+import { registerWsHandlers } from '@/lib/ws/event-handlers';
+import { wsClient } from '@/lib/ws/client';
 
 export default function ChatLayout({ children }: { children: React.ReactNode }) {
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
@@ -15,6 +17,12 @@ export default function ChatLayout({ children }: { children: React.ReactNode }) 
   useEffect(() => {
     listRooms().then(setRooms).catch(() => {});
   }, [setRooms]);
+
+  useEffect(() => {
+    registerWsHandlers();
+    wsClient.connect();
+    return () => wsClient.disconnect();
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden">

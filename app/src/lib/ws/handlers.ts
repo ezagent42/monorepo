@@ -23,13 +23,14 @@ export function registerDefaultHandlers(client: WsClient): void {
     }
   });
 
-  client.on('message.edited', (_event: WsEvent) => {
-    // Edited messages could be handled by a full message replace
-    // For now, treat as annotation update if ref_id present
+  client.on('message.edited', (event: WsEvent) => {
+    if (!event.room_id || !event.ref_id) return;
+    useMessageStore.getState().updateMessage(event.room_id, event.ref_id, event.data as Partial<Message>);
   });
 
-  client.on('message.deleted', (_event: WsEvent) => {
-    // Message deletion - could be handled via annotation or store method
+  client.on('message.deleted', (event: WsEvent) => {
+    if (!event.room_id || !event.ref_id) return;
+    useMessageStore.getState().removeMessage(event.room_id, event.ref_id);
   });
 
   // -----------------------------------------------------------------------
@@ -43,6 +44,16 @@ export function registerDefaultHandlers(client: WsClient): void {
   client.on('room.config_updated', (event: WsEvent) => {
     if (!event.room_id) return;
     useRoomStore.getState().updateRoom(event.room_id, event.data as Partial<Room>);
+  });
+
+  client.on('room.member_joined', (event: WsEvent) => {
+    if (!event.room_id || !event.author) return;
+    usePresenceStore.getState().setOnline(event.room_id, event.author);
+  });
+
+  client.on('room.member_left', (event: WsEvent) => {
+    if (!event.room_id || !event.author) return;
+    usePresenceStore.getState().setOffline(event.room_id, event.author);
   });
 
   // -----------------------------------------------------------------------
