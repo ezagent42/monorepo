@@ -1,5 +1,5 @@
 export type { Identity, AuthSession } from './identity';
-export type { Room, RoomMember } from './room';
+export type { Room, RoomMember, MembershipPolicy, CreateRoomParams, UpdateRoomParams } from './room';
 export type { Message, SchemaField, FlowAction } from './message';
 export type {
   RendererConfig, RendererType, FieldMapping, MetadataField, BadgeConfig,
@@ -7,3 +7,6 @@ export type {
   WidgetRegistration, WidgetProps,
 } from './renderer';
 export type { WsEvent, WsEventType } from './events';
+export type { InviteCode, JoinByInviteResult } from './invite';
+export type { SocialwareApp } from './socialware';
+export type { UserProfile, UpdateProfileParams } from './profile';
