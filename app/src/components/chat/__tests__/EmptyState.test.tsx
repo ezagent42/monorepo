@@ -102,7 +102,8 @@ describe('CreateRoomDialog (TC-5-JOURNEY-002)', () => {
     await waitFor(() => {
       expect(createRoom).toHaveBeenCalledWith({
         name: 'My New Room',
-        description: '',
+        description: undefined,
+        membership_policy: 'invite',
       });
     });
 
