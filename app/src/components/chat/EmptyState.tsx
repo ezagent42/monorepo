@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CreateRoomDialog } from './CreateRoomDialog';
 import { JoinByCodeDialog } from '@/components/invite/JoinByCodeDialog';
+import { OnboardingHints } from './OnboardingHints';
 
 export function EmptyState() {
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -34,6 +35,7 @@ export function EmptyState() {
 
       <CreateRoomDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       <JoinByCodeDialog open={joinOpen} onOpenChange={setJoinOpen} />
+      <OnboardingHints />
     </div>
   );
 }

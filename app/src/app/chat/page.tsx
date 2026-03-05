@@ -6,16 +6,18 @@ import { useMessageStore } from '@/stores/message-store';
 import { Timeline } from '@/components/chat/Timeline';
 import { RoomHeader } from '@/components/chat/RoomHeader';
 import { ComposeArea } from '@/components/chat/ComposeArea';
+import { RoomEmptyState } from '@/components/chat/RoomEmptyState';
 import { listMessages } from '@/lib/api/messages';
 
 export default function ChatPage() {
   const activeRoomId = useRoomStore((s) => s.activeRoomId);
+  const messages = useMessageStore((s) => activeRoomId ? s.messagesByRoom[activeRoomId] : undefined);
   const setMessages = useMessageStore((s) => s.setMessages);
 
   useEffect(() => {
     if (activeRoomId) {
-      listMessages(activeRoomId, { limit: 50 }).then((messages) => {
-        setMessages(activeRoomId, messages);
+      listMessages(activeRoomId, { limit: 50 }).then((msgs) => {
+        setMessages(activeRoomId, msgs);
       }).catch(() => {
         // Handle error silently for now
       });
@@ -30,10 +32,16 @@ export default function ChatPage() {
     );
   }
 
+  const hasMessages = messages && messages.length > 0;
+
   return (
     <>
       <RoomHeader />
-      <Timeline roomId={activeRoomId} />
+      {hasMessages ? (
+        <Timeline roomId={activeRoomId} />
+      ) : (
+        <RoomEmptyState roomId={activeRoomId} />
+      )}
       <ComposeArea roomId={activeRoomId} />
     </>
   );
