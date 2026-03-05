@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getRoomMembers } from '@/lib/api/rooms';
+import { InviteCodeSection } from '@/components/invite/InviteCodeSection';
 import type { RoomMember } from '@/types';
 
 interface MembersTabProps {
@@ -29,7 +30,7 @@ export function MembersTab({ roomId }: MembersTabProps) {
           <span className="text-xs text-muted-foreground">{m.roles.join(', ')}</span>
         </div>
       ))}
-      {/* Invite Code section will be wired in Task 6 */}
+      <InviteCodeSection roomId={roomId} />
     </div>
   );
 }

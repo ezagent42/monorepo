@@ -3,9 +3,11 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { CreateRoomDialog } from './CreateRoomDialog';
+import { JoinByCodeDialog } from '@/components/invite/JoinByCodeDialog';
 
 export function EmptyState() {
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [joinOpen, setJoinOpen] = useState(false);
 
   return (
     <div
@@ -25,12 +27,13 @@ export function EmptyState() {
         <Button onClick={() => setDialogOpen(true)}>
           Create a room
         </Button>
-        <Button variant="outline">
+        <Button variant="outline" onClick={() => setJoinOpen(true)}>
           Enter invite code
         </Button>
       </div>
 
       <CreateRoomDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <JoinByCodeDialog open={joinOpen} onOpenChange={setJoinOpen} />
     </div>
   );
 }
