@@ -9,6 +9,7 @@ interface RoomState {
   addRoom: (room: Room) => void;
   setActiveRoom: (roomId: string) => void;
   updateRoom: (roomId: string, updates: Partial<Room>) => void;
+  removeRoom: (roomId: string) => void;
   incrementUnread: (roomId: string) => void;
   clearUnread: (roomId: string) => void;
 }
@@ -25,6 +26,11 @@ export const useRoomStore = create<RoomState>()((set) => ({
       rooms: state.rooms.map((r) =>
         r.room_id === roomId ? { ...r, ...updates } : r
       ),
+    })),
+  removeRoom: (roomId) =>
+    set((state) => ({
+      rooms: state.rooms.filter((r) => r.room_id !== roomId),
+      activeRoomId: state.activeRoomId === roomId ? null : state.activeRoomId,
     })),
   incrementUnread: (roomId) =>
     set((state) => ({
