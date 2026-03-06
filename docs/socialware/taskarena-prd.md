@@ -64,11 +64,11 @@ TaskArena 的核心理念是：**任务是一种结构化的承诺关系**。Pub
 
 2. **发现**：Worker 浏览 `ta:task_marketplace` Arena（通过 `ta:open_tasks` Index），按技能过滤找到此任务
 
-3. **认领**：Worker（Human Translator）写入 `ta:claimed` Annotation → ta:task_lifecycle: open → claimed
+3. **认领**：Worker（Human Translator）发送 `ta:task.claim` Message → ta:task_lifecycle: open → claimed
 
 4. **执行**：Worker 在 `ta:task_workshop` Arena 中工作，上传翻译稿
 
-5. **提交**：Worker 发送 ta:task.submit Message，附带交付物引用 → ta:task_lifecycle: in_progress → submitted
+5. **提交**：Worker 发送 ta:task.submit Message，附带交付物引用 → ta:task_lifecycle: claimed → submitted
 
 6. **评审**：`ta:assign_reviewers` Hook 自动选择 2 名 Reviewer：
    - Reviewer A（日语母语 Agent，擅长文法检查）
@@ -105,7 +105,7 @@ TaskArena 的核心理念是：**任务是一种结构化的承诺关系**。Pub
    - 发现 Agent 遗漏了一个潜在的 race condition
    - verdict: revision_requested, feedback="请补充对 concurrent access pattern 的分析"
 
-5. Agent 收到反馈 → ta:task_lifecycle 回退到 in_progress → 补充分析后重新提交
+5. Agent 收到反馈 → ta:task_lifecycle 回退到 claimed → 补充分析后重新提交
 
 6. Human Tech Lead 再次审查 → approved
 
@@ -170,7 +170,7 @@ TaskArena 的核心理念是：**任务是一种结构化的承诺关系**。Pub
 
 1. Reviewer 发出 verdict: rejected, score=0.3, feedback="大量误译，质量不合格"
 
-2. Worker 不同意，写入 `ta:disputed` Annotation：
+2. Worker 不同意，发送 `ta:dispute.open` Message：
    - reason: "Reviewer 的评判标准与 task_spec 不一致，task_spec 要求'意译为主'，但 Reviewer 按直译标准打分"
    - 附带具体段落的对比证据
 
@@ -272,25 +272,48 @@ required_capability: "task.propose"
 flow_subject: true
 reply_to_type: null                  # 不需要 reply_to（这是新 Flow 的起点）
 body_schema:
-  title:          string
-  description:    any                  # 富文本，JSON-compatible
-  task_type:      string               # "bounty", "assigned", "competitive", "collaborative"
+  title:          string               # 最大 200 字符
+  description:    string               # Markdown 格式，最大 10000 字符
+  task_type:      string               # "bounty" | "assigned" | "competitive" | "collaborative"
   requirements:
     skills:       [string]
-    resource_needs: [ResourceNeedTemplate] | null
+    resource_needs: [ResourceNeed] | null  # 所需资源（通过 ResPool 获取）
     deadline:     RFC 3339 | null
     min_reviewers: number
     max_submissions: number | null
     max_workers:  number | null
   rewards:
-    type:         string               # "token", "reputation", "resource_credit", "custom"
+    type:         string               # "token" | "reputation" | "resource_credit" | "custom"
     amount:       number
     currency:     string
-    distribution: string               # "winner_takes_all", "proportional", "equal"
+    distribution: string               # "winner_takes_all" | "proportional" | "equal"
   review_config:
     auto_approve_threshold: number | null
-    consensus_rule:  string            # "unanimous", "majority", "weighted_average"
-  attachments:    [ContentRef]
+    consensus_rule:  string            # "unanimous" | "majority" | "weighted_average"
+    reviewer_selection:                # Reviewer 选择配置
+      mode:         string             # "manual" | "auto"（默认 "auto"）
+      preferred_reviewers: [ref_id] | null  # mode=manual 时，Publisher 指定的 Reviewer Entity ID 列表
+      criteria:                        # 筛选条件（manual 时用于缩小候选列表，auto 时用于匹配）
+        reviewer_type: string | null   # "human" | "agent" | "any"（默认 "any"）
+        min_confidence: number | null  # 最低置信度评分（0.0-1.0），来自历史评审表现
+        review_style:  string | null   # "functional" | "metrics" | "comprehensive" | null
+        required_skills: [string] | null  # Reviewer 需具备的领域技能
+  attachments:    [ref_id]             # 附件的 Content Object ref_id 列表
+```
+
+**引用类型说明**：
+
+- `ref_id`：ezagent 协议中 Message 或 Content Object 的唯一标识符（string）。
+  用于 `reply_to`、`attachments`、`evidence_refs` 等跨 Message 引用。
+  详见 `specs/architecture.md` §Identity 模型。
+- `ResourceNeed`：向 ResPool 申请资源的模板，schema 如下：
+
+```yaml
+ResourceNeed:
+  resource_type:  string               # ResPool 中的资源类型 ID
+  amount:         number
+  unit:           string               # "hours" | "tokens" | "credits"
+  description:    string | null
 ```
 
 #### ta:task.claim — 认领任务
@@ -312,7 +335,7 @@ required_capability: "task.submit"
 flow_trigger: "claimed → submitted"
 reply_to_type: "ta:task.propose"
 body_schema:
-  artifacts:      [ContentRef]
+  artifacts:      [ref_id]
   notes:          string | null
   revision_of:    ref_id | null        # 如果是修改稿，指向前一个 submit Message
 ```
@@ -326,6 +349,47 @@ flow_trigger: "open → cancelled"
 reply_to_type: "ta:task.propose"
 body_schema:
   reason:         string
+```
+
+#### ta:task.amend — 修改任务要求
+
+```yaml
+type: "ta:task.amend"
+description: "Publisher 修改已发布的任务要求。
+              open 状态下直接生效；claimed 状态下需 Worker 确认
+              （Worker 在 24h 内未回复视为默认接受）"
+required_capability: "task.amend"
+reply_to_type: "ta:task.propose"
+body_schema:
+  amended_fields:                      # 只包含需要修改的字段，null 表示不变
+    title:          string | null
+    description:    string | null
+    requirements:   object | null      # 与 ta:task.propose.requirements 相同结构
+    rewards:        object | null      # 与 ta:task.propose.rewards 相同结构
+  reason:           string             # 修改原因（Worker 据此判断是否接受）
+  worker_consent:   string             # "not_required"（open 状态）| "pending"（claimed 状态）
+```
+
+#### ta:task.amend.accept — Worker 接受修改
+
+```yaml
+type: "ta:task.amend.accept"
+description: "Worker 接受 Publisher 的任务修改"
+required_capability: "task.claim"       # Worker 能力
+reply_to_type: "ta:task.amend"
+body_schema: {}
+```
+
+#### ta:task.amend.reject — Worker 拒绝修改
+
+```yaml
+type: "ta:task.amend.reject"
+description: "Worker 拒绝 Publisher 的任务修改。
+              拒绝后任务回到修改前的要求，Worker 可选择继续或放弃"
+required_capability: "task.claim"
+reply_to_type: "ta:task.amend"
+body_schema:
+  reason:           string | null
 ```
 
 #### ta:verdict.approve — 审批通过
@@ -375,7 +439,7 @@ flow_trigger: "rejected → disputed"
 reply_to_type: "ta:task.propose"
 body_schema:
   reason:         string
-  evidence_refs:  [ContentRef]
+  evidence_refs:  [ref_id]
 ```
 
 #### ta:dispute.resolve — 解决争议
@@ -405,6 +469,34 @@ required_capability: "role.manage"
 body_schema:
   entity:         Entity ID
   role:           string
+```
+
+#### ta:_system.reviewer_assigned — 系统分配 Reviewer
+
+```yaml
+type: "ta:_system.reviewer_assigned"
+description: "系统自动生成的 Message，通知 Reviewer 被分配到某个 submission 的评审任务"
+required_capability: null              # 系统发送，无需 capability
+reply_to_type: "ta:task.submit"
+body_schema:
+  reviewer_id:    Entity ID            # 被分配的 Reviewer
+  task_ref:       ref_id               # 任务引用
+  submission_ref: ref_id               # 提交物引用
+  review_chamber_room_id: string       # 为该 Reviewer 创建的评审 Room ID
+```
+
+#### ta:_system.consensus_reached — 系统共识达成
+
+```yaml
+type: "ta:_system.consensus_reached"
+description: "系统自动生成的 Message，表示评审共识已达成"
+required_capability: null
+reply_to_type: "ta:task.submit"
+body_schema:
+  decision:       string               # "approved" | "rejected"
+  avg_score:      number               # 平均评分
+  reviewer_count: number               # 参与评审的 Reviewer 数量
+  consensus_rule: string               # 使用的共识规则
 ```
 
 ### 3.2 Hooks
@@ -442,13 +534,19 @@ body_schema:
 |------|---|
 | trigger.datatype | `timeline_index` |
 | trigger.event | `insert` |
-| trigger.filter | `content_type == 'ta:task.claim'` |
+| trigger.filter | `content_type in ['ta:task.claim', 'ta:verdict.approve', 'ta:verdict.reject', 'ta:verdict.request_revision']` |
 | priority | `102` |
 
+**当 content_type == `ta:task.claim` 时**：
 - [MUST] 对于 bounty 类型，验证没有其他 active claim（从 State Cache 读取）。
 - [MUST] 验证 claimer 满足 task 的 skills 要求。
 - [MUST] 对于 assigned 类型，验证 claimer ∈ task.assigned_to。
 - [MUST] 对于 collaborative 类型，验证当前 claimed 数 < max_workers。
+
+**当 content_type startswith `ta:verdict.` 时**：
+- [MUST] 验证 feedback 非空且 >= 10 字符（Commitment `ta:fair_review` 强制）。
+- [MUST] 验证 score 在 0.0-1.0 范围内。
+- [MUST] 验证 sender 是被分配到该 submission 的 Reviewer（从 State Cache 查询）。
 
 #### after_write: ta:advance_flow (priority 100)
 
@@ -462,6 +560,34 @@ body_schema:
 - [MUST] 更新 State Cache：flow_states、task_details、claims、submissions、verdicts。
 - [MUST] 处理自动转换链（如 submitted → in_review）。
 - [MUST] 处理 CRDT 合并冲突：非法 transition 的 Message 标记为 invalid_refs。
+- [MUST] 当 submitted → in_review 时，执行 Reviewer 分配：
+
+**Reviewer 分配算法**（submitted → in_review 自动转换时触发）：
+
+```
+1. 读取 task 的 review_config.reviewer_selection
+
+2. IF mode == "manual":
+     candidates = review_config.reviewer_selection.preferred_reviewers
+     验证每个 candidate 拥有 ta:reviewer Role
+     IF 有效 candidates 数量 < min_reviewers:
+       补充不足部分走 auto 流程（混合模式）
+
+3. IF mode == "auto"（或 manual 补充不足时）:
+     a. 从 State Cache 获取所有拥有 ta:reviewer Role 的 Identity
+     b. 按 criteria 过滤:
+        - reviewer_type: 过滤 human/agent（通过 Identity 元数据判断）
+        - min_confidence: 过滤历史评审置信度 < 阈值的 Reviewer
+        - review_style: 匹配 Reviewer Profile 的 review_styles 字段
+        - required_skills: 匹配 Reviewer Profile 的 skills 字段
+     c. 从过滤后的候选列表中随机选取 min_reviewers 名
+        - 排除与 Worker 为同一 Identity 的 Reviewer
+        - 排除与 Publisher 为同一 Identity 的 Reviewer
+
+4. 为每个选中的 Reviewer:
+     发送 ta:_system.reviewer_assigned Message
+     创建独立的 ta:review_chamber Room
+```
 
 #### after_write: ta:check_consensus (priority 101)
 
@@ -514,33 +640,126 @@ class TaskArenaState:
 
     # 信誉（可选，跨 Room 聚合）
     reputation: dict[str, dict]              # entity_id → reputation info
+
+    # Reviewer Profile（从 ta:role.grant + 历史 verdict 派生）
+    reviewer_profiles: dict[str, ReviewerProfile]  # entity_id → profile
+
+class ReviewerProfile:
+    entity_id:      str
+    entity_type:    str                      # "human" | "agent"
+    skills:         list[str]                # 领域技能
+    review_styles:  list[str]                # "functional" | "metrics" | "comprehensive"
+    confidence:     float                    # 历史评审置信度（verdict 与最终结果一致的比例）
+    total_reviews:  int                      # 累计评审数
+    avg_score_delta: float                   # 与最终共识分数的平均偏差（越小越稳定）
 ```
 
 ### 3.4 Indexes
 
 TaskArena 主要依赖 EXT-17 Runtime 的通用 `socialware_messages` Index。额外声明以下 Socialware-specific Index（由 Socialware Runtime 自己维护，不是 Bus Index）：
 
-```python
-# 这些是 Socialware HTTP API 端点，从 State Cache 查询
-@api("GET /ta/tasks")
-async def list_tasks(room_id, state=None, task_type=None):
-    """开放任务列表（对应旧 ta:open_tasks Index）"""
+#### GET /ta/tasks — 任务列表
 
-@api("GET /ta/tasks/{ref_id}")
-async def get_task(ref_id):
-    """任务详情（对应旧 ta:task_detail Index）"""
+```yaml
+request:
+  query_params:
+    room_id:    string               # [MUST] 所在 Room
+    state:      string | null        # 按 Flow 状态过滤（如 "open", "claimed"）
+    task_type:  string | null        # "bounty" | "assigned" | "competitive" | "collaborative"
+    offset:     number               # 分页偏移，默认 0
+    limit:      number               # 每页条数，默认 20，最大 100
+response:
+  200:
+    items:      [TaskSummary]
+    total:      number
+    offset:     number
+    limit:      number
+  TaskSummary:
+    ref_id:     string
+    title:      string
+    task_type:  string
+    state:      string               # 当前 Flow 状态
+    publisher_id: string
+    rewards:    { type, amount, currency }
+    deadline:   RFC 3339 | null
+    claim_count: number
+    created_at: RFC 3339
+```
 
-@api("GET /ta/my-tasks")
-async def my_tasks(entity_id, room_id=None):
-    """我的任务列表（对应旧 ta:my_tasks Index）"""
+#### GET /ta/tasks/{ref_id} — 任务详情
 
-@api("GET /ta/reviews/pending")
-async def pending_reviews(entity_id):
-    """待审队列（对应旧 ta:review_queue Index）"""
+```yaml
+request:
+  path_params:
+    ref_id:     string               # 任务的 ref_id
+response:
+  200:          TaskDetail
+  404:          { error: "task_not_found", message: string }
+  TaskDetail:
+    ref_id:     string
+    body:       object               # 完整的 ta:task.propose body
+    state:      string
+    publisher_id: string
+    claims:     [{ claimer_id, claimed_at }]
+    submissions: [{ ref_id, submitter_id, submitted_at }]
+    verdicts:   [{ ref_id, reviewer_id, decision, score }]
+    created_at: RFC 3339
+    updated_at: RFC 3339
+```
 
-@api("GET /ta/reputation")
-async def reputation_board(specialty=None):
-    """信誉排行（对应旧 ta:reputation_board Index）"""
+#### GET /ta/my-tasks — 我的任务
+
+```yaml
+request:
+  query_params:
+    entity_id:  string               # [MUST] 查询者的 Entity ID
+    role:       string | null        # "publisher" | "worker" | "reviewer"（过滤视角）
+    state:      string | null
+    offset:     number
+    limit:      number
+response:
+  200:
+    items:      [TaskSummary]        # 与 GET /ta/tasks 相同结构
+    total:      number
+```
+
+#### GET /ta/reviews/pending — 待审队列
+
+```yaml
+request:
+  query_params:
+    entity_id:  string               # [MUST] Reviewer 的 Entity ID
+response:
+  200:
+    items:      [PendingReview]
+  PendingReview:
+    submission_ref_id: string
+    task_ref_id:       string
+    task_title:        string
+    submitted_at:      RFC 3339
+    review_chamber_room_id: string
+    deadline:          RFC 3339 | null
+```
+
+#### GET /ta/reputation — 信誉排行
+
+```yaml
+request:
+  query_params:
+    specialty:  string | null        # 按技能领域过滤
+    offset:     number
+    limit:      number
+response:
+  200:
+    items:      [ReputationEntry]
+    total:      number
+  ReputationEntry:
+    entity_id:  string
+    entity_type: string              # "human" | "agent"
+    level:      string               # "newcomer" | "active" | "trusted" | "expert"
+    tasks_completed: number
+    avg_score:  number
+    skills:     [string]
 ```
 
 ---
@@ -554,8 +773,8 @@ roles:
   # ─── 施加于 Identity ───
   - id: ta:publisher
     assignable_to: [Identity]
-    capabilities: [task.propose, task.cancel, role.manage]
-    description: "任务发布者——可以发布、取消任务和管理角色"
+    capabilities: [task.propose, task.cancel, task.amend, role.manage]
+    description: "任务发布者——可以发布、取消、修改任务和管理角色"
 
   - id: ta:worker
     assignable_to: [Identity]
@@ -597,6 +816,7 @@ roles:
 ```
 ta:publisher  → task.propose      → ta:task.propose
               → task.cancel       → ta:task.cancel
+              → task.amend        → ta:task.amend
               → role.manage       → ta:role.grant, ta:role.revoke
 
 ta:worker     → task.claim        → ta:task.claim
@@ -630,28 +850,30 @@ arenas:
 
   # ─── 内部 ───
   - id: ta:task_workshop
-    over: [Room with role(ta:workshop), created per task on ta:task.claim]
+    over: [Room with role(ta:workshop)]
     boundary: internal
+    created_by: "ta:advance_flow Hook，当 open → claimed 时自动创建"
     entry_policy: >
-      role_required(ta:publisher who published this task
-                    | ta:worker who claimed this task)
+      sender == task.publisher_id OR sender == task.claimer_id
     purpose: "任务执行的工作空间。Publisher 和 Worker 可在此沟通"
 
   - id: ta:review_chamber
-    over: [Room created per (submission × reviewer) pair]
+    over: [Room, 每个 (submission × reviewer) pair 一个独立 Room]
     boundary: internal
+    created_by: "ta:advance_flow Hook，当 submitted → in_review 时为每个 Reviewer 创建"
     entry_policy: >
-      role_required(ta:reviewer assigned to this submission)
+      sender == assigned_reviewer_id
     purpose: "独立评审空间。每个 Reviewer 有独立的 Room，
               互不可见，防止评审偏见"
 
   - id: ta:dispute_tribunal
     over: [Room with role(ta:tribunal)]
     boundary: internal
+    created_by: "ta:advance_flow Hook，当 rejected → disputed 时自动创建"
     entry_policy: >
-      role_required(ta:arbitrator
-                    | ta:worker who is disputing party
-                    | ta:publisher of disputed task)
+      sender == task.arbitrator_id
+      OR sender == dispute.worker_id
+      OR sender == task.publisher_id
     purpose: "争议仲裁空间。双方和仲裁者可在此提交证据和陈述"
 
   # ─── 联邦 ───
@@ -721,8 +943,15 @@ commitments:
 
   - id: ta:verdict_finality
     between: [ta:verdict.* Message author (Reviewer), all parties]
-    obligation: "裁决结果为最终结果，除非在 72h 内发送 ta:dispute.open"
+    obligation: "裁决结果为最终结果，除非在争议窗口期内发送 ta:dispute.open"
     triggered_by: "共识达成（ta:_system.consensus_reached）"
+    timeout_mechanism: >
+      ta:check_commitments Hook 在收到 ta:_system.consensus_reached 后，
+      向 State Cache 写入 dispute_window_deadline = consensus_reached_at + dispute_window。
+      每次 ta:advance_flow Hook 触发时检查：
+        IF now > dispute_window_deadline AND flow_state == 'rejected':
+          自动转换 rejected → cancelled（不可再争议）
+      dispute_window 默认值在 sla-thresholds.toml 中配置。
 
   # ─── Socialware ↔ Socialware ───
   - id: ta:event_reporting
@@ -759,11 +988,31 @@ flows:
       (disputed, dispute.resolve):  completed | cancelled  # 取决于 decision 字段
       (claimed, _timeout):          open                # Worker 超时未提交
     preferences:
-      fast_iteration: preferred
-      multi_reviewer: preferred_when(rewards.amount > threshold)
-      auto_approve: allowed_when(reviewer_consensus == unanimous AND score > 0.9)
-      escalate_to_human: preferred_when(disputed AND agent_confidence < 0.7)
-      revision_over_rejection: preferred_when(score > 0.4 AND score < 0.6)
+      # 每个 preference 是一条行为策略，由 guard 条件控制是否激活
+      # guard 使用 State Cache 中可查询的字段，开发者可直接翻译为 if 语句
+      - id: fast_iteration
+        strategy: preferred                  # "required" | "preferred" | "allowed" | "forbidden"
+        description: "鼓励快速迭代，revision 优先于 rejection"
+
+      - id: multi_reviewer
+        strategy: preferred
+        guard: "task.rewards.amount >= 100"  # 奖励 >= 100 时启用多 Reviewer
+        description: "高价值任务使用更多 Reviewer"
+
+      - id: auto_approve
+        strategy: allowed
+        guard: "review_config.consensus_rule == 'unanimous' AND avg_score > 0.9"
+        description: "全票通过且高分时自动批准"
+
+      - id: escalate_to_human
+        strategy: preferred
+        guard: "flow_state == 'disputed' AND agent_confidence < 0.7"
+        description: "争议中 Agent 置信度不足时升级到 Human"
+
+      - id: revision_over_rejection
+        strategy: preferred
+        guard: "avg_score > 0.4 AND avg_score < 0.6"
+        description: "评分处于模糊区间时，request_revision 优于 reject"
 
   - id: ta:review_cycle
     subject_type: "ta:task.submit"      # Flow subject = submit Message
@@ -775,24 +1024,45 @@ flows:
       (in_review, verdict.reject):   scored
       (assigned, _timeout):          abstained
     preferences:
-      independent_review: required
-      reviewer_diversity: preferred (Human + Agent mix)
-      min_reviewers: 2
-      abstain_consequence: reputation_decrease_for_reviewer
+      - id: independent_review
+        strategy: required
+        description: "Reviewer 之间互不可见，独立评审"
+
+      - id: reviewer_diversity
+        strategy: preferred
+        description: "优先混合分配 Human 和 Agent Reviewer"
+
+      - id: min_reviewers
+        value: 2                             # 最少 Reviewer 数量（可被 task.review_config 覆盖）
+
+      - id: abstain_consequence
+        strategy: required
+        description: "Reviewer 超时未评审（abstained），信誉下降"
 
   - id: ta:reputation_evolution
     subject_type: "ta:role.grant WHERE role == ta:worker"  # worker 角色授予时创建
     states: [newcomer, active, trusted, expert, suspended]
     transitions:
-      (newcomer, _eval):  active     # completed 3+ tasks, avg_score > 0.6
-      (active, _eval):    trusted    # completed 10+ tasks, avg_score > 0.8
-      (trusted, _eval):   expert     # completed 30+ tasks, avg_score > 0.9
-      (any, _violation):  suspended  # 3+ rejected in window OR 2+ disputes lost
-      (suspended, _appeal): active   # 30d cooling + appeal approved
+      # _eval 触发时机：ta:check_commitments Hook 在 Flow state → completed 时触发评估
+      # _violation 触发时机：ta:check_commitments Hook 在 Flow state → rejected 时检查连续 reject 计数
+      (newcomer, _eval):  active     # guard: tasks_completed >= 3 AND avg_score > 0.6
+      (active, _eval):    trusted    # guard: tasks_completed >= 10 AND avg_score > 0.8
+      (trusted, _eval):   expert     # guard: tasks_completed >= 30 AND avg_score > 0.9
+      (any, _violation):  suspended  # guard: rejected_count_in_window >= 3 OR disputes_lost >= 2
+      (suspended, _appeal): active   # guard: days_since_suspended >= 30 AND appeal_approved == true
     preferences:
-      slow_promotion: preferred
-      fast_demotion: preferred
-      rehabilitation: allowed_after(30d cooling_period)
+      - id: slow_promotion
+        strategy: preferred
+        description: "升级门槛高，需多次任务积累"
+
+      - id: fast_demotion
+        strategy: preferred
+        description: "降级门槛低，连续失败快速 suspend"
+
+      - id: rehabilitation
+        strategy: allowed
+        guard: "days_since_suspended >= 30"
+        description: "30 天冷却期后可申诉恢复到 active"
 ```
 
 ---
@@ -858,7 +1128,7 @@ THEN   Flow state 直接设为 "claimed"（跳过 open）
 #### TC-TA-010: 提交成果并触发评审分配
 
 ```
-GIVEN  Task T-001 状态为 in_progress
+GIVEN  Task T-001 状态为 claimed
        E-worker 在 workshop 中准备好了翻译稿
 
 WHEN   E-worker 发送 ta:task.submit Message:
@@ -868,7 +1138,7 @@ THEN   ta:advance_flow Hook (auto-assign) 触发
        选择 2 名 Reviewer（假设 E-reviewer-A, E-reviewer-B）
        系统发送 ta:_system.reviewer_assigned Message
        为每个 Reviewer 创建独立的 review_chamber Room
-       ta:task_lifecycle: submitted → under_review
+       ta:task_lifecycle: submitted → in_review
 ```
 
 #### TC-TA-011: Reviewer 评审通过
@@ -886,7 +1156,7 @@ THEN   ta:check_consensus Hook: 2/2 approved, unanimous → 共识达成
        Flow state → "approved"
        ta:check_commitments Hook 触发 → 向 ResPool 请求发放 200 USDT
        State Cache reputation 更新: avg_score = (0.85 + 0.90) / 2 = 0.875
-       ta:task_lifecycle: under_review → approved → completed
+       ta:task_lifecycle: in_review → approved → completed
 ```
 
 #### TC-TA-012: 评审意见不一致需额外 Reviewer
@@ -921,7 +1191,7 @@ THEN   ta:check_business_rules pre_send Hook 拒绝写入
 GIVEN  Task T-001 状态为 "rejected"
        verdict.decision = "rejected", feedback = "大量误译"
 
-WHEN   E-worker 写入 ta:disputed Annotation:
+WHEN   E-worker 发送 ta:dispute.open Message:
        { reason: "评审标准与 task_spec 不一致", evidence_refs: [...] }
 
 THEN   ta:advance_flow Hook (dispute) 触发
@@ -1132,12 +1402,10 @@ views:
 flow_renderers:
   - flow: ta:task_lifecycle
     badge:
-      draft: { color: "gray", label: "Draft" }
       open: { color: "blue", label: "Open" }
       claimed: { color: "yellow", label: "Claimed" }
-      in_progress: { color: "orange", label: "In Progress" }
       submitted: { color: "purple", label: "Submitted" }
-      under_review: { color: "indigo", label: "Under Review" }
+      in_review: { color: "indigo", label: "In Review" }
       approved: { color: "green", label: "Approved" }
       rejected: { color: "red", label: "Rejected" }
       disputed: { color: "crimson", label: "Disputed" }
@@ -1151,7 +1419,7 @@ flow_renderers:
         visible_to: "role:ta:worker"
         confirm: false
 
-      - transition: "in_progress → submitted"
+      - transition: "claimed → submitted"
         label: "Submit Work"
         icon: "upload"
         style: primary
@@ -1159,14 +1427,14 @@ flow_renderers:
         confirm: true
         confirm_message: "确认提交？提交后不可修改。"
 
-      - transition: "under_review → approved"
+      - transition: "in_review → approved"
         label: "Approve"
         icon: "check"
         style: primary
         visible_to: "role:ta:reviewer"
         confirm: true
 
-      - transition: "under_review → rejected"
+      - transition: "in_review → rejected"
         label: "Reject"
         icon: "x"
         style: danger
@@ -1183,9 +1451,11 @@ flow_renderers:
 
   - flow: ta:review_cycle
     badge:
-      pending: { color: "yellow", label: "Pending Review" }
-      reviewed: { color: "blue", label: "Reviewed" }
-      consensus: { color: "green", label: "Consensus" }
+      pending_review: { color: "yellow", label: "Pending Review" }
+      assigned: { color: "blue", label: "Assigned" }
+      in_review: { color: "indigo", label: "In Review" }
+      scored: { color: "green", label: "Scored" }
+      abstained: { color: "gray", label: "Abstained" }
     actions: []   # review cycle 主要由 Agent 驱动
 
   - flow: ta:reputation_evolution
@@ -1224,6 +1494,52 @@ ezagent/socialware/task-arena/
     └── sla-thresholds.toml           # SLA 阈值配置
 ```
 
+#### config/reward-policies.toml
+
+```toml
+# 奖励结算策略配置
+
+[settlement]
+auto_settle_on_approve = true         # approved 后自动向 ResPool 发起结算
+settlement_timeout_hours = 48         # 结算超时时间
+
+[distribution]
+# winner_takes_all: 最高分获全部奖励
+# proportional: 按评分比例分配
+# equal: 均分
+default_distribution = "winner_takes_all"
+
+[penalty]
+cancellation_fee_percent = 0          # Publisher 取消已 claimed 任务时的罚金比例（0-100）
+late_submission_penalty_percent = 10  # Worker 超期提交时的扣减比例
+```
+
+#### config/sla-thresholds.toml
+
+```toml
+# SLA 阈值配置——控制各种超时和窗口期
+
+[timeouts]
+claim_timeout_hours = 168             # Worker 认领后最大执行时间（默认 7 天），超时回到 open
+review_timeout_hours = 72             # Reviewer 分配后最大评审时间，超时标记 abstained
+amend_consent_timeout_hours = 24      # Worker 对 ta:task.amend 的响应窗口，超时视为接受
+
+[windows]
+dispute_window_hours = 72             # 共识达成后的争议窗口期
+appeal_cooldown_days = 30             # suspended 后的冷却期（天）
+
+[reputation]
+# 信誉升级阈值（与 Flow ta:reputation_evolution 的 guard 对应）
+newcomer_to_active_tasks = 3
+newcomer_to_active_min_score = 0.6
+active_to_trusted_tasks = 10
+active_to_trusted_min_score = 0.8
+trusted_to_expert_tasks = 30
+trusted_to_expert_min_score = 0.9
+violation_reject_count = 3            # 连续 reject 多少次触发 suspended
+violation_dispute_lost_count = 2      # 输掉多少次争议触发 suspended
+```
+
 ### 9.2 manifest.toml
 
 ```toml
@@ -1235,10 +1551,12 @@ version = "0.9.5"
 
 [declaration]
 content_types = ["ta:task.propose", "ta:task.claim", "ta:task.submit", "ta:task.cancel",
+                 "ta:task.amend", "ta:task.amend.accept", "ta:task.amend.reject",
                  "ta:verdict.approve", "ta:verdict.reject", "ta:verdict.request_revision",
                  "ta:dispute.open", "ta:dispute.resolve",
-                 "ta:role.grant", "ta:role.revoke"]
-roles = ["ta:publisher", "ta:worker", "ta:reviewer", "ta:arbiter"]
+                 "ta:role.grant", "ta:role.revoke",
+                 "ta:_system.reviewer_assigned", "ta:_system.consensus_reached"]
+roles = ["ta:publisher", "ta:worker", "ta:reviewer", "ta:arbitrator"]
 flows = ["task_lifecycle", "review_cycle", "reputation_evolution"]
 
 [commands]
@@ -1247,7 +1565,7 @@ claim = { params = ["task_id"], role = "ta:worker" }
 submit = { params = ["task_id"], role = "ta:worker" }
 review = { params = ["submission_id", "verdict"], role = "ta:reviewer" }
 dispute = { params = ["task_id", "reason"], role = "ta:worker" }
-arbitrate = { params = ["dispute_id", "ruling"], role = "ta:arbiter" }
+arbitrate = { params = ["dispute_id", "ruling"], role = "ta:arbitrator" }
 cancel = { params = ["task_id"], role = "ta:publisher" }
 
 [dependencies]
@@ -1268,7 +1586,7 @@ TaskArena 注册以下命令（命名空间 `ta`）：
 | `/ta:submit` | `--task-id` | `ta:worker` | 提交任务成果 |
 | `/ta:review` | `--submission-id`, `--verdict` (approve/reject) | `ta:reviewer` | 审查提交 |
 | `/ta:dispute` | `--task-id`, `--reason` | `ta:worker` | 发起争议 |
-| `/ta:arbitrate` | `--dispute-id`, `--ruling` | `ta:arbiter` | 仲裁争议 |
+| `/ta:arbitrate` | `--dispute-id`, `--ruling` | `ta:arbitrator` | 仲裁争议 |
 | `/ta:cancel` | `--task-id` | `ta:publisher` | 取消任务 |
 
 命令处理示例（v0.9.5 推荐方式）：
@@ -1283,7 +1601,7 @@ class TaskArena:
         "ta:publisher": Role(capabilities=capabilities("task.propose", "task.cancel")),
         "ta:worker":    Role(capabilities=capabilities("task.claim", "task.submit")),
         "ta:reviewer":  Role(capabilities=capabilities("verdict.approve", "verdict.reject")),
-        "ta:arbiter":   Role(capabilities=capabilities("dispute.resolve")),
+        "ta:arbitrator":   Role(capabilities=capabilities("dispute.resolve")),
     }
     task_lifecycle = Flow(
         subject="task.propose",
